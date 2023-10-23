@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="onec\components\aabb.hpp" />
+    <ClInclude Include="onec\components\camera.hpp" />
+    <ClInclude Include="onec\components\hierarchy.hpp" />
+    <ClInclude Include="onec\components\layer.hpp" />
+    <ClInclude Include="onec\components\light.hpp" />
+    <ClInclude Include="onec\components\meta.hpp" />
+    <ClInclude Include="onec\components\render_mesh.hpp" />
+    <ClInclude Include="onec\components\trackball.hpp" />
+    <ClInclude Include="onec\components\transform.hpp" />
+    <ClInclude Include="onec\config\config.hpp" />
+    <ClInclude Include="onec\config\cu.hpp" />
+    <ClInclude Include="onec\config\gl.hpp" />
+    <ClInclude Include="onec\config\glfw.hpp" />
+    <ClInclude Include="onec\core\application.hpp" />
+    <ClInclude Include="onec\core\input.hpp" />
+    <ClInclude Include="onec\core\scene.hpp" />
+    <ClInclude Include="onec\core\window.hpp" />
+    <ClInclude Include="onec\cu\array.hpp" />
+    <ClInclude Include="onec\cu\buffer.hpp" />
+    <ClInclude Include="onec\cu\format.hpp" />
+    <ClInclude Include="onec\cu\stopwatch.hpp" />
+    <ClInclude Include="onec\cu\surface.hpp" />
+    <ClInclude Include="onec\cu\texture.hpp" />
+    <ClInclude Include="onec\device\light.hpp" />
+    <ClInclude Include="onec\device\lighting.hpp" />
+    <ClInclude Include="onec\device\mesh_renderer.hpp" />
+    <ClInclude Include="onec\device\phong_brdf.hpp" />
+    <ClInclude Include="onec\device\renderer.hpp" />
+    <ClInclude Include="onec\graphics\bind_group.hpp" />
+    <ClInclude Include="onec\graphics\buffer.hpp" />
+    <ClInclude Include="onec\graphics\framebuffer.hpp" />
+    <ClInclude Include="onec\graphics\material.hpp" />
+    <ClInclude Include="onec\graphics\mesh.hpp" />
+    <ClInclude Include="onec\graphics\phong_brdf.hpp" />
+    <ClInclude Include="onec\graphics\program.hpp" />
+    <ClInclude Include="onec\graphics\renderbuffer.hpp" />
+    <ClInclude Include="onec\graphics\render_state.hpp" />
+    <ClInclude Include="onec\graphics\sampler.hpp" />
+    <ClInclude Include="onec\graphics\shader.hpp" />
+    <ClInclude Include="onec\graphics\texture.hpp" />
+    <ClInclude Include="onec\graphics\vertex_array.hpp" />
+    <ClInclude Include="onec\math\color.hpp" />
+    <ClInclude Include="onec\math\common.hpp" />
+    <ClInclude Include="onec\onec.hpp" />
+    <ClInclude Include="onec\singletons\camera.hpp" />
+    <ClInclude Include="onec\singletons\gravity.hpp" />
+    <ClInclude Include="onec\singletons\lighting.hpp" />
+    <ClInclude Include="onec\singletons\mesh_renderer.hpp" />
+    <ClInclude Include="onec\singletons\renderer.hpp" />
+    <ClInclude Include="onec\singletons\screenshot.hpp" />
+    <ClInclude Include="onec\singletons\viewport.hpp" />
+    <ClInclude Include="onec\systems\camera_system.hpp" />
+    <ClInclude Include="onec\systems\hierarchy_system.hpp" />
+    <ClInclude Include="onec\systems\lighting_system.hpp" />
+    <ClInclude Include="onec\systems\mesh_render_system.hpp" />
+    <ClInclude Include="onec\systems\render_system.hpp" />
+    <ClInclude Include="onec\systems\screenshot_system.hpp" />
+    <ClInclude Include="onec\systems\title_bar_system.hpp" />
+    <ClInclude Include="onec\systems\trackball_system.hpp" />
+    <ClInclude Include="onec\systems\transform_system.hpp" />
+    <ClInclude Include="onec\systems\viewport_system.hpp" />
+    <ClInclude Include="onec\utility\io.hpp" />
+    <ClInclude Include="onec\utility\span.hpp" />
+    <ClInclude Include="onec\utility\stopwatch.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="onec\config\cu.cpp" />
+    <ClCompile Include="onec\config\gl.cpp" />
+    <ClCompile Include="onec\config\glfw.cpp" />
+    <ClCompile Include="onec\core\application.cpp" />
+    <ClCompile Include="onec\core\input.cpp" />
+    <ClCompile Include="onec\core\scene.cpp" />
+    <ClCompile Include="onec\core\window.cpp" />
+    <ClCompile Include="onec\cu\array.cpp" />
+    <ClCompile Include="onec\cu\buffer.cpp" />
+    <ClCompile Include="onec\cu\surface.cpp" />
+    <ClCompile Include="onec\cu\texture.cpp" />
+    <ClCompile Include="onec\graphics\bind_group.cpp" />
+    <ClCompile Include="onec\graphics\buffer.cpp" />
+    <ClCompile Include="onec\graphics\framebuffer.cpp" />
+    <ClCompile Include="onec\graphics\mesh.cpp" />
+    <ClCompile Include="onec\graphics\program.cpp" />
+    <ClCompile Include="onec\graphics\renderbuffer.cpp" />
+    <ClCompile Include="onec\graphics\render_state.cpp" />
+    <ClCompile Include="onec\graphics\sampler.cpp" />
+    <ClCompile Include="onec\graphics\shader.cpp" />
+    <ClCompile Include="onec\graphics\texture.cpp" />
+    <ClCompile Include="onec\graphics\vertex_array.cpp" />
+    <ClCompile Include="onec\systems\camera_system.cpp" />
+    <ClCompile Include="onec\systems\hierarchy_system.cpp" />
+    <ClCompile Include="onec\systems\lighting_system.cpp" />
+    <ClCompile Include="onec\systems\mesh_render_system.cpp" />
+    <ClCompile Include="onec\systems\render_system.cpp" />
+    <ClCompile Include="onec\systems\screenshot_system.cpp" />
+    <ClCompile Include="onec\systems\title_bar_system.cpp" />
+    <ClCompile Include="onec\systems\trackball_system.cpp" />
+    <ClCompile Include="onec\systems\transform_system.cpp" />
+    <ClCompile Include="onec\systems\viewport_system.cpp" />
+    <ClCompile Include="onec\utility\io.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="onec\core\scene.inl" />
+    <None Include="onec\cu\format.inl" />
+    <None Include="onec\cu\stopwatch.inl" />
+    <None Include="onec\graphics\texture.inl" />
+    <None Include="onec\math\color.inl" />
+    <None Include="onec\math\common.inl" />
+    <None Include="onec\systems\camera_system.inl" />
+    <None Include="onec\systems\lighting_system.inl" />
+    <None Include="onec\systems\mesh_render_system.inl" />
+    <None Include="onec\systems\transform_system.inl" />
+    <None Include="onec\utility\span.inl" />
+    <None Include="onec\utility\stopwatch.inl" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{73B26006-DF5B-46FD-8682-B8FFB74F460A}</ProjectGuid>
+    <RootNamespace>onec</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.3.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ObjectFileName>$(IntDir)%(RelativeDir)/</ObjectFileName>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ObjectFileName>$(IntDir)%(RelativeDir)/</ObjectFileName>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.3.targets" />
+  </ImportGroup>
+</Project>
