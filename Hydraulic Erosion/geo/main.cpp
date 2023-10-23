@@ -20,23 +20,14 @@ void start()
 	scene.addComponent<onec::WorldToView>(camera);
 	scene.addComponent<onec::ViewToClip>(camera);
 
-	scene.addSingleton<onec::ActiveCamera>(camera);
-
 	const entt::entity directionalLight{ scene.addEntity() };
 	scene.addComponent<onec::DirectionalLight>(directionalLight);
 	scene.addComponent<onec::Rotation>(directionalLight, glm::quat{ glm::radians(glm::vec3{ -50.0f, 30.0f, 0.0f }) });
 	scene.addComponent<onec::LocalToWorld>(directionalLight);
 	scene.addComponent<onec::Static>(directionalLight);
-}
 
-int main()
-{
-	onec::Application& application{ onec::createApplication(APPLICATION_NAME, WINDOW_SIZE, MSAA) };
-	application.setVSyncCount(VSYNC_COUNT);
-	application.setTargetFrameRate(TARGET_FRAME_RATE);
-	
-	onec::Scene& scene{ onec::getScene() };
-
+	scene.addSingleton<onec::ActiveCamera>(camera);
+	scene.addSingleton<onec::Gravity>();
 	scene.addSingleton<onec::Viewport>();
 	scene.addSingleton<onec::Renderer>();
 	scene.addSingleton<onec::MeshRenderer>();
@@ -45,31 +36,63 @@ int main()
 	scene.addSingleton<geo::TerrainRenderer>();
 	scene.addSingleton<geo::GUI>();
 
+	onec::RenderSystem::start();
+	onec::MeshRenderSystem::start();
+	onec::LightingSystem::start();
+	geo::TerrainRenderSystem::start();
+	geo::GUISystem::start();
+
+	onec::ViewportSystem::update();
+	onec::HierarchySystem::update();
+	onec::TrackballSystem::update();
+	onec::TransformSystem::update();
+	onec::CameraSystem::update();
+}
+
+void update()
+{
+	geo::GUISystem::update();
+	onec::TitleBarSystem::update();
+	onec::ViewportSystem::update();
+	onec::HierarchySystem::update();
+	onec::TrackballSystem::update();
+	onec::TransformSystem::update(entt::exclude<onec::Static>);
+	onec::CameraSystem::update(entt::exclude<onec::Static>);
+	onec::RenderSystem::update();
+	onec::ScreenshotSystem::update();
+}
+
+void fixedUpdate()
+{
+
+}
+
+void preRender()
+{
+	onec::LightingSystem::update();
+}
+
+void render()
+{
+	onec::MeshRenderSystem::update();
+	geo::TerrainRenderSystem::update();
+}
+
+int main()
+{
+	onec::Application& application{ onec::createApplication(APPLICATION_NAME, WINDOW_SIZE, MSAA) };
+	application.setVSyncCount(VSYNC_COUNT);
+	application.setTargetFrameRate(TARGET_FRAME_RATE);
+
+	onec::Scene& scene{ onec::getScene() };
 	scene.addSystem<onec::OnStart, &start>();
-	scene.addSystem<onec::OnStart, onec::ViewportSystem::update>();
-	scene.addSystem<onec::OnStart, &onec::HierarchySystem::update>();
-	scene.addSystem<onec::OnStart, &onec::TrackballSystem::update>();
-	scene.addSystem<onec::OnStart, &onec::TransformSystem::start>();
-	scene.addSystem<onec::OnStart, &onec::CameraSystem::start>();
-	scene.addSystem<onec::OnStart, &onec::LightingSystem::start>();
-	scene.addSystem<onec::OnStart, &onec::RenderSystem::start>();
-	scene.addSystem<onec::OnStart, &onec::MeshRenderSystem::start>();
-	scene.addSystem<onec::OnStart, &geo::TerrainRenderSystem::start>();
-	scene.addSystem<onec::OnStart, &geo::GUISystem::start>();
+	scene.addSystem<onec::OnUpdate, &update>();
+	scene.addSystem<onec::OnFixedUpdate, &fixedUpdate>();
+	scene.addSystem<onec::OnPreRender, &preRender>();
+	scene.addSystem<onec::OnRender, &render>();
 
-	scene.addSystem<onec::OnUpdate, &onec::TitleBarSystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::ViewportSystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::HierarchySystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::TrackballSystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::TransformSystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::CameraSystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::RenderSystem::update>();
-	scene.addSystem<onec::OnUpdate, &onec::ScreenshotSystem::update>();
-
-	scene.addSystem<onec::OnPreRender, &onec::LightingSystem::update>();
-	scene.addSystem<onec::OnRender, &onec::MeshRenderSystem::update>();
-	scene.addSystem<onec::OnRender, &geo::TerrainRenderSystem::update>();
-	scene.addSystem<onec::OnGUI, &geo::GUISystem::update>();
-	
 	application.run();
 }
+
+// device namespace
+// gl attach naming

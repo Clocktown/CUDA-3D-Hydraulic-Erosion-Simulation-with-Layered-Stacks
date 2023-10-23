@@ -34,9 +34,4 @@ void MeshRenderSystem::start()
 	meshRenderer.uniformBuffer.initialize(sizeof(device::MeshRenderer));
 }
 
-void MeshRenderSystem::update()
-{
-	render();
-}
-
 }

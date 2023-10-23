@@ -99,7 +99,6 @@
     <ClCompile Include="onec\graphics\shader.cpp" />
     <ClCompile Include="onec\graphics\texture.cpp" />
     <ClCompile Include="onec\graphics\vertex_array.cpp" />
-    <ClCompile Include="onec\systems\camera_system.cpp" />
     <ClCompile Include="onec\systems\hierarchy_system.cpp" />
     <ClCompile Include="onec\systems\lighting_system.cpp" />
     <ClCompile Include="onec\systems\mesh_render_system.cpp" />
@@ -107,7 +106,6 @@
     <ClCompile Include="onec\systems\screenshot_system.cpp" />
     <ClCompile Include="onec\systems\title_bar_system.cpp" />
     <ClCompile Include="onec\systems\trackball_system.cpp" />
-    <ClCompile Include="onec\systems\transform_system.cpp" />
     <ClCompile Include="onec\systems\viewport_system.cpp" />
     <ClCompile Include="onec\utility\io.cpp" />
   </ItemGroup>

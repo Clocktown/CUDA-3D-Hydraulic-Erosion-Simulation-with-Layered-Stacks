@@ -13,6 +13,14 @@
 namespace onec
 {
 
+template<typename ...Includes, typename ...Excludes>
+inline void CameraSystem::update(const entt::exclude_t<Excludes...> excludes)
+{
+	updateParentToView<Includes...>(excludes);
+	updateWorldToView<Includes...>(excludes);
+	updateViewToClip<Includes...>(excludes);
+}
+
 template<typename... Includes, typename... Excludes>
 inline void CameraSystem::updateParentToView(const entt::exclude_t<Excludes...> excludes)
 {

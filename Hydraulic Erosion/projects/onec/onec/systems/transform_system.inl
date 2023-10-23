@@ -12,6 +12,13 @@ namespace onec
 {
 
 template<typename... Includes, typename... Excludes>
+inline void TransformSystem::update(const entt::exclude_t<Excludes...> excludes)
+{
+	updateLocalToParent<Includes...>(excludes);
+	updateLocalToWorld<Includes...>(excludes);
+}
+
+template<typename... Includes, typename... Excludes>
 inline void TransformSystem::updateLocalToParent(const entt::exclude_t<Excludes...> excludes)
 {
 	updateMatrices<LocalToParent, Parent, Includes...>(excludes);

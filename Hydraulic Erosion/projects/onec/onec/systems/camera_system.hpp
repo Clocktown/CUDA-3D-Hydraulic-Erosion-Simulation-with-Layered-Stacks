@@ -8,8 +8,8 @@ namespace onec
 class CameraSystem
 {
 public:
-	static void start();
-	static void update();
+	template<typename... Includes, typename... Excludes>
+	static void update(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
 private:
 	template<typename... Includes, typename... Excludes>
 	static void updateParentToView(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});

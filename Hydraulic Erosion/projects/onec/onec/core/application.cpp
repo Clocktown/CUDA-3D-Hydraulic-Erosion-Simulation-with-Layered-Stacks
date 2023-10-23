@@ -92,7 +92,6 @@ void Application::run()
 			}
 			
 			scene.dispatch<OnUpdate>();
-			scene.dispatch<OnGUI>();
 
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -125,6 +124,11 @@ void Application::exit()
 void Application::setName(const std::string_view& name)
 {
 	m_name = name;
+}
+
+void Application::setDirectory(const std::filesystem::path& directory)
+{
+	m_directory = directory;
 }
 
 void Application::setVSyncCount(const int vSyncCount)

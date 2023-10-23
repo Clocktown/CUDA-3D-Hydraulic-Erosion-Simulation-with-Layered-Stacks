@@ -87,11 +87,11 @@ inline void Scene::removeSingleton()
 template<typename Event, auto system, typename... Instance>
 inline void Scene::removeSystem(Instance&&... instance)
 {
-	const entt::delegate<void(std::decay_t<Event>&)> delegate;
-	delegate.connect<system>(std::forward<Instance>(instance)...);
+	entt::delegate<void(std::decay_t<Event>&)> delegate;
+	delegate.connect<system>();
 
 	auto& systems{ getSystems<std::decay_t<Event>>() };
-	std::remove(systems.begin(), systems.end(), delegate);
+	systems.erase(std::remove(systems.begin(), systems.end(), delegate), systems.end());
 }
 
 template<typename Event>

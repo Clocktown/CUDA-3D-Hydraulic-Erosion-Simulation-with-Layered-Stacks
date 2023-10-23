@@ -19,7 +19,7 @@ namespace onec
 {
 
 template<typename ...Includes, typename ...Excludes>
-inline void MeshRenderSystem::render(const entt::exclude_t<Excludes...> excludes)
+inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes)
 {
 	Scene& scene{ getScene() };
 

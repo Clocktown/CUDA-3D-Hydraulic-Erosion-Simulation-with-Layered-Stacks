@@ -22,6 +22,7 @@ public:
 	void exit();
 
 	void setName(const std::string_view& name);
+	void setDirectory(const std::filesystem::path& directory);
 	void setVSyncCount(const int vSyncCount);
 	void setTargetFrameRate(const int targetFrameRate);
 	void setMaxDeltaTime(const double maxDeltaTime);
@@ -48,6 +49,7 @@ private:
 	explicit Application(const std::string_view* const name);
 
 	std::string m_name;
+	std::filesystem::path m_directory{ std::filesystem::current_path() };
 	int m_frameCount{ 0 };
 	int m_vSyncCount{ 1 };
 	double m_targetFrameRate{ 60.0 };
@@ -78,11 +80,6 @@ struct OnUpdate
 };
 
 struct OnFixedUpdate
-{
-
-};
-
-struct OnGUI
 {
 
 };

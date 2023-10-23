@@ -15,7 +15,7 @@ namespace onec
 {
 
 template<typename... Includes, typename... Excludes>
-inline void LightingSystem::updateUniformBuffer(const entt::exclude_t<Excludes...> excludes)
+inline void LightingSystem::update(const entt::exclude_t<Excludes...> excludes)
 {
 	Scene& scene{ getScene() };
 

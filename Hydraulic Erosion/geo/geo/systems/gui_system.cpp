@@ -22,7 +22,15 @@ void GUISystem::start()
 
 void GUISystem::update()
 {
+	Scene& scene{ getScene() };
 
+	ONEC_ASSERT(scene.hasSingleton<GUI>(), "Scene must have a gui singleton");
+	ONEC_ASSERT(scene.hasSingleton<Renderer>(), "Scene must have a renderer singleton");
+
+	GUI& gui{ *scene.getSingleton<GUI>() };
+	Renderer& renderer{ *scene.getSingleton<Renderer>() };
+
+	// ...
 }
 
 }

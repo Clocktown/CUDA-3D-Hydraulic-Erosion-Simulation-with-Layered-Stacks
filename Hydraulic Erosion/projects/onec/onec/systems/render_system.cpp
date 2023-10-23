@@ -29,8 +29,6 @@ void RenderSystem::start()
 void RenderSystem::update()
 {
 	Scene& scene{ getScene() };
-	const ActiveCamera* const activeCamera{ scene.getSingleton<ActiveCamera>() };
-
 	ONEC_ASSERT(scene.hasSingleton<Renderer>(), "Scene must have a renderer singleton");
 	ONEC_ASSERT(scene.hasSingleton<Viewport>(), "Scene must have a viewport singleton");
 	
@@ -38,6 +36,8 @@ void RenderSystem::update()
 	const Viewport viewport{ *scene.getSingleton<Viewport>() };
 	
 	updateRenderTarget(renderer, viewport);
+
+	const ActiveCamera* const activeCamera{ scene.getSingleton<ActiveCamera>() };
 
 	if (activeCamera != nullptr)
 	{

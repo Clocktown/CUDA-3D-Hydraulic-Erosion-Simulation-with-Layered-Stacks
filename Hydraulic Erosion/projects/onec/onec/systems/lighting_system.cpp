@@ -18,9 +18,4 @@ void LightingSystem::start()
 	lighting.uniformBuffer.initialize(sizeof(device::Lighting));
 }
 
-void LightingSystem::update()
-{
-	updateUniformBuffer();
-}
-
 }
