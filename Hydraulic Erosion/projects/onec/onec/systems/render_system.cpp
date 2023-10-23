@@ -31,24 +31,23 @@ void RenderSystem::update()
 	Scene& scene{ getScene() };
 	const ActiveCamera* const activeCamera{ scene.getSingleton<ActiveCamera>() };
 
-	if (activeCamera == nullptr)
-	{
-		return;
-	}
-
 	ONEC_ASSERT(scene.hasSingleton<Renderer>(), "Scene must have a renderer singleton");
 	ONEC_ASSERT(scene.hasSingleton<Viewport>(), "Scene must have a viewport singleton");
 	
 	Renderer& renderer{ *scene.getSingleton<Renderer>() };
 	const Viewport viewport{ *scene.getSingleton<Viewport>() };
-	const entt::entity camera{ activeCamera->activeCamera };
 	
-	updateUniformBuffer(renderer, viewport, camera);
 	updateRenderTarget(renderer, viewport);
 
-	scene.dispatch<OnPreRender>();
-	scene.dispatch<OnRender>();
-	scene.dispatch<OnPostRender>();
+	if (activeCamera != nullptr)
+	{
+		const entt::entity camera{ activeCamera->activeCamera };
+		updateUniformBuffer(renderer, viewport, camera);
+
+		scene.dispatch<OnPreRender>();
+		scene.dispatch<OnRender>();
+		scene.dispatch<OnPostRender>();
+	}
 
 	GL_CHECK_ERROR(glDisable(GL_SCISSOR_TEST));
 	GL_CHECK_ERROR(glDisable(GL_MULTISAMPLE));

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <imgui.h>
 #include <glm/glm.hpp>
 #include <filesystem>
 #include <string>
@@ -23,14 +22,13 @@ public:
 	void exit();
 
 	void setName(const std::string_view& name);
-	void setAssetFolder(const std::filesystem::path& assetFolder);
 	void setVSyncCount(const int vSyncCount);
 	void setTargetFrameRate(const int targetFrameRate);
 	void setMaxDeltaTime(const double maxDeltaTime);
 	void setFixedDeltaTime(const double fixedDeltaTime);
 
 	const std::string& getName() const;
-	const std::filesystem::path& getAssetFolder() const;
+	const std::filesystem::path& getDirectory() const;
 	int getFrameCount() const;
 	int getVSyncCount() const;
 	int getTargetFrameRate() const;
@@ -50,7 +48,6 @@ private:
 	explicit Application(const std::string_view* const name);
 
 	std::string m_name;
-	std::filesystem::path m_assetFolder{ std::filesystem::current_path() / "assets" };
 	int m_frameCount{ 0 };
 	int m_vSyncCount{ 1 };
 	double m_targetFrameRate{ 60.0 };

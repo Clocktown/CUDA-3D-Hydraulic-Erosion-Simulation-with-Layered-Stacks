@@ -43,7 +43,7 @@ inline void TransformSystem::updateLocalToWorld(const entt::entity entity, const
 {
 	Scene& scene{ getScene() };
 
-	if constexpr ((!scene.hasComponent<Includes>(entity) || ...) || (scene.hasComponent<Excludes>(entity) || ...))
+	if ((!scene.hasComponent<Includes>(entity) || ...) || (scene.hasComponent<Excludes>(entity) || ...))
 	{
 		return;
 	}

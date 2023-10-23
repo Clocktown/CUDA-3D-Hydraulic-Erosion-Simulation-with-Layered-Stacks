@@ -127,11 +127,6 @@ void Application::setName(const std::string_view& name)
 	m_name = name;
 }
 
-void Application::setAssetFolder(const std::filesystem::path& assetFolder)
-{
-	m_assetFolder = assetFolder;
-}
-
 void Application::setVSyncCount(const int vSyncCount)
 {
 	m_vSyncCount = vSyncCount;
@@ -158,9 +153,9 @@ const std::string& Application::getName() const
 	return m_name;
 }
 
-const std::filesystem::path& Application::getAssetFolder() const
+const std::filesystem::path& Application::getDirectory() const
 {
-	return m_assetFolder;
+	return std::filesystem::current_path();
 }
 
 int Application::getFrameCount() const
