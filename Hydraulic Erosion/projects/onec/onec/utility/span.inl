@@ -133,7 +133,7 @@ auto asBytes(Type* const first, Type* const last)
 template<typename Type>
 auto asBytes(const std::initializer_list<Type>& data)
 {
-	return asBytes(Span<Type>{ data });
+	return asBytes(Span<const Type>{ data });
 }
 
 template<typename Type, size_t count>

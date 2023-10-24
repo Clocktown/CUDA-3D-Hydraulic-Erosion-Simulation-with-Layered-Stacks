@@ -242,6 +242,16 @@ void Buffer::unmap()
 	m_isMapped = false;
 }
 
+const std::byte* Buffer::getData() const
+{
+	return static_cast<const std::byte*>(m_data);
+}
+
+std::byte* Buffer::getData()
+{
+	return static_cast<std::byte*>(m_data);
+}
+
 int Buffer::getCount() const
 {
 	return m_count;
