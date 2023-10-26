@@ -29,8 +29,11 @@
     <ClInclude Include="onec\core\scene.hpp" />
     <ClInclude Include="onec\core\window.hpp" />
     <ClInclude Include="onec\cu\array.hpp" />
+    <ClInclude Include="onec\cu\array_view.hpp" />
     <ClInclude Include="onec\cu\buffer.hpp" />
+    <ClInclude Include="onec\cu\buffer_view.hpp" />
     <ClInclude Include="onec\cu\format.hpp" />
+    <ClInclude Include="onec\cu\graphics_resource.hpp" />
     <ClInclude Include="onec\cu\stopwatch.hpp" />
     <ClInclude Include="onec\cu\surface.hpp" />
     <ClInclude Include="onec\cu\texture.hpp" />
@@ -85,7 +88,10 @@
     <ClCompile Include="onec\core\scene.cpp" />
     <ClCompile Include="onec\core\window.cpp" />
     <ClCompile Include="onec\cu\array.cpp" />
+    <ClCompile Include="onec\cu\array_view.cpp" />
     <ClCompile Include="onec\cu\buffer.cpp" />
+    <ClCompile Include="onec\cu\buffer_view.cpp" />
+    <ClCompile Include="onec\cu\graphics_resource.cpp" />
     <ClCompile Include="onec\cu\surface.cpp" />
     <ClCompile Include="onec\cu\texture.cpp" />
     <ClCompile Include="onec\graphics\bind_group.cpp" />
@@ -113,7 +119,6 @@
     <None Include="onec\core\scene.inl" />
     <None Include="onec\cu\format.inl" />
     <None Include="onec\cu\stopwatch.inl" />
-    <None Include="onec\graphics\texture.inl" />
     <None Include="onec\math\color.inl" />
     <None Include="onec\math\common.inl" />
     <None Include="onec\systems\camera_system.inl" />

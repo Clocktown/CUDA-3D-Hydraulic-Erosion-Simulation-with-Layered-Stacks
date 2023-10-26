@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../config/cu.hpp"
 #include <glm/glm.hpp>
 
 namespace onec

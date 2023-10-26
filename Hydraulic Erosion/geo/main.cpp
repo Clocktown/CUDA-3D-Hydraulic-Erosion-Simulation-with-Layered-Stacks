@@ -9,6 +9,7 @@
 
 void start()
 {
+	onec::Application& application{ onec::getApplication() };
 	onec::Scene& scene{ onec::getScene() };
 
 	const entt::entity camera{ scene.addEntity() };
@@ -33,13 +34,11 @@ void start()
 	scene.addSingleton<onec::MeshRenderer>();
 	scene.addSingleton<onec::Lighting>();
 	scene.addSingleton<onec::Screenshot>();
-	scene.addSingleton<geo::TerrainRenderer>();
 	scene.addSingleton<geo::GUI>();
 
 	onec::RenderSystem::start();
 	onec::MeshRenderSystem::start();
 	onec::LightingSystem::start();
-	geo::TerrainRenderSystem::start();
 	geo::GUISystem::start();
 
 	onec::ViewportSystem::update();
@@ -75,7 +74,6 @@ void preRender()
 void render()
 {
 	onec::MeshRenderSystem::update();
-	geo::TerrainRenderSystem::update();
 }
 
 int main()

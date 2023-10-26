@@ -30,7 +30,7 @@ inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes
 	meshRenderer.uniformBuffer.bind(GL_UNIFORM_BUFFER, meshRenderer.uniformBufferLocation);
 
 	device::MeshRenderer uniforms;
-	const Mesh* activeMesh{ nullptr };
+	Mesh* activeMesh{ nullptr };
 	Material* activeMaterial{ nullptr };
 	const Program* activeProgram{ nullptr };
 	const RenderState* activeRenderState{ nullptr };
@@ -51,9 +51,9 @@ inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes
 		{
 			activeMesh = renderMesh.mesh.get();
 
-			meshRenderer.vertexArray.attachIndexBuffer(activeMesh->indexBuffer);
-			meshRenderer.vertexArray.attachVertexBuffer(0, activeMesh->positionBuffer, sizeof(glm::vec3));
-			meshRenderer.vertexArray.attachVertexBuffer(1, activeMesh->vertexPropertyBuffer, sizeof(VertexProperties));
+			GL_CHECK_ERROR(glVertexArrayElementBuffer(meshRenderer.vertexArray.getHandle(), activeMesh->indexBuffer.getHandle()));
+			GL_CHECK_ERROR(glVertexArrayVertexBuffer(meshRenderer.vertexArray.getHandle(), 0, activeMesh->positionBuffer.getHandle(), 0, sizeof(glm::vec3)));
+			GL_CHECK_ERROR(glVertexArrayVertexBuffer(meshRenderer.vertexArray.getHandle(), 1, activeMesh->vertexPropertyBuffer.getHandle(), 0, sizeof(VertexProperties)));
 		}
 
 		const glm::mat4& localToWorld{ view.get<LocalToWorld>(entity).localToWorld };

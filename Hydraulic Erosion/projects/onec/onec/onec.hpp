@@ -60,9 +60,12 @@
 #include "graphics/shader.hpp"
 
 #include "cu/buffer.hpp"
+#include "cu/buffer_view.hpp"
 #include "cu/array.hpp"
+#include "cu/array_view.hpp"
 #include "cu/surface.hpp"
 #include "cu/texture.hpp"
+#include "cu/graphics_resource.hpp"
 #include "cu/stopwatch.hpp"
 #include "cu/format.hpp"
 

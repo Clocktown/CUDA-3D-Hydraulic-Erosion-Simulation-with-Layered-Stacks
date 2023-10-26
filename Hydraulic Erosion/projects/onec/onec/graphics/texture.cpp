@@ -23,7 +23,7 @@ Texture::Texture() :
 
 }
 
-Texture::Texture(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount, const int sampleCount, const bool hasFixedSampleLocations) :
+Texture::Texture(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount, const int sampleCount) :
 	m_target{ target },
 	m_size{ size },
 	m_format{ format }
@@ -33,7 +33,7 @@ Texture::Texture(const GLenum target, const glm::ivec3& size, const GLenum forma
 		m_mipCount = mipCount;
 		m_sampleCount = sampleCount;
 
-		create(hasFixedSampleLocations);
+		create();
 	}
 	else
 	{
@@ -155,7 +155,7 @@ void Texture::unbind(const GLuint unit) const
 	GL_CHECK_ERROR(glBindTextureUnit(unit, GL_NONE));
 }
 
-void Texture::initialize(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount, const int sampleCount, const bool hasFixedSampleLocations)
+void Texture::initialize(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount, const int sampleCount)
 {
 	if (m_target == target && m_size == size && m_format == format && m_mipCount == mipCount)
 	{
@@ -176,7 +176,7 @@ void Texture::initialize(const GLenum target, const glm::ivec3& size, const GLen
 		m_mipCount = mipCount;
 		m_sampleCount = sampleCount;
 
-		create(hasFixedSampleLocations);
+		create();
 	}
 	else
 	{
@@ -270,7 +270,7 @@ void Texture::download(const Span<std::byte>&& data, const GLenum format, const 
 	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, offset.x, offset.y, offset.z, size.x, size.y, size.z, format, type, data.getByteCount(), data.getData()));
 }
 
-void Texture::create(const bool hasFixedSampleLocations)
+void Texture::create()
 {
 	GL_CHECK_ERROR(glCreateTextures(m_target, 1, &m_handle));
 	GL_CHECK_ERROR(glGetInternalformativ(m_target, m_format, GL_INTERNALFORMAT_PREFERRED, 1, reinterpret_cast<GLint*>(&m_format)));
@@ -292,7 +292,7 @@ void Texture::create(const bool hasFixedSampleLocations)
 	case GL_TEXTURE_2D_MULTISAMPLE:
 		ONEC_ASSERT(m_size.z == 0, "Size z must be 0");
 
-		GL_CHECK_ERROR(glTextureStorage2DMultisample(m_handle, m_sampleCount, m_format, m_size.x, m_size.y, hasFixedSampleLocations));
+		GL_CHECK_ERROR(glTextureStorage2DMultisample(m_handle, m_sampleCount, m_format, m_size.x, m_size.y, true));
 		break;
 	case GL_TEXTURE_CUBE_MAP:
 		ONEC_ASSERT(m_size.z == 6, "Size z must be 6");
@@ -305,7 +305,7 @@ void Texture::create(const bool hasFixedSampleLocations)
 		GL_CHECK_ERROR(glTextureStorage3D(m_handle, m_mipCount, m_format, m_size.x, m_size.y, m_size.z));
 		break;
 	case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
-		GL_CHECK_ERROR(glTextureStorage3DMultisample(m_handle, m_sampleCount, m_format, m_size.x, m_size.y, m_size.z, hasFixedSampleLocations));
+		GL_CHECK_ERROR(glTextureStorage3DMultisample(m_handle, m_sampleCount, m_format, m_size.x, m_size.y, m_size.z, true));
 		break;
 	default:
 		ONEC_ERROR("Target must be valid");
@@ -402,6 +402,16 @@ int Texture::getSampleCount() const
 bool Texture::isEmpty() const
 {
 	return m_handle == GL_NONE;
+}
+
+int getMaxMipCount(const glm::ivec3& size)
+{
+	return 1 + static_cast<int>(glm::log2(static_cast<float>(glm::max(size.x, glm::max(size.y, size.z)))));
+}
+
+glm::vec3 getMipSize(const glm::ivec3& base, const int mipLevel)
+{
+	return base / (1 << mipLevel);
 }
 
 }

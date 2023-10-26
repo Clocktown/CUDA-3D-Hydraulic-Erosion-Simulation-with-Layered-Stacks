@@ -45,26 +45,6 @@ void VertexArray::unbind() const
 	GL_CHECK_ERROR(glBindVertexArray(GL_NONE));
 }
 
-void VertexArray::attachIndexBuffer(const Buffer& indexBuffer)
-{
-	GL_CHECK_ERROR(glVertexArrayElementBuffer(m_handle, const_cast<Buffer&>(indexBuffer).getHandle()));
-}
-
-void VertexArray::attachVertexBuffer(const GLuint location, const Buffer& vertexBuffer, const int stride)
-{
-	GL_CHECK_ERROR(glVertexArrayVertexBuffer(m_handle, location, const_cast<Buffer&>(vertexBuffer).getHandle(), 0, stride));
-}
-
-void VertexArray::detachIndexBuffer()
-{
-	GL_CHECK_ERROR(glVertexArrayElementBuffer(m_handle, GL_NONE));
-}
-
-void VertexArray::detachVertexBuffer(const GLuint location)
-{
-	GL_CHECK_ERROR(glVertexArrayVertexBuffer(m_handle, location, GL_NONE, 0, 0));
-}
-
 void VertexArray::setName(const std::string_view& name)
 {
 	GL_LABEL_OBJECT(m_handle, GL_VERTEX_ARRAY, name);

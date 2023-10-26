@@ -1,5 +1,6 @@
 #pragma once
 
+#include "buffer.hpp"
 #include "../utility/span.hpp"
 #include <cuda_runtime.h>
 
@@ -8,23 +9,17 @@ namespace onec
 namespace cu
 {
 
-class Buffer
+class GraphicsResource;
+
+class BufferView
 {
 public:
-	explicit Buffer();
-	explicit Buffer(const int count);
-	explicit Buffer(const Span<const std::byte>&& data);
-	Buffer(const Buffer& other);
-	Buffer(Buffer&& other) noexcept;
-	
-	~Buffer();
+	BufferView();
+	BufferView(Buffer& buffer);
+	BufferView(Buffer& buffer, const int count);
 
-	Buffer& operator=(const Buffer& other);
-	Buffer& operator=(Buffer&& other) noexcept;
+	BufferView& operator=(Buffer& buffer);
 
-	void initialize(const int count);
-	void initialize(const Span<const std::byte>&& data);
-	void release();
 	void upload(const Span<const std::byte>&& data);
 	void upload(const Span<const std::byte>&& data, const int count);
 	void upload(const Span<const std::byte>&& data, const int offset, const int count);
@@ -37,8 +32,12 @@ public:
 	int getCount() const;
 	bool isEmpty() const;
 private:
+	BufferView(std::byte* const data, const int count);
+
 	std::byte* m_data;
 	int m_count;
+
+	friend class GraphicsResource;
 };
 
 }

@@ -60,7 +60,7 @@ inline Stopwatch<Period>& Stopwatch<Period>::operator=(Stopwatch<Period>&& other
 }
 
 template<typename Period>
-inline void Stopwatch<Period>::start(const cudaStream_t stream)
+inline void Stopwatch<Period>::start(cudaStream_t stream)
 {
 	ONEC_ASSERT(m_state == State::Stopped, "Stopwatch must be stopped");
 

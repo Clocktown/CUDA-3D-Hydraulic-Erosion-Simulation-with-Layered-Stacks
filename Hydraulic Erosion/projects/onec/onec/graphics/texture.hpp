@@ -13,7 +13,7 @@ class Texture
 {
 public:
 	explicit Texture();
-	explicit Texture(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount = 1, const int sampleCount = 0, const bool hasFixedSampleLocations = true);
+	explicit Texture(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount = 1, const int sampleCount = 0);
 	explicit Texture(const std::filesystem::path& file, const int mipCount = 1);
 	Texture(const Texture& other);
 	Texture(Texture&& other) noexcept;
@@ -25,7 +25,7 @@ public:
 
 	void bind(const GLuint unit) const;
 	void unbind(const GLuint unit) const;
-	void initialize(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount = 1, const int sampleCount = 0, const bool hasFixedSampleLocations = true);
+	void initialize(const GLenum target, const glm::ivec3& size, const GLenum format, const int mipCount = 1, const int sampleCount = 0);
 	void release();
 	void generateMipmap();
 	void upload(const Span<const std::byte>&& data, const GLenum format, const GLenum type, const int mipLevel = 0);
@@ -55,7 +55,7 @@ public:
 	int getSampleCount() const;
 	bool isEmpty() const;
 private:
-	void create(const bool hasFixedSampleLocations = true);
+	void create();
 
 	GLuint m_handle;
 	GLenum m_target;
@@ -69,5 +69,3 @@ int getMaxMipCount(const glm::ivec3& size);
 glm::vec3 getMipSize(const glm::ivec3& base, const int mipLevel);
 
 }
-
-#include "texture.inl"

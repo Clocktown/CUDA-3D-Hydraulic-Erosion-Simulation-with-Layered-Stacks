@@ -22,11 +22,6 @@ public:
 	void bind() const;
 	void unbind() const;
 
-	void attachIndexBuffer(const Buffer& indexBuffer);
-	void attachVertexBuffer(const GLuint location, const Buffer& vertexBuffer, const int stride);
-	void detachIndexBuffer();
-	void detachVertexBuffer(const GLuint location);
-
 	void setName(const std::string_view& name);
 	void setVertexAttributeFormat(const int index, const int count, const GLenum type, const bool isNormalized = false, const int relativeOffset = 0);
 	void setVertexAttributeLocation(const int index, const GLuint location);

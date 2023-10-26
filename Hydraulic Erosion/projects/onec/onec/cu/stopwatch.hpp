@@ -21,7 +21,7 @@ public:
 	Stopwatch<Period>& operator=(const Stopwatch<Period>& other) = delete;
 	Stopwatch<Period>& operator=(Stopwatch<Period>&& other) noexcept;
 	
-	void start(const cudaStream_t stream = cudaStream_t{});
+	void start(cudaStream_t stream = cudaStream_t{});
 	void resume();
 	void pause();
 	void stop();

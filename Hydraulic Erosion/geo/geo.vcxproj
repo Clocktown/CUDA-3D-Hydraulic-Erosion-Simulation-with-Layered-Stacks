@@ -16,19 +16,28 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="geo\systems\terrain_render_system.cpp" />
     <ClCompile Include="geo\systems\gui_system.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="geo\components\render_terrain.hpp" />
     <ClInclude Include="geo\graphics\terrain.hpp" />
     <ClInclude Include="geo\device\terrain_renderer.hpp" />
     <ClInclude Include="geo\geo.hpp" />
-    <ClInclude Include="geo\singletons\terrain_renderer.hpp" />
-    <ClInclude Include="geo\systems\terrain_render_system.hpp" />
     <ClInclude Include="geo\singletons\gui.hpp" />
     <ClInclude Include="geo\systems\gui_system.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="assets\shaders\lighting\light.glsl" />
+    <None Include="assets\shaders\lighting\lighting.glsl" />
+    <None Include="assets\shaders\lighting\phong_brdf.glsl" />
+    <None Include="assets\shaders\math\color.glsl" />
+    <None Include="assets\shaders\math\constants.glsl" />
+    <None Include="assets\shaders\mesh_renderer\mesh.vert" />
+    <None Include="assets\shaders\mesh_renderer\mesh_renderer.glsl" />
+    <None Include="assets\shaders\mesh_renderer\phong.frag" />
+    <None Include="assets\shaders\mesh_renderer\vertex_attributes.glsl" />
+    <None Include="assets\shaders\mesh_renderer\vertex_to_fragment.glsl" />
+    <None Include="assets\shaders\renderer\renderer.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{963C492E-64A6-4E47-881B-19AFD4C70801}</ProjectGuid>
