@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33530.505
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "onec", "projects\onec\onec.vcxproj", "{73B26006-DF5B-46FD-8682-B8FFB74F460A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "geo", "projects\geo\geo.vcxproj", "{963C492E-64A6-4E47-881B-19AFD4C70801}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{73B26006-DF5B-46FD-8682-B8FFB74F460A}.Debug|x64.ActiveCfg = Debug|x64
+		{73B26006-DF5B-46FD-8682-B8FFB74F460A}.Debug|x64.Build.0 = Debug|x64
+		{73B26006-DF5B-46FD-8682-B8FFB74F460A}.Release|x64.ActiveCfg = Release|x64
+		{73B26006-DF5B-46FD-8682-B8FFB74F460A}.Release|x64.Build.0 = Release|x64
+		{963C492E-64A6-4E47-881B-19AFD4C70801}.Debug|x64.ActiveCfg = Debug|x64
+		{963C492E-64A6-4E47-881B-19AFD4C70801}.Debug|x64.Build.0 = Debug|x64
+		{963C492E-64A6-4E47-881B-19AFD4C70801}.Release|x64.ActiveCfg = Release|x64
+		{963C492E-64A6-4E47-881B-19AFD4C70801}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {16409A8B-48BF-4297-8736-E1B2DEBA224D}
+	EndGlobalSection
+EndGlobal
