@@ -20,6 +20,8 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="geo\components\simulation.hpp" />
+    <ClInclude Include="geo\graphics\terrain.hpp" />
     <ClInclude Include="geo\systems\editor_system.hpp" />
     <ClInclude Include="geo\geo.hpp" />
     <ClInclude Include="geo\singletons\editor.hpp" />
@@ -37,9 +39,12 @@
     <None Include="assets\shaders\mesh_renderer\vertex_attributes.glsl" />
     <None Include="assets\shaders\mesh_renderer\vertex_to_fragment.glsl" />
     <None Include="assets\shaders\renderer\renderer.glsl" />
+    <None Include="assets\shaders\terrain\geometry_to_fragment.glsl" />
+    <None Include="assets\shaders\terrain\material.glsl" />
     <None Include="assets\shaders\terrain\terrain.frag" />
     <None Include="assets\shaders\terrain\terrain.geom" />
     <None Include="assets\shaders\terrain\terrain.vert" />
+    <None Include="assets\shaders\terrain\vertex_to_geometry.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{963C492E-64A6-4E47-881B-19AFD4C70801}</ProjectGuid>

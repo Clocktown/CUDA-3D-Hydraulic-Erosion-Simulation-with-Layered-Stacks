@@ -4,8 +4,6 @@
 #define APPLICATION_NAME "Hydraulic Erosion"
 #define WINDOW_SIZE glm::ivec2{ 1280, 720 }
 #define MSAA 0
-#define VSYNC_COUNT 0
-#define TARGET_FRAME_RATE 0
 
 void start()
 {

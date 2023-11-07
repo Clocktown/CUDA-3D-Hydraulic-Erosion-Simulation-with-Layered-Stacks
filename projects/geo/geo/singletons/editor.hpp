@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../graphics/terrain.hpp"
 #include "../graphics/terrain_brdf.hpp"
 #include <onec/onec.hpp>
 
@@ -25,9 +26,10 @@ struct Editor
 	struct Terrain
 	{
 		entt::entity entity{ entt::null };
-		glm::ivec2 gridSize{ 1024 };
+		std::shared_ptr<geo::Terrain> terrain{ nullptr };
+		glm::ivec2 gridSize{ 1 };
 		float gridScale{ 1.0f };
-		int maxLayerCount{ 8 };
+		int maxLayerCount{ 1 };
 	};
 
 	struct Simulation
