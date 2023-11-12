@@ -27,9 +27,9 @@ struct Editor
 	{
 		entt::entity entity{ entt::null };
 		std::shared_ptr<geo::Terrain> terrain{ nullptr };
-		glm::ivec2 gridSize{ 1 };
+		glm::ivec2 gridSize{ 256 };
 		float gridScale{ 1.0f };
-		int maxLayerCount{ 1 };
+		int maxLayerCount{ 4 };
 	};
 
 	struct Simulation
@@ -45,6 +45,7 @@ struct Editor
 		glm::vec3 bedrockColor{ 0.5f, 0.5f, 0.5f };
 		glm::vec3 sandColor{ 0.9f, 0.8f, 0.6f };
 		glm::vec3 waterColor{ 0.1f, 0.1f, 1.0f };
+		float ambientReflectance{ 0.05f };
 		std::shared_ptr<TerrainBRDF> material{ nullptr };
 	};
 

@@ -12,12 +12,15 @@ public:
 	static void start();
 	static void update();
 private:
-	static void addDirectionalLight();
-	static void addCamera(Editor& editor);
-	static void addTerrain(Editor& editor);
-	static void addMaterial(Editor& editor);
-	static void addRenderMesh(Editor& editor);
-	static void addSimulation(Editor& editor);
+	static void initializeDirectionalLight(Editor& editor);
+	static void initializeCamera(Editor& editor);
+	static void initializeTerrain(Editor& editor);
+	static void initializeMaterial(Editor& editor);
+	static void initializeRenderMesh(Editor& editor);
+	static void initializeSimulation(Editor& editor);
+	static void updateTerrain(Editor& editor);
+	static void updateMaterial(Editor& editor);
+	static void updateRenderMesh(Editor& editor);
 	static void updateApplicationGUI(Editor& editor);
 	static void updateCameraGUI(Editor& editor);
 	static void updateTerrainGUI(Editor& editor);

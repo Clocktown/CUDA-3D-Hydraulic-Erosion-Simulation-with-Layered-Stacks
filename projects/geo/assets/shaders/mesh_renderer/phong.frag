@@ -17,12 +17,13 @@ const unsigned int normalMapBit = 16;
 layout(binding = materialBufferLocation, std140) uniform MaterialBuffer
 {
 	vec3 diffuseColor;
-    float alpha;
+	float diffuseReflectance;
 	vec3 specularColor;
 	float specularReflectance;
 	vec3 emissionColor;
 	float emissionStrength;
 	float shininess;
+	float alpha;
     unsigned int maps;
 };
 
@@ -49,6 +50,8 @@ PhongBRDF getPhongBRDF()
 	{
 		phongBRDF.diffuseColor = diffuseColor;
 	}
+
+	phongBRDF.diffuseReflectance = diffuseReflectance;
 
 	if ((maps & specularColorMapBit) != 0)
 	{

@@ -5,7 +5,12 @@ struct GeometryToFragment
 {
 	vec3 position;
 	vec3 normal;
-	vec3 uvw;
+};
+
+struct FlatGeometryToFragment
+{
+	ivec3 cell;
+	int cellType;
 };
 
 #endif

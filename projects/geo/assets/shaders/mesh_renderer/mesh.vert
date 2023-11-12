@@ -9,7 +9,7 @@ out VertexToFragment vertexToFragment;
 
 void main() 
 {
-    const mat3 normalMatrix = mat3(localToWorld);
+    const mat3 normalMatrix = mat3(transpose(worldToLocal));
 
     vertexToFragment.position = vec3(localToWorld * vec4(position.xyz, 1.0f));
     vertexToFragment.normal = normalize(normalMatrix * normal); 

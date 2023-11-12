@@ -6,23 +6,24 @@
 
 layout (triangles) in;
 in VertexToGeometry vertexToGeometry[];
-
+in FlatVertexToGeometry flatVertexToGeometry[];
 
 layout (triangle_strip, max_vertices = 3) out;
 out GeometryToFragment geometryToFragment;
-flat out int cellType;
+out FlatGeometryToFragment flatGeometryToFragment;
 
 void main()
 {
-    if (vertexToGeometry[0].cellType != -1) 
+    if (flatVertexToGeometry[0].cellType != -1) 
     {
+        flatGeometryToFragment.cell = flatVertexToGeometry[0].cell;
+        flatGeometryToFragment.cellType = flatVertexToGeometry[0].cellType;
+        
         for (int i = 0; i < 3; ++i)
         {
             geometryToFragment.position = vertexToGeometry[i].position;
             geometryToFragment.normal = vertexToGeometry[i].normal;
-            geometryToFragment.uvw = vertexToGeometry[i].uvw;
-            cellType = vertexToGeometry[i].cellType;
-
+           
             gl_Position = gl_in[i].gl_Position;
 
             EmitVertex();

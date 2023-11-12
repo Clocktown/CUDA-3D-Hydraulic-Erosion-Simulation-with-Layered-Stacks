@@ -7,6 +7,7 @@
 struct PhongBRDF
 {
 	vec3 diffuseColor;
+	float diffuseReflectance;
 	vec3 specularColor;
 	float specularReflectance;
 	float shininess;
@@ -25,7 +26,7 @@ vec3 getPhongReflectance(const PhongBRDF phongBRDF, const vec3 lightDirection, c
 	const vec3 diffuseBRDF = rPi * phongBRDF.diffuseColor;
 	const vec3 specularBRDF = 0.5f * rPi * (phongBRDF.shininess + 2.0f) * pow(cosPhi, phongBRDF.shininess) * phongBRDF.specularColor;
 
-	return mix(diffuseBRDF, specularBRDF, phongBRDF.specularReflectance);
+	return phongBRDF.diffuseReflectance * diffuseBRDF + phongBRDF.specularReflectance * specularBRDF;
 }
 
 vec3 getPointLightRadiance(const PointLight pointLight, const PhongBRDF phongBRDF, const vec3 direction)

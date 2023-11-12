@@ -17,12 +17,11 @@ void EditorSystem::start()
 	application.setTargetFrameRate(editor.application.targetFramerate);
 	application.setVSyncCount(editor.application.isVSyncEnabled);
 
-	addDirectionalLight();
-	addCamera(editor);
-	addTerrain(editor);
-	addMaterial(editor);
-	addRenderMesh(editor);
-	addSimulation(editor);
+	initializeCamera(editor);
+	initializeTerrain(editor);
+	initializeMaterial(editor);
+	initializeRenderMesh(editor);
+	initializeSimulation(editor);
 
 	onec::Renderer& renderer{ *world.getSingleton<onec::Renderer>() };
 	renderer.clearColor = glm::vec4{ editor.rendering.backgroundColor, 1.0f };
@@ -47,7 +46,7 @@ void EditorSystem::update()
 	ImGui::End();
 }
 
-void EditorSystem::addDirectionalLight()
+void EditorSystem::initializeDirectionalLight(Editor& editor)
 {
 	onec::World& world{ onec::getWorld() };
 
@@ -58,7 +57,7 @@ void EditorSystem::addDirectionalLight()
 	world.addComponent<onec::Static>(directionalLight);
 }
 
-void EditorSystem::addCamera(Editor& editor)
+void EditorSystem::initializeCamera(Editor& editor)
 {
 	onec::World& world{ onec::getWorld() };
 
@@ -70,35 +69,24 @@ void EditorSystem::addCamera(Editor& editor)
 	world.addComponent<onec::LocalToWorld>(editor.camera.entity);
 	world.addComponent<onec::WorldToView>(editor.camera.entity);
 	world.addComponent<onec::ViewToClip>(editor.camera.entity);
+
 	world.setSingleton<onec::ActiveCamera>(editor.camera.entity);
 }
 
-void EditorSystem::addTerrain(Editor& editor)
-{
-	editor.terrain.terrain = std::make_shared<geo::Terrain>();
-	geo::Terrain& terrain{ *editor.terrain.terrain };
-
-	terrain.heightMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RGBA32F);
-	terrain.waterVelocityMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RG32F);
-	terrain.indexMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RG32I);
-}
-
-void EditorSystem::addMaterial(Editor& editor)
+void EditorSystem::initializeTerrain(Editor& editor)
 {
 	onec::World& world{ onec::getWorld() };
 
+	editor.terrain.terrain = std::make_shared<geo::Terrain>();
 	editor.terrain.entity = world.addEntity();
-	world.addComponent<onec::LocalToWorld>(editor.camera.entity);
 
+	updateTerrain(editor);
+}
+
+void EditorSystem::initializeMaterial(Editor& editor)
+{
 	editor.rendering.material = std::make_shared<TerrainBRDF>();
 	TerrainBRDF& material{ *editor.rendering.material };
-
-	material.uniforms.gridSize = editor.terrain.gridSize;
-	material.uniforms.maxLayerCount = editor.terrain.maxLayerCount;
-	material.uniforms.bedrockColor = glm::vec4{ editor.rendering.bedrockColor, 1.0f };
-	material.uniforms.sandColor = glm::vec4{ editor.rendering.sandColor, 1.0f };
-	material.uniforms.waterColor = glm::vec4{ editor.rendering.waterColor, 1.0f };
-	material.uniformBuffer.initialize(onec::asBytes(&material.uniforms, 1));
 
 	const onec::Application& application{ onec::getApplication() };
 	const std::filesystem::path assets{ application.getDirectory() / "assets" };
@@ -110,25 +98,26 @@ void EditorSystem::addMaterial(Editor& editor)
 	material.program->link();
 
 	material.renderState = std::make_shared<onec::RenderState>();
-
 	material.bindGroup = std::make_shared<onec::BindGroup>();
-	material.bindGroup->attachTexture(0, editor.terrain.terrain->heightMap);
+
+	updateMaterial(editor);
 }
 
-void EditorSystem::addRenderMesh(Editor& editor)
+void EditorSystem::initializeRenderMesh(Editor& editor)
 {
+	const onec::Application& application{ onec::getApplication() };
+
 	onec::World& world{ onec::getWorld() };
 	world.addComponent<onec::LocalToWorld>(editor.terrain.entity);
-
-	const onec::Application& application{ onec::getApplication() };
 
 	onec::RenderMesh& renderMesh{ world.addComponent<onec::RenderMesh>(editor.terrain.entity) };
 	renderMesh.mesh = std::make_shared<onec::Mesh>(application.getDirectory() / "assets/meshes/cube.obj");
 	renderMesh.materials.emplace_back(editor.rendering.material);
-	renderMesh.instanceCount = 3 * editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount;
+
+	updateRenderMesh(editor);
 }
 
-void EditorSystem::addSimulation(Editor& editor)
+void EditorSystem::initializeSimulation(Editor& editor)
 {
 	onec::World& world{ onec::getWorld() };
 
@@ -137,6 +126,59 @@ void EditorSystem::addSimulation(Editor& editor)
 	simulation.timeScale = editor.simulation.timeScale;
 	simulation.gravityScale = editor.simulation.gravityScale;
 	simulation.isPaused = editor.simulation.isPaused;
+}
+
+void EditorSystem::updateTerrain(Editor& editor)
+{
+	//editor.terrain.gridSize = glm::ivec2{ 1 };
+	//editor.terrain.maxLayerCount = 4;
+
+	geo::Terrain& terrain{ *editor.terrain.terrain };
+	terrain.infoMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RGBA8I);
+	terrain.heightMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RGBA32F);
+	terrain.waterVelocityMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RG32F);
+	
+	const size_t count{ static_cast<size_t>(editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount) };
+	std::vector<glm::i8vec4> infos(count);
+	std::vector<glm::vec4> heights(count);
+	std::fill(heights.begin(), heights.end(), glm::vec4{ 0.0f });
+	std::fill(infos.begin(), infos.end(), glm::i8vec4{ 0 });
+
+	//infos[0][1] = 1;
+	//infos[1][1] = 2;
+	//heights[0] = glm::vec4{ 1.0f, 0.5f, 2.0f, 4.5f };
+	//heights[1] = glm::vec4{ 1.0f, 1.0f, 0.0f, 6.5f };
+	//heights[2] = glm::vec4{ 0.5f, 1.5f, 1.0f, 9.5f };
+	
+	terrain.infoMap.upload(onec::asBytes(infos), GL_RGBA_INTEGER, GL_BYTE);
+	terrain.heightMap.upload(onec::asBytes(heights), GL_RGBA, GL_FLOAT);
+}
+
+void EditorSystem::updateMaterial(Editor& editor)
+{
+	TerrainBRDF& material{ *editor.rendering.material };
+
+	material.uniforms.gridSize = editor.terrain.gridSize;
+	material.uniforms.gridScale = editor.terrain.gridScale;
+	material.uniforms.maxLayerCount = editor.terrain.maxLayerCount;
+	material.uniforms.bedrockColor = glm::vec4{ editor.rendering.bedrockColor, 1.0f };
+	material.uniforms.sandColor = glm::vec4{ editor.rendering.sandColor, 1.0f };
+	material.uniforms.waterColor = glm::vec4{ editor.rendering.waterColor, 1.0f };
+	material.uniformBuffer.initialize(onec::asBytes(&material.uniforms, 1));
+
+	material.bindGroup->attachTexture(0, editor.terrain.terrain->infoMap);
+	material.bindGroup->attachTexture(1, editor.terrain.terrain->heightMap);
+	material.bindGroup->attachTexture(2, editor.terrain.terrain->waterVelocityMap);
+}
+
+void EditorSystem::updateRenderMesh(Editor& editor)
+{
+	onec::World& world{ onec::getWorld() };
+
+	ONEC_ASSERT(world.hasComponent<onec::RenderMesh>(editor.terrain.entity), "Terrain must have a render mesh component");
+
+	onec::RenderMesh& renderMesh{ *world.getComponent<onec::RenderMesh>(editor.terrain.entity) };
+	renderMesh.instanceCount = 3 * editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount;
 }
 
 void EditorSystem::updateApplicationGUI(Editor& editor)
@@ -192,19 +234,15 @@ void EditorSystem::updateTerrainGUI(Editor& editor)
 {
 	if (ImGui::TreeNode("Terrain"))
 	{
-		if (ImGui::DragInt2("Grid Size", &editor.terrain.gridSize.x, 1.0f, 16, 4096))
+		ImGui::DragInt2("Grid Size", &editor.terrain.gridSize.x, 1.0f, 16, 4096);
+		ImGui::DragFloat("Grid Scale", &editor.terrain.gridScale, 1.0f, 0.001f);
+		ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount, 1.0f, 1);
+
+		if (ImGui::Button("Reset"))
 		{
-
-		}
-
-		if (ImGui::DragFloat("Grid Scale", &editor.terrain.gridScale, 1.0f, 0.001f))
-		{
-
-		}
-
-		if (ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount, 1.0f, 1))
-		{
-
+			updateTerrain(editor);
+			updateMaterial(editor);
+			updateRenderMesh(editor);
 		}
 
 		ImGui::TreePop();
@@ -251,7 +289,7 @@ void EditorSystem::updateRenderingGUI(Editor& editor)
 
 		bool materialHasChanged{ static_cast<bool>(ImGui::ColorEdit3("Bedrock Color", &editor.rendering.bedrockColor.x) |
 								                   ImGui::ColorEdit3("Sand Color", &editor.rendering.sandColor.x) |
-								                   ImGui::ColorEdit3("Water Color", &editor.rendering.waterColor.x)) };
+												   ImGui::ColorEdit3("Water Color", &editor.rendering.waterColor.x)) };
 
 		if (materialHasChanged)
 		{

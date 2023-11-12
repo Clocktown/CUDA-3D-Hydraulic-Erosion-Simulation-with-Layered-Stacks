@@ -119,6 +119,12 @@ void Buffer::initialize(const int count)
 	}
 }
 
+void Buffer::initialize(const Span<const std::byte>&& data)
+{
+	initialize(data.getCount());
+	CU_CHECK_ERROR(cudaMemcpy(m_data, data.getData(), static_cast<size_t>(m_count), cudaMemcpyHostToDevice));
+}
+
 void Buffer::release()
 {
 	if (!isEmpty())

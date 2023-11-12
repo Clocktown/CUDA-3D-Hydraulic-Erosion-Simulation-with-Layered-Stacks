@@ -136,6 +136,7 @@ void Buffer::initialize(const Span<const std::byte>&& data)
 {
 	if (m_count == data.getCount())
 	{
+		GL_CHECK_ERROR(glNamedBufferSubData(m_handle, 0, m_count, data.getData()));
 		return;
 	}
 

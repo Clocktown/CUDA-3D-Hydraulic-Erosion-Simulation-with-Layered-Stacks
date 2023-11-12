@@ -11,14 +11,15 @@
 
 layout(early_fragment_tests) in;
 in GeometryToFragment geometryToFragment;
-flat in int cellType;
+in flat FlatGeometryToFragment flatGeometryToFragment;
 
 layout(location = 0) out vec4 fragmentColor;
 
 PhongBRDF getPhongBRDF()
 {
 	PhongBRDF phongBRDF;
-	phongBRDF.diffuseColor = sRGBToLinear(color[cellType].rgb);
+	phongBRDF.diffuseColor = sRGBToLinear(color[flatGeometryToFragment.cellType].rgb);
+	phongBRDF.diffuseReflectance = 0.99f;
 	phongBRDF.specularColor = vec3(1.0f);
 	phongBRDF.specularReflectance = 0.0f;
 	phongBRDF.shininess = 40.0f;
@@ -33,7 +34,7 @@ void main()
     const PhongBRDF phongBRDF = getPhongBRDF();
 	const vec3 viewDirection = normalize(viewToWorld[3].xyz - phongBRDF.position);
 
-	vec3 radiance = vec3(0.0f);
+	vec3 radiance = 0.01f * phongBRDF.diffuseColor;
 
 	for (int i = 0; i < pointLightCount; ++i)
 	{
