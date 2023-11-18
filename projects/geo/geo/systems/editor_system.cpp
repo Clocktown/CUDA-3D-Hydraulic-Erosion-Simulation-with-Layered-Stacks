@@ -46,17 +46,6 @@ void EditorSystem::update()
 	ImGui::End();
 }
 
-void EditorSystem::initializeDirectionalLight(Editor& editor)
-{
-	onec::World& world{ onec::getWorld() };
-
-	const entt::entity directionalLight{ world.addEntity() };
-	world.addComponent<onec::DirectionalLight>(directionalLight);
-	world.addComponent<onec::Rotation>(directionalLight, glm::quat{ glm::radians(glm::vec3{ -50.0f, 30.0f, 0.0f }) });
-	world.addComponent<onec::LocalToWorld>(directionalLight);
-	world.addComponent<onec::Static>(directionalLight);
-}
-
 void EditorSystem::initializeCamera(Editor& editor)
 {
 	onec::World& world{ onec::getWorld() };
@@ -146,6 +135,12 @@ void EditorSystem::updateTerrain(Editor& editor)
 
 	//infos[0][1] = 1;
 	//infos[1][1] = 2;
+	
+	for (glm::vec4& x : heights)
+	{
+		x = glm::vec4{ 1.0f, 0.5f, 2.0f, 4.5f };
+	}
+		 
 	//heights[0] = glm::vec4{ 1.0f, 0.5f, 2.0f, 4.5f };
 	//heights[1] = glm::vec4{ 1.0f, 1.0f, 0.0f, 6.5f };
 	//heights[2] = glm::vec4{ 0.5f, 1.5f, 1.0f, 9.5f };
@@ -178,7 +173,7 @@ void EditorSystem::updateRenderMesh(Editor& editor)
 	ONEC_ASSERT(world.hasComponent<onec::RenderMesh>(editor.terrain.entity), "Terrain must have a render mesh component");
 
 	onec::RenderMesh& renderMesh{ *world.getComponent<onec::RenderMesh>(editor.terrain.entity) };
-	renderMesh.instanceCount = 3 * editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount;
+	renderMesh.instanceCount = editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount;
 }
 
 void EditorSystem::updateApplicationGUI(Editor& editor)
@@ -192,7 +187,7 @@ void EditorSystem::updateApplicationGUI(Editor& editor)
 			application.setVSyncCount(editor.application.isVSyncEnabled);
 		}
 
-		if (ImGui::DragInt("Target Frame Rate", &editor.application.targetFramerate, 1.0f, 30, 3000))
+		if (ImGui::DragInt("Target Frame Rate", &editor.application.targetFramerate))
 		{
 			application.setTargetFrameRate(editor.application.targetFramerate);
 		}
@@ -211,17 +206,17 @@ void EditorSystem::updateCameraGUI(Editor& editor)
 
 		onec::PerspectiveCamera& perspectiveCamera{ *world.getComponent<onec::PerspectiveCamera>(editor.camera.entity) };
 
-		if (ImGui::DragFloat("Field Of View", &editor.camera.fieldOfView, 0.367f, 173.0f))
+		if (ImGui::DragFloat("Field Of View", &editor.camera.fieldOfView))
 		{
 			perspectiveCamera.fieldOfView = glm::radians(editor.camera.fieldOfView);
 		}
 
-		if (ImGui::DragFloat("Near Plane", &editor.camera.nearPlane, 1.0f, 0.001f))
+		if (ImGui::DragFloat("Near Plane", &editor.camera.nearPlane))
 		{
 			perspectiveCamera.nearPlane = editor.camera.nearPlane;
 		}
 
-		if (ImGui::DragFloat("Far Plane", &editor.camera.farPlane, 1.0f, 0.001f))
+		if (ImGui::DragFloat("Far Plane", &editor.camera.farPlane))
 		{
 			perspectiveCamera.farPlane = editor.camera.farPlane;
 		}
@@ -234,9 +229,9 @@ void EditorSystem::updateTerrainGUI(Editor& editor)
 {
 	if (ImGui::TreeNode("Terrain"))
 	{
-		ImGui::DragInt2("Grid Size", &editor.terrain.gridSize.x, 1.0f, 16, 4096);
-		ImGui::DragFloat("Grid Scale", &editor.terrain.gridScale, 1.0f, 0.001f);
-		ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount, 1.0f, 1);
+		ImGui::DragInt2("Grid Size", &editor.terrain.gridSize.x);
+		ImGui::DragFloat("Grid Scale", &editor.terrain.gridScale);
+		ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount);
 
 		if (ImGui::Button("Reset"))
 		{

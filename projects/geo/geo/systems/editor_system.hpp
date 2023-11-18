@@ -12,7 +12,6 @@ public:
 	static void start();
 	static void update();
 private:
-	static void initializeDirectionalLight(Editor& editor);
 	static void initializeCamera(Editor& editor);
 	static void initializeTerrain(Editor& editor);
 	static void initializeMaterial(Editor& editor);

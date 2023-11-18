@@ -5,12 +5,13 @@ struct GeometryToFragment
 {
 	vec3 position;
 	vec3 normal;
+	float v;
 };
 
 struct FlatGeometryToFragment
 {
 	ivec3 cell;
-	int cellType;
+	vec3 maxV;
 };
 
 #endif

@@ -14,9 +14,6 @@ void main()
 {
     int index = gl_InstanceID;
 
-    const int cellType = index % 3;
-    index /= 3;
-
     const int layer = index % maxLayerCount;
     index /= maxLayerCount;
 
@@ -25,11 +22,11 @@ void main()
     cell.y = index / gridSize.x;
     cell.z = 0;
 
-    float totalHeight;
+    vec3 offset;
    
     if (layer == 0) 
     {
-        totalHeight = 0.0f;
+        offset.y = 0.0f;
     }
     else 
     {
@@ -39,7 +36,7 @@ void main()
 
             if (above <= cell.z) 
             {
-                flatVertexToGeometry.cellType = -1;
+                flatVertexToGeometry.isValid = false;
                 return;
             }
 
@@ -50,39 +47,42 @@ void main()
         
         if (above <= cell.z) 
         {
-            flatVertexToGeometry.cellType = -1;
+            flatVertexToGeometry.isValid = false;
             return;
         }
 
-        totalHeight = texelFetch(heightMap, cell, 0)[maxHeightIndex];
+        offset.y = texelFetch(heightMap, cell, 0)[maxHeightIndex];
         cell.z = above;
     }
 
-    const vec3 scale = vec3(gridScale, 0.5f * texelFetch(heightMap, cell, 0)[cellType], gridScale);
+    const vec3 height = texelFetch(heightMap, cell, 0).xyz;
+    const float totalHeight = height[bedrockIndex] + height[sandIndex] + height[waterIndex];
 
-    if (scale.y <= epsilon) 
+    if (totalHeight <= epsilon) 
     {
-        flatVertexToGeometry.cellType = -1;
+        flatVertexToGeometry.isValid = false;
         return;
     }
 
-    const vec3 height = texelFetch(heightMap, cell, 0).xyz;
+    flatVertexToGeometry.cell = cell;
+    flatVertexToGeometry.maxV[bedrockIndex] = offset.y + height[bedrockIndex];
+    flatVertexToGeometry.maxV[sandIndex] = flatVertexToGeometry.maxV[bedrockIndex] + height[sandIndex];
+    flatVertexToGeometry.maxV.xy /= flatVertexToGeometry.maxV[sandIndex] + height[waterIndex];
+    flatVertexToGeometry.maxV[waterIndex] = 1.0f;
+    
+    flatVertexToGeometry.isValid = true;
 
-    for (int i = 0; i < cellType; ++i) 
-    {
-        totalHeight += height[i];
-    }
+    const vec3 scale = vec3(gridScale, 0.5f * totalHeight, gridScale);
+    offset.x = gridScale * (cell.x + 0.5f);
+    offset.y += scale.y;
+    offset.z = gridScale * (cell.y + 0.5f);
 
-    totalHeight += scale.y;
-
-    vertexToGeometry.position = scale * position + vec3(0.0f, totalHeight, 0.0f);
+    vertexToGeometry.position = offset + scale * position;
+    vertexToGeometry.v = 0.5f * (position.y + 1.0f);
     vertexToGeometry.position = (localToWorld * vec4(vertexToGeometry.position, 1.0f)).xyz;
-
+    
     const mat3 normalMatrix = mat3(transpose(worldToLocal));
     vertexToGeometry.normal = normalMatrix * normal;
-    
-    flatVertexToGeometry.cell = cell;
-    flatVertexToGeometry.cellType = cellType;
-
+   
     gl_Position = worldToClip * vec4(vertexToGeometry.position, 1.0f);
 }

@@ -14,21 +14,22 @@ out FlatGeometryToFragment flatGeometryToFragment;
 
 void main()
 {
-    if (flatVertexToGeometry[0].cellType != -1) 
+    if (flatVertexToGeometry[0].isValid) 
     {
         flatGeometryToFragment.cell = flatVertexToGeometry[0].cell;
-        flatGeometryToFragment.cellType = flatVertexToGeometry[0].cellType;
+        flatGeometryToFragment.maxV = flatVertexToGeometry[0].maxV;
         
         for (int i = 0; i < 3; ++i)
         {
             geometryToFragment.position = vertexToGeometry[i].position;
             geometryToFragment.normal = vertexToGeometry[i].normal;
-           
+            geometryToFragment.v = vertexToGeometry[i].v;
+
             gl_Position = gl_in[i].gl_Position;
 
             EmitVertex();
         }
-    }
 
-    EndPrimitive();
+        EndPrimitive();
+    }
 }

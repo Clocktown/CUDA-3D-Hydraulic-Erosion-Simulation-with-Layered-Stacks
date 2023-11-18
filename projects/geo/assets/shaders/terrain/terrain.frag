@@ -7,6 +7,7 @@
 #include "../lighting/lighting.glsl"
 #include "../lighting/light.glsl"
 #include "../lighting/phong_brdf.glsl"
+#include "../math/constants.glsl"
 #include "../math/color.glsl"
 
 layout(early_fragment_tests) in;
@@ -17,8 +18,18 @@ layout(location = 0) out vec4 fragmentColor;
 
 PhongBRDF getPhongBRDF()
 {
+    int cellType;
+
+	for (cellType = bedrockIndex; cellType < waterIndex; ++cellType) 
+	{
+		if (geometryToFragment.v <= flatGeometryToFragment.maxV[cellType]) 
+	    {
+	        break;
+	    }
+	}
+
 	PhongBRDF phongBRDF;
-	phongBRDF.diffuseColor = sRGBToLinear(color[flatGeometryToFragment.cellType].rgb);
+	phongBRDF.diffuseColor = sRGBToLinear(color[cellType].rgb);
 	phongBRDF.diffuseReflectance = 0.99f;
 	phongBRDF.specularColor = vec3(1.0f);
 	phongBRDF.specularReflectance = 0.0f;

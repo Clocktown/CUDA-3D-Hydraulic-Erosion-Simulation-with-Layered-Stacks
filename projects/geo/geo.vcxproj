@@ -21,11 +21,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="geo\components\simulation.hpp" />
+    <ClInclude Include="geo\device\terrain_brdf.hpp" />
     <ClInclude Include="geo\graphics\terrain.hpp" />
     <ClInclude Include="geo\systems\editor_system.hpp" />
     <ClInclude Include="geo\geo.hpp" />
     <ClInclude Include="geo\singletons\editor.hpp" />
     <ClInclude Include="geo\graphics\terrain_brdf.hpp" />
+    <ClInclude Include="geo\systems\simulation_system.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\shaders\lighting\light.glsl" />
