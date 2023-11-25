@@ -38,7 +38,7 @@ struct Editor
 	{
 		struct Rain
 		{
-			float amount{ 0.1f };
+			float amount{ 500.0f };
 			bool isPaused{ true };
 		};
 

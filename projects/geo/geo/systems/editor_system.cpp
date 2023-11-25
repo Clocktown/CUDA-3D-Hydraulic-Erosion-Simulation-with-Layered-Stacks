@@ -234,8 +234,6 @@ void EditorSystem::updateTerrainGUI(Editor& editor)
 		ImGui::DragFloat("Grid Scale [m]", &editor.terrain.gridScale);
 		ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount);
 
-
-
 		ImGui::TreePop();
 	}
 }
@@ -250,6 +248,23 @@ void EditorSystem::updateSimulationGUI(Editor& editor)
 		ONEC_ASSERT(world.hasComponent<Simulation>(editor.terrain.entity), "Terrain must have a perspective camera component");
 
 		Simulation& simulation{ *world.getComponent<Simulation>(editor.terrain.entity) };
+
+		if (editor.simulation.isPaused)
+		{
+			if (ImGui::Button("Start"))
+			{
+				editor.simulation.isPaused = false;
+				simulation.isPaused = false;
+			}
+		}
+		else
+		{
+			if (ImGui::Button("Stop"))
+			{
+				editor.simulation.isPaused = true;
+				simulation.isPaused = true;
+			}
+		}
 
 		updateRainGUI(editor, simulation);
 
@@ -278,8 +293,11 @@ void EditorSystem::updateRainGUI(Editor& editor, Simulation& simulation)
 			}
 		}
 
-		ImGui::DragFloat("Amount [mm/m^2 * s]", &editor.simulation.rain.amount);
-
+		if (ImGui::DragFloat("Amount [mm/m^2 * s]", &editor.simulation.rain.amount) && !editor.simulation.rain.isPaused)
+		{
+			simulation.deviceParameters.rain.amount = editor.simulation.rain.amount;
+		}
+		
 		ImGui::TreePop();
 	}
 }

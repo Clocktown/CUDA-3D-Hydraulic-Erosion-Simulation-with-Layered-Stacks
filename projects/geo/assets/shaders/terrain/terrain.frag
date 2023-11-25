@@ -28,6 +28,11 @@ PhongBRDF getPhongBRDF()
 	    }
 	}
 
+	if (geometryToFragment.v > flatGeometryToFragment.maxV[cellType]) 
+	{
+	    discard;
+	}
+
 	PhongBRDF phongBRDF;
 	phongBRDF.diffuseColor = sRGBToLinear(color[cellType].rgb);
 	phongBRDF.diffuseReflectance = 0.99f;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <onec/config/cu.hpp>
 #include <glm/glm.hpp>
 #include <device_launch_parameters.h>
 
@@ -106,6 +107,25 @@ __forceinline__ __device__ bool isOutside(const glm::ivec2& cell, const glm::ive
 __forceinline__ __device__ bool isOutside(const glm::ivec3& cell, const glm::ivec3& gridSize)
 {
 	return cell.x >= gridSize.x || cell.y >= gridSize.y || cell.z >= gridSize.z || cell.x < 0 || cell.y < 0 || cell.z < 0;
+}
+
+__forceinline__ __device__ int findTopLayer(const glm::ivec3& cell, const Simulation& simulation)
+{
+	int z{ cell.z };
+
+	for (int i{ 0 }; i < simulation.gridSize.z; ++i)
+	{
+		const glm::i8vec4 info{ simulation.infoSurface.read<glm::i8vec4>(cell) };
+
+		if (info[aboveIndex] <= 0)
+		{
+			break;
+		}
+
+		z = info[aboveIndex];
+	}
+
+	return z;
 }
 
 }

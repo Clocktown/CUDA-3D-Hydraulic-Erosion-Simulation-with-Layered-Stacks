@@ -8,7 +8,8 @@ namespace geo
 namespace device
 {
 
-void initialize(const Launch& launch, const Simulation& simulation);
+void initialization(const Launch& launch, const Simulation& simulation);
+void rain(const Launch& launch, const Simulation& simulation);
 
 }
 }

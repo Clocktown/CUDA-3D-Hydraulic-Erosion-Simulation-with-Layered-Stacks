@@ -6,10 +6,8 @@ namespace geo
 {
 namespace device
 {
-namespace kernel
-{
 
-__global__ void initialize(Simulation simulation)
+__global__ void initializationKernel(Simulation simulation)
 {
 	const glm::ivec3 index{ getGlobalIndex3D() };
 	const glm::ivec3 stride{ getGridStride3D() };
@@ -22,18 +20,17 @@ __global__ void initialize(Simulation simulation)
 		{
 			for (cell.z = index.z; cell.z < simulation.gridSize.z; cell.z += stride.z)
 			{
-				surf3Dwrite(char4{ 0, 0, 0, 0 }, simulation.infoSurface, cell.x * static_cast<int>(sizeof(char4)), cell.y, cell.z);
-				surf3Dwrite(float4{ 0.0f, 0.0f, 0.0f, 0.0f }, simulation.heightSurface, cell.x * static_cast<int>(sizeof(float4)), cell.y, cell.z);
+				simulation.infoSurface.write(cell, char4{ 0, 0, 0, 0 });
+				simulation.heightSurface.write(cell, float4{ 0.0f, 0.0f, 0.0f, 0.0f });
+				simulation.waterVelocitySurface.write(cell, float2{ 0.0f, 0.0f });
 			}
 		}
 	}
 }
 
-}
-
-void initialize(const Launch& launch, const Simulation& simulation) 
+void initialization(const Launch& launch, const Simulation& simulation) 
 {
-	kernel::initialize<<<launch.gridStride3D.gridSize, launch.gridStride3D.blockSize>>>(simulation);
+	initializationKernel<<<launch.gridStride3D.gridSize, launch.gridStride3D.blockSize>>>(simulation);
 }
 
 }

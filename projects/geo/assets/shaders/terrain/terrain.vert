@@ -65,11 +65,11 @@ void main()
     }
 
     flatVertexToGeometry.cell = cell;
-    flatVertexToGeometry.maxV[bedrockIndex] = offset.y + height[bedrockIndex];
+    flatVertexToGeometry.maxV[bedrockIndex] = height[bedrockIndex];
     flatVertexToGeometry.maxV[sandIndex] = flatVertexToGeometry.maxV[bedrockIndex] + height[sandIndex];
     flatVertexToGeometry.maxV.xy /= flatVertexToGeometry.maxV[sandIndex] + height[waterIndex];
     flatVertexToGeometry.maxV[waterIndex] = 1.0f;
-    
+
     flatVertexToGeometry.isValid = true;
 
     const vec3 scale = vec3(gridScale, 0.5f * totalHeight, gridScale);
@@ -78,7 +78,7 @@ void main()
     offset.z = gridScale * (cell.y + 0.5f);
 
     vertexToGeometry.position = offset + scale * position;
-    vertexToGeometry.v = 0.5f * (position.y + 1.0f);
+    vertexToGeometry.v = uv.x;
     vertexToGeometry.position = (localToWorld * vec4(vertexToGeometry.position, 1.0f)).xyz;
     
     const mat3 normalMatrix = mat3(transpose(worldToLocal));

@@ -8,12 +8,24 @@ namespace geo
 
 void SimulationSystem::initialize(Simulation& simulation)
 {
-	const int device{ 0 };
+	ONEC_ASSERT(simulation.terrain != nullptr, "Terrain cannot be nullptr");
+
+	Terrain& terrain{ *simulation.terrain };
+	simulation.deviceParameters.gridSize = glm::ivec3{ terrain.gridSize, terrain.maxLayerCount };
+	simulation.deviceParameters.gridScale = terrain.gridScale;
+	simulation.deviceParameters.rGridScale = 1.0f / terrain.gridScale;
+	simulation.deviceParameters.cellCount = terrain.gridSize.x * terrain.gridSize.y * terrain.maxLayerCount;
+	simulation.deviceParameters.horizontalCellCount = terrain.gridSize.x * terrain.gridSize.y;
+
+	simulation.infoResource.initialize(terrain.infoMap, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+	simulation.heightResource.initialize(terrain.heightMap, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+	simulation.waterVelocityResource.initialize(terrain.waterVelocityMap, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+
 	int smCount;
 	int smThreadCount;
-	CU_CHECK_ERROR(cudaSetDevice(device));
-	CU_CHECK_ERROR(cudaDeviceGetAttribute(&smCount, cudaDevAttrMultiProcessorCount, device));
-	CU_CHECK_ERROR(cudaDeviceGetAttribute(&smThreadCount, cudaDevAttrMaxThreadsPerMultiProcessor, device));
+	CU_CHECK_ERROR(cudaSetDevice(0));
+	CU_CHECK_ERROR(cudaDeviceGetAttribute(&smCount, cudaDevAttrMultiProcessorCount, 0));
+	CU_CHECK_ERROR(cudaDeviceGetAttribute(&smThreadCount, cudaDevAttrMaxThreadsPerMultiProcessor, 0));
 	const float threadCount{ static_cast<float>(smCount * smThreadCount) };
 
 	simulation.launchParameters.standard1D.gridSize = static_cast<unsigned int>(glm::ceil(static_cast<float>(simulation.deviceParameters.horizontalCellCount) / static_cast<float>(simulation.launchParameters.standard1D.blockSize)));
@@ -34,22 +46,9 @@ void SimulationSystem::initialize(Simulation& simulation)
 	simulation.launchParameters.gridStride3D.gridSize.y = simulation.launchParameters.gridStride3D.gridSize.x;
 	simulation.launchParameters.gridStride3D.gridSize.z = simulation.launchParameters.gridStride3D.gridSize.x;
 
-	ONEC_ASSERT(simulation.terrain != nullptr, "Terrain cannot be nullptr");
-
-	Terrain& terrain{ *simulation.terrain };
-	simulation.deviceParameters.gridSize = glm::ivec3{ terrain.gridSize, terrain.maxLayerCount };
-	simulation.deviceParameters.gridScale = terrain.gridScale;
-	simulation.deviceParameters.rGridScale = 1.0f / terrain.gridScale;
-	simulation.deviceParameters.cellCount = terrain.gridSize.x * terrain.gridSize.y * terrain.maxLayerCount;
-	simulation.deviceParameters.horizontalCellCount = terrain.gridSize.x * terrain.gridSize.y;
-
-	simulation.infoResource.initialize(terrain.infoMap, cudaGraphicsRegisterFlagsSurfaceLoadStore);
-	simulation.heightResource.initialize(terrain.heightMap, cudaGraphicsRegisterFlagsSurfaceLoadStore);
-	simulation.waterVelocityResource.initialize(terrain.waterVelocityMap, cudaGraphicsRegisterFlagsSurfaceLoadStore);
-
 	map(simulation);
 
-	device::initialize(simulation.launchParameters, simulation.deviceParameters);
+	device::initialization(simulation.launchParameters, simulation.deviceParameters);
 
 	unmap(simulation);
 }
@@ -96,6 +95,8 @@ void SimulationSystem::simulate(Simulation& simulation, const float deltaTime)
 
 		simulation.deviceParameters.deltaTime = deltaTime;
 		simulation.deviceParameters.gravity = world.getSingleton<onec::Gravity>()->gravity;
+
+		device::rain(simulation.launchParameters, simulation.deviceParameters);
 	}
 
 	unmap(simulation);
@@ -115,9 +116,9 @@ void SimulationSystem::map(Simulation& simulation)
 	simulation.heightSurface.initialize(simulation.heightArray);
 	simulation.waterVelocitySurface.initialize(simulation.waterVelocityArray);
 
-	simulation.deviceParameters.infoSurface = simulation.infoSurface.getHandle();
-	simulation.deviceParameters.heightSurface = simulation.heightSurface.getHandle();
-	simulation.deviceParameters.waterVelocitySurface = simulation.waterVelocitySurface.getHandle();
+	simulation.deviceParameters.infoSurface.handle = simulation.infoSurface.getHandle();
+	simulation.deviceParameters.heightSurface.handle = simulation.heightSurface.getHandle();
+	simulation.deviceParameters.waterVelocitySurface.handle = simulation.waterVelocitySurface.getHandle();
 }
 
 void SimulationSystem::unmap(Simulation& simulation)
