@@ -14,6 +14,7 @@ namespace cu
 
 class GraphicsResource
 {
+public:
 	explicit GraphicsResource();
 	explicit GraphicsResource(onec::Buffer& buffer, const unsigned int flags = cudaGraphicsRegisterFlagsNone);
 	explicit GraphicsResource(onec::Texture& texture, const unsigned int flags = cudaGraphicsRegisterFlagsNone);

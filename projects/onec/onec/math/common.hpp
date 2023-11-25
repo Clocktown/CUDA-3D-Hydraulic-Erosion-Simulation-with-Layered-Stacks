@@ -20,3 +20,5 @@ CU_IF_HOST(requires std::is_integral_v<Integral>)
 CU_HOST_DEVICE constexpr bool isPowerOfTwo(const Integral value);
 
 }
+
+#include "common.inl"

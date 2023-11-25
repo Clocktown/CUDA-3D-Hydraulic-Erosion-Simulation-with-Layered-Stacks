@@ -257,17 +257,17 @@ void Texture::download(const Span<std::byte>&& data, const GLenum format, const 
 	size.y = glm::max(size.y, 1);
 	size.z = glm::max(size.z, 1);
 
-	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, 0, 0, 0, size.x, size.y, size.z, format, type, data.getByteCount(), data.getData()));
+	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, 0, 0, 0, size.x, size.y, size.z, format, type, data.getCount(), data.getData()));
 }
 
 void Texture::download(const Span<std::byte>&& data, const GLenum format, const GLenum type, const glm::ivec3& size, const int mipLevel) const
 {
-	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, 0, 0, 0, size.x, size.y, size.z, format, type, data.getByteCount(), data.getData()));
+	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, 0, 0, 0, size.x, size.y, size.z, format, type, data.getCount(), data.getData()));
 }
 
 void Texture::download(const Span<std::byte>&& data, const GLenum format, const GLenum type, const glm::ivec3& offset, const glm::ivec3& size, const int mipLevel) const
 {
-	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, offset.x, offset.y, offset.z, size.x, size.y, size.z, format, type, data.getByteCount(), data.getData()));
+	GL_CHECK_ERROR(glGetTextureSubImage(m_handle, mipLevel, offset.x, offset.y, offset.z, size.x, size.y, size.z, format, type, data.getCount(), data.getData()));
 }
 
 void Texture::create()

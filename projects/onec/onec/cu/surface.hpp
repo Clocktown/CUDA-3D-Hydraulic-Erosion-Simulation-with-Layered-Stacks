@@ -1,6 +1,7 @@
 #pragma once
 
 #include "array.hpp"
+#include "array_view.hpp"
 #include <cuda_runtime.h>
 
 namespace onec
@@ -13,6 +14,7 @@ class Surface
 public:
 	explicit Surface();
 	explicit Surface(Array& array);
+	explicit Surface(ArrayView& arrayView);
 	Surface(const Surface& other) = delete;
 	Surface(Surface&& other) noexcept;
 
@@ -22,6 +24,7 @@ public:
 	Surface& operator=(Surface&& other) noexcept;
 
 	void initialize(Array& array);
+	void initialize(ArrayView& arrayView);
 	void release();
 
 	cudaSurfaceObject_t getHandle();

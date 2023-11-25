@@ -25,6 +25,7 @@ public:
 	void setDirectory(const std::filesystem::path& directory);
 	void setVSyncCount(const int vSyncCount);
 	void setTargetFrameRate(const int targetFrameRate);
+	void setTimeScale(const double timeScale);
 	void setMaxDeltaTime(const double maxDeltaTime);
 	void setFixedDeltaTime(const double fixedDeltaTime);
 
@@ -34,6 +35,7 @@ public:
 	int getVSyncCount() const;
 	int getTargetFrameRate() const;
 	double getFrameRate() const;
+	double getTimeScale() const;
 	double getTime() const;
 	double getDeltaTime() const;
 	double getMaxDeltaTime() const;

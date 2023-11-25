@@ -1,6 +1,7 @@
 #include "editor_system.hpp"
 #include "../components/simulation.hpp"
 #include "../singletons/editor.hpp"
+#include "../systems/simulation_system.hpp"
 
 namespace geo
 {
@@ -16,6 +17,8 @@ void EditorSystem::start()
 	onec::Application& application{ onec::getApplication() };
 	application.setTargetFrameRate(editor.application.targetFramerate);
 	application.setVSyncCount(editor.application.isVSyncEnabled);
+	application.setTimeScale(editor.application.timeScale);
+	application.setFixedDeltaTime(editor.application.fixedDeltaTime);
 
 	initializeCamera(editor);
 	initializeTerrain(editor);
@@ -51,9 +54,12 @@ void EditorSystem::initializeCamera(Editor& editor)
 	onec::World& world{ onec::getWorld() };
 
 	editor.camera.entity = world.addEntity();
+
+	const float maxLength{ editor.terrain.gridScale * static_cast<float>(glm::max(editor.terrain.gridSize.x, editor.terrain.gridSize.y)) };
+
 	world.addComponent<onec::PerspectiveCamera>(editor.camera.entity, glm::radians(editor.camera.fieldOfView), editor.camera.nearPlane, editor.camera.farPlane);
 	world.addComponent<onec::Trackball>(editor.camera.entity);
-	world.addComponent<onec::Position>(editor.camera.entity, glm::vec3{ 0.0f, 0.0f, 5.0f });
+	world.addComponent<onec::Position>(editor.camera.entity, glm::vec3{ 0.0f, 0.25f * maxLength, 0.75f * maxLength });
 	world.addComponent<onec::Rotation>(editor.camera.entity);
 	world.addComponent<onec::LocalToWorld>(editor.camera.entity);
 	world.addComponent<onec::WorldToView>(editor.camera.entity);
@@ -112,41 +118,17 @@ void EditorSystem::initializeSimulation(Editor& editor)
 
 	Simulation& simulation{ world.addComponent<Simulation>(editor.terrain.entity) };
 	simulation.terrain = editor.terrain.terrain;
-	simulation.timeScale = editor.simulation.timeScale;
-	simulation.gravityScale = editor.simulation.gravityScale;
 	simulation.isPaused = editor.simulation.isPaused;
+
+	SimulationSystem::initialize(simulation);
 }
 
 void EditorSystem::updateTerrain(Editor& editor)
 {
-	//editor.terrain.gridSize = glm::ivec2{ 1 };
-	//editor.terrain.maxLayerCount = 4;
-
 	geo::Terrain& terrain{ *editor.terrain.terrain };
 	terrain.infoMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RGBA8I);
 	terrain.heightMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RGBA32F);
 	terrain.waterVelocityMap.initialize(GL_TEXTURE_3D, glm::ivec3{ editor.terrain.gridSize, editor.terrain.maxLayerCount }, GL_RG32F);
-	
-	const size_t count{ static_cast<size_t>(editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount) };
-	std::vector<glm::i8vec4> infos(count);
-	std::vector<glm::vec4> heights(count);
-	std::fill(heights.begin(), heights.end(), glm::vec4{ 0.0f });
-	std::fill(infos.begin(), infos.end(), glm::i8vec4{ 0 });
-
-	//infos[0][1] = 1;
-	//infos[1][1] = 2;
-	
-	for (glm::vec4& x : heights)
-	{
-		x = glm::vec4{ 1.0f, 0.5f, 2.0f, 4.5f };
-	}
-		 
-	//heights[0] = glm::vec4{ 1.0f, 0.5f, 2.0f, 4.5f };
-	//heights[1] = glm::vec4{ 1.0f, 1.0f, 0.0f, 6.5f };
-	//heights[2] = glm::vec4{ 0.5f, 1.5f, 1.0f, 9.5f };
-	
-	terrain.infoMap.upload(onec::asBytes(infos), GL_RGBA_INTEGER, GL_BYTE);
-	terrain.heightMap.upload(onec::asBytes(heights), GL_RGBA, GL_FLOAT);
 }
 
 void EditorSystem::updateMaterial(Editor& editor)
@@ -172,6 +154,8 @@ void EditorSystem::updateRenderMesh(Editor& editor)
 
 	ONEC_ASSERT(world.hasComponent<onec::RenderMesh>(editor.terrain.entity), "Terrain must have a render mesh component");
 
+	world.setComponent<onec::Position>(editor.terrain.entity, glm::vec3{ -0.5f * editor.terrain.gridScale * editor.terrain.gridSize.x, 0.0f, -0.5f * editor.terrain.gridScale * editor.terrain.gridSize.y });
+
 	onec::RenderMesh& renderMesh{ *world.getComponent<onec::RenderMesh>(editor.terrain.entity) };
 	renderMesh.instanceCount = editor.terrain.gridSize.x * editor.terrain.gridSize.y * editor.terrain.maxLayerCount;
 }
@@ -192,6 +176,16 @@ void EditorSystem::updateApplicationGUI(Editor& editor)
 			application.setTargetFrameRate(editor.application.targetFramerate);
 		}
 
+		if (ImGui::DragFloat("Time Scale", &editor.application.timeScale))
+		{
+			application.setTimeScale(editor.application.timeScale);
+		}
+
+		if (ImGui::DragFloat("Fixed Delta Time [s]", &editor.application.fixedDeltaTime))
+		{
+			application.setFixedDeltaTime(editor.application.fixedDeltaTime);
+		}
+
 		ImGui::TreePop();
 	}
 }
@@ -206,17 +200,17 @@ void EditorSystem::updateCameraGUI(Editor& editor)
 
 		onec::PerspectiveCamera& perspectiveCamera{ *world.getComponent<onec::PerspectiveCamera>(editor.camera.entity) };
 
-		if (ImGui::DragFloat("Field Of View", &editor.camera.fieldOfView))
+		if (ImGui::DragFloat("Field Of View [°]", &editor.camera.fieldOfView))
 		{
 			perspectiveCamera.fieldOfView = glm::radians(editor.camera.fieldOfView);
 		}
 
-		if (ImGui::DragFloat("Near Plane", &editor.camera.nearPlane))
+		if (ImGui::DragFloat("Near Plane [m]", &editor.camera.nearPlane))
 		{
 			perspectiveCamera.nearPlane = editor.camera.nearPlane;
 		}
 
-		if (ImGui::DragFloat("Far Plane", &editor.camera.farPlane))
+		if (ImGui::DragFloat("Far Plane [m]", &editor.camera.farPlane))
 		{
 			perspectiveCamera.farPlane = editor.camera.farPlane;
 		}
@@ -229,16 +223,18 @@ void EditorSystem::updateTerrainGUI(Editor& editor)
 {
 	if (ImGui::TreeNode("Terrain"))
 	{
-		ImGui::DragInt2("Grid Size", &editor.terrain.gridSize.x);
-		ImGui::DragFloat("Grid Scale", &editor.terrain.gridScale);
-		ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount);
-
 		if (ImGui::Button("Reset"))
 		{
 			updateTerrain(editor);
 			updateMaterial(editor);
 			updateRenderMesh(editor);
 		}
+
+		ImGui::DragInt2("Grid Size", &editor.terrain.gridSize.x);
+		ImGui::DragFloat("Grid Scale [m]", &editor.terrain.gridScale);
+		ImGui::DragInt("Max Layer Count", &editor.terrain.maxLayerCount);
+
+
 
 		ImGui::TreePop();
 	}
@@ -248,21 +244,41 @@ void EditorSystem::updateSimulationGUI(Editor& editor)
 {
 	if (ImGui::TreeNode("Simulation"))
 	{
+		onec::Application& application{ onec::getApplication() };
 		onec::World& world{ onec::getWorld() };
 
 		ONEC_ASSERT(world.hasComponent<Simulation>(editor.terrain.entity), "Terrain must have a perspective camera component");
 
 		Simulation& simulation{ *world.getComponent<Simulation>(editor.terrain.entity) };
 
-		if (ImGui::DragFloat("Time Scale", &editor.simulation.timeScale))
+		updateRainGUI(editor, simulation);
+
+		ImGui::TreePop();
+	}
+}
+
+void EditorSystem::updateRainGUI(Editor& editor, Simulation& simulation)
+{
+	if (ImGui::TreeNode("Rain"))
+	{
+		if (editor.simulation.rain.isPaused)
 		{
-			simulation.timeScale = editor.simulation.timeScale;
+			if (ImGui::Button("Start"))
+			{
+				editor.simulation.rain.isPaused = false;
+				simulation.deviceParameters.rain.amount = editor.simulation.rain.amount;
+			}
+		}
+		else
+		{
+			if (ImGui::Button("Stop"))
+			{
+				editor.simulation.rain.isPaused = true;
+				simulation.deviceParameters.rain.amount = 0.0f;
+			}
 		}
 
-		if (ImGui::DragFloat("Gravity Scale", &editor.simulation.gravityScale))
-		{
-			simulation.gravityScale = editor.simulation.gravityScale;
-		}
+		ImGui::DragFloat("Amount [mm/m^2 * s]", &editor.simulation.rain.amount);
 
 		ImGui::TreePop();
 	}

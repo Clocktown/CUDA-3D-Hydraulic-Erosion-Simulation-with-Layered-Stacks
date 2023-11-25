@@ -17,10 +17,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="geo\systems\editor_system.cpp" />
+    <ClCompile Include="geo\systems\simulation_system.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="geo\components\simulation.hpp" />
+    <ClInclude Include="geo\device\grid.hpp" />
+    <ClInclude Include="geo\device\kernels.hpp" />
+    <ClInclude Include="geo\device\launch.hpp" />
+    <ClInclude Include="geo\device\simulation.hpp" />
     <ClInclude Include="geo\device\terrain_brdf.hpp" />
     <ClInclude Include="geo\graphics\terrain.hpp" />
     <ClInclude Include="geo\systems\editor_system.hpp" />
@@ -47,6 +52,9 @@
     <None Include="assets\shaders\terrain\terrain.geom" />
     <None Include="assets\shaders\terrain\terrain.vert" />
     <None Include="assets\shaders\terrain\vertex_to_geometry.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="geo\device\initialization.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{963C492E-64A6-4E47-881B-19AFD4C70801}</ProjectGuid>

@@ -1,5 +1,6 @@
 #include "surface.hpp"
 #include "array.hpp"
+#include "array_view.hpp"
 #include "../config/cu.hpp"
 #include <cuda_runtime.h>
 #include <utility>
@@ -19,6 +20,14 @@ Surface::Surface(Array& array)
 {
 	const cudaResourceDesc resource{ .resType{ cudaResourceTypeArray },
 								     .res{ .array{ .array{ array.getHandle() } } } };
+
+	CU_CHECK_ERROR(cudaCreateSurfaceObject(&m_handle, &resource));
+}
+
+Surface::Surface(ArrayView& arrayView)
+{
+	const cudaResourceDesc resource{ .resType{ cudaResourceTypeArray },
+								     .res{ .array{ .array{ arrayView.getHandle() } } } };
 
 	CU_CHECK_ERROR(cudaCreateSurfaceObject(&m_handle, &resource));
 }
@@ -61,6 +70,19 @@ void Surface::initialize(Array& array)
 
 	const cudaResourceDesc resource{ .resType{ cudaResourceTypeArray },
 							         .res{ .array{ .array{ array.getHandle() } } } };
+
+	CU_CHECK_ERROR(cudaCreateSurfaceObject(&m_handle, &resource));
+}
+
+void Surface::initialize(ArrayView& arrayView)
+{
+	if (!isEmpty())
+	{
+		CU_CHECK_ERROR(cudaDestroySurfaceObject(m_handle));
+	}
+
+	const cudaResourceDesc resource{ .resType{ cudaResourceTypeArray },
+							         .res{ .array{ .array{ arrayView.getHandle() } } } };
 
 	CU_CHECK_ERROR(cudaCreateSurfaceObject(&m_handle, &resource));
 }

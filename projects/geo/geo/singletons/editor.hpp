@@ -12,6 +12,8 @@ struct Editor
 	struct Application
 	{
 		int targetFramerate{ 3000 };
+		float timeScale{ 1.0f };
+		float fixedDeltaTime{ 1.0f / 60.0f };
 		bool isVSyncEnabled{ false };
 	};
 
@@ -29,13 +31,18 @@ struct Editor
 		std::shared_ptr<geo::Terrain> terrain{ nullptr };
 		glm::ivec2 gridSize{ 256 };
 		float gridScale{ 1.0f };
-		int maxLayerCount{ 4 };
+		int maxLayerCount{ 8 };
 	};
 
 	struct Simulation
 	{
-		float timeScale{ 1.0f };
-		float gravityScale{ 1.0f };
+		struct Rain
+		{
+			float amount{ 0.1f };
+			bool isPaused{ true };
+		};
+
+		Rain rain;
 		bool isPaused{ true };
 	};
 
@@ -45,7 +52,6 @@ struct Editor
 		glm::vec3 bedrockColor{ 0.5f, 0.5f, 0.5f };
 		glm::vec3 sandColor{ 0.9f, 0.8f, 0.6f };
 		glm::vec3 waterColor{ 0.1f, 0.1f, 1.0f };
-		float ambientReflectance{ 0.05f };
 		std::shared_ptr<TerrainBRDF> material{ nullptr };
 	};
 

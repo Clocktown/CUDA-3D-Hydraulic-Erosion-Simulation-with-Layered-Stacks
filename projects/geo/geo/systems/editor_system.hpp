@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../components/simulation.hpp"
 #include "../singletons/editor.hpp"
 #include <onec/onec.hpp>
 
@@ -24,6 +25,7 @@ private:
 	static void updateCameraGUI(Editor& editor);
 	static void updateTerrainGUI(Editor& editor);
 	static void updateSimulationGUI(Editor& editor);
+	static void updateRainGUI(Editor& editor, Simulation& simulation);
 	static void updateRenderingGUI(Editor& editor);
 };
 

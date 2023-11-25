@@ -86,9 +86,9 @@ inline void TransformSystem::updateMatrices([[maybe_unused]] const entt::exclude
 			const glm::vec3& position{ view.get<Position>(entity).position };
 
 			glm::mat4& matrix{ reinterpret_cast<glm::mat4&>(view.get<Matrix>(entity)) };
-			matrix[0] = glm::vec4{ 0.0f };
-			matrix[1] = glm::vec4{ 0.0f };
-			matrix[2] = glm::vec4{ 0.0f };
+			matrix[0] = glm::vec4{ 1.0f, 0.0f, 0.0f, 0.0f };
+			matrix[1] = glm::vec4{ 0.0f, 1.0f, 0.0f, 0.0f };
+			matrix[2] = glm::vec4{ 0.0f, 0.0f, 1.0f, 0.0f };
 			matrix[3] = glm::vec4{ position, 1.0f };
 		}
 	}

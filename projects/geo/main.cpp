@@ -51,7 +51,7 @@ void update()
 
 void fixedUpdate()
 {
-
+	geo::SimulationSystem::fixedUpdate();
 }
 
 void preRender()

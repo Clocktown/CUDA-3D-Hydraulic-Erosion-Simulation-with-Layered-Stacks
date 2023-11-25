@@ -142,6 +142,11 @@ void Application::setTargetFrameRate(const int targetFrameRate)
 	m_targetFrameRate = static_cast<double>(targetFrameRate);
 }
 
+void Application::setTimeScale(const double timeScale)
+{
+	m_timeScale = timeScale;
+}
+
 void Application::setMaxDeltaTime(const double maxDeltaTime)
 {
 	m_maxDeltaTime = maxDeltaTime;
@@ -180,6 +185,11 @@ int Application::getTargetFrameRate() const
 double Application::getFrameRate() const
 {
 	return m_frameRate;
+}
+
+double Application::getTimeScale() const
+{
+	return m_timeScale;
 }
 
 double Application::getTime() const
