@@ -2,6 +2,8 @@
 
 #include <glm/glm.hpp>
 #include <string>
+#include <array>
+#include <vector>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -20,29 +22,60 @@ public:
 	Window& operator=(const Window& other) = delete;
 	Window& operator=(Window&& other) = delete;
 
-	void setTitle(const std::string_view& title);
-	
+	void open();
+	void close();
+	void maximize();
+	void minimize();
+	void restore();
+	void pollEvents();
+	void swapBuffers();
+
+	void setTitle(std::string_view title);
+	void setPosition(glm::ivec2 position);
+	void setSize(glm::ivec2 size);
+	void setSwapInterval(int swapInterval);
+
 	GLFWwindow* getHandle();
 	const std::string& getTitle() const;
-	const glm::ivec2& getPosition() const;
-	const glm::ivec2& getSize() const;
-	const glm::ivec2& getFramebufferSize() const;
-	const int getSampleCount() const;
+	glm::ivec2 getPosition() const;
+	glm::ivec2 getSize() const;
+	glm::ivec2 getFramebufferSize() const;
+	int getSampleCount() const;
+	int getSwapInterval() const;
+	glm::vec2 getMousePosition() const;
+	glm::vec2 getMouseDelta() const;
+	glm::vec2 getMouseScrollDelta() const;
+	const std::vector<unsigned int>& getInputText() const;
+	bool isOpen() const;
 	bool isFocused() const;
 	bool isHovered() const;
-	bool isMinimized() const;
 	bool isMaximized() const;
-	bool shouldClose() const;
+	bool isMinimized() const;
+	bool isKeyPressed(int key) const;
+	bool isKeyReleased(int key) const;
+	bool isKeyDown(int key) const;
+	bool isKeyUp(int key) const;
 private:
-	static void onFocus(GLFWwindow* const window, int isFocused);
-	static void onMinimize(GLFWwindow* const window, int isMinimized);
-	static void onMaximize(GLFWwindow* const window, int isMaximized);
-	static void onDrag(GLFWwindow* const window, const int x, const int y);
-	static void onResize(GLFWwindow* const window, const int width, const int height);
-	static void onFramebufferResize(GLFWwindow* const window, const int width, const int height);
-	static Window& get(const std::string_view* const title, const glm::ivec2& size, const int sampleCount);
+	static void onClose(GLFWwindow* window);
+	static void onFocus(GLFWwindow* window, int isFocused);
+	static void onMaximize(GLFWwindow* window, int isMaximized);
+	static void onMinimize(GLFWwindow* window, int isMinimized);
+	static void onMove(GLFWwindow* window, int x, int y);
+	static void onResize(GLFWwindow* window, int width, int height);
+	static void onFramebufferResize(GLFWwindow* window, int width, int height);
+	static void onMouseEnter(GLFWwindow* window, int hasMouseEntered);
+	static void onMouseMove(GLFWwindow* window, double x, double y);
+	static void onMouseScroll(GLFWwindow* window, double x, double y);
+	static void onMouseButtonInput(GLFWwindow* window, int mouseButton, int action, int modifier);
+	static void onKeyInput(GLFWwindow* window, int key, int scancode, int action, int modifier);
+	static void onCharInput(GLFWwindow* window, unsigned int unicode);
+	static Window& get(const std::string_view* title, glm::ivec2 size, int sampleCount);
 
-	explicit Window(const std::string_view* const title, const glm::ivec2& size, const int sampleCount);
+	explicit Window(const std::string_view* title, glm::ivec2 size, int sampleCount);
+
+	void initializeOpenGL();
+	void initializeImGui();
+	void updateMousePosition();
 
 	GLFWwindow* m_handle;
 	std::string m_title;
@@ -50,42 +83,19 @@ private:
 	glm::ivec2 m_size;
 	glm::ivec2 m_framebufferSize;
 	int m_sampleCount;
-
-	friend Window& createWindow(const std::string_view& title, const glm::ivec2& size, const int sampleCount);
+	int m_swapInterval{ 1 };
+	glm::vec2 m_mousePosition;
+	glm::vec2 m_mouseDelta{ 0.0f };
+	glm::vec2 m_mouseScrollDelta{ 0.0f };
+	std::array<char, GLFW_KEY_LAST + 1> m_actions;
+	std::vector<unsigned int> m_inputText;
+	std::array<bool, GLFW_KEY_LAST + 1> m_isKeyDown;
+	
+	friend Window& createWindow(std::string_view title, glm::ivec2 size, int sampleCount);
 	friend Window& getWindow();
 };
 
-struct OnWindowFocus
-{
-	bool isFocused;
-};
-
-struct OnWindowMinimize
-{
-	bool isMinimized;
-};
-
-struct OnWindowMaximize
-{
-	bool isMaximized;
-};
-
-struct OnWindowDrag
-{
-	glm::ivec2 position;
-};
-
-struct OnWindowResize
-{
-	glm::ivec2 size;
-};
-
-struct OnFramebufferResize
-{
-	glm::ivec2 size;
-};
-
-Window& createWindow(const std::string_view& title = "Window", const glm::ivec2& size = glm::ivec2{ 1280, 720 }, const int sampleCount = 0);
+Window& createWindow(std::string_view title = "Window", glm::ivec2 size = glm::ivec2{ 1280, 720 }, int sampleCount = 0);
 Window& getWindow();
 
 }

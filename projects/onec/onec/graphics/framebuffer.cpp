@@ -1,132 +1,66 @@
 #include "framebuffer.hpp"
 #include "texture.hpp"
-#include "renderbuffer.hpp"
+#include "../config/config.hpp"
 #include "../config/gl.hpp"
-#include "../core/window.hpp"
 #include "../utility/span.hpp"
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <utility>
 #include <string>
+#include <type_traits>
 
 namespace onec
 {
 
-Framebuffer::Framebuffer(const glm::ivec2& size, const int sampleCount) :
-	m_size{ size },
-	m_sampleCount{ sampleCount }
+Framebuffer::Framebuffer() :
+	m_handle{ GL_NONE },
+	m_size{ 0 }
 {
-	GL_CHECK_ERROR(glCreateFramebuffers(1, &m_handle));
+
 }
 
-Framebuffer::Framebuffer(Framebuffer&& other) noexcept :
+Framebuffer::Framebuffer(const Span<Texture*>&& colorBuffers, Texture* const depthBuffer, Texture* const stencilBuffer, const GLenum readBuffer)
+{
+	create(std::forward<const Span<Texture*>&&>(colorBuffers), depthBuffer, stencilBuffer, readBuffer);
+}
+
+Framebuffer::Framebuffer(Framebuffer&& other)  noexcept :
 	m_handle{ std::exchange(other.m_handle, GL_NONE) },
-	m_size{ std::exchange(other.m_size, glm::ivec2{ 0 }) },
-	m_sampleCount{ std::exchange(other.m_sampleCount, 0) }
+	m_size{ std::exchange(other.m_size, glm::ivec2{ 0 }) }
 {
 
 }
 
 Framebuffer::~Framebuffer()
 {
-	GL_CHECK_ERROR(glDeleteFramebuffers(1, &m_handle));
+	destroy();
 }
 
 Framebuffer& Framebuffer::operator=(Framebuffer&& other) noexcept
 {
 	if (this != &other)
 	{
-		GL_CHECK_ERROR(glDeleteFramebuffers(1, &m_handle));
+		destroy();
 
 		m_handle = std::exchange(other.m_handle, GL_NONE);
 		m_size = std::exchange(other.m_size, glm::ivec2{ 0 });
-		m_sampleCount = std::exchange(other.m_sampleCount, 0);
 	}
 
 	return *this;
 }
 
-void Framebuffer::bind(const GLenum target) const
+void Framebuffer::initialize(const Span<Texture*>&& colorBuffers, Texture* const depthBuffer, Texture* const stencilBuffer, const GLenum readBuffer)
 {
-	GL_CHECK_FRAMEBUFFER(m_handle, target);
-	GL_CHECK_ERROR(glBindFramebuffer(target, m_handle));
+	destroy();
+	create(std::forward<const Span<Texture*>&&>(colorBuffers), depthBuffer, stencilBuffer, readBuffer);
 }
 
-void Framebuffer::unbind(const GLenum target) const
+void Framebuffer::release()
 {
-	GL_CHECK_ERROR(glBindFramebuffer(target, GL_NONE));
-}
+	destroy();
 
-void Framebuffer::blit(const GLbitfield mask, const GLenum filter) const
-{
-	const glm::ivec2& size{ getWindow().getFramebufferSize() };
-	GL_CHECK_ERROR(glBlitNamedFramebuffer(m_handle, 0, 0, 0, m_size.x, m_size.y, 0, 0, size.x, size.y, mask, filter));
-}
-
-void Framebuffer::blit(const glm::ivec2& size, const GLbitfield mask, const GLenum filter) const
-{
-	GL_CHECK_ERROR(glBlitNamedFramebuffer(m_handle, 0, 0, 0, m_size.x, m_size.y, 0, 0, size.x, size.y, mask, filter));
-}
-
-void Framebuffer::blit(const glm::ivec2& offset, const glm::ivec2& size, const GLbitfield mask, const GLenum filter) const
-{
-	GL_CHECK_ERROR(glBlitNamedFramebuffer(m_handle, 0, 0, 0, m_size.x, m_size.y, offset.x, offset.y, size.x, size.y, mask, filter));
-}
-
-void Framebuffer::blit(Framebuffer& framebuffer, const GLbitfield mask, const GLenum filter) const
-{
-	GL_CHECK_ERROR(glBlitNamedFramebuffer(m_handle, framebuffer.getHandle(), 0, 0, m_size.x, m_size.y, 0, 0, framebuffer.getSize().x, framebuffer.getSize().y, mask, filter));
-}
-
-void Framebuffer::blit(Framebuffer& framebuffer, const glm::ivec2& size, const GLbitfield mask, const GLenum filter) const
-{
-	GL_CHECK_ERROR(glBlitNamedFramebuffer(m_handle, framebuffer.getHandle(), 0, 0, m_size.x, m_size.y, 0, 0, size.x, size.y, mask, filter));
-}
-
-void Framebuffer::blit(Framebuffer& framebuffer, const glm::ivec2& offset, const glm::ivec2& size, const GLbitfield mask, const GLenum filter) const
-{
-	GL_CHECK_ERROR(glBlitNamedFramebuffer(m_handle, framebuffer.getHandle(), 0, 0, m_size.x, m_size.y, offset.x, offset.y, size.x, size.y, mask, filter));
-}
-
-void Framebuffer::attachImage(const GLenum attachment, Texture& texture, const int mipLevel)
-{
-	GL_CHECK_ERROR(glNamedFramebufferTexture(m_handle, attachment, texture.getHandle(), mipLevel));
-}
-
-void Framebuffer::attachImage(const GLenum attachment, Renderbuffer& renderbuffer)
-{
-	GL_CHECK_ERROR(glNamedFramebufferRenderbuffer(m_handle, attachment, GL_RENDERBUFFER, renderbuffer.getHandle()));
-}
-
-void Framebuffer::detachImage(const GLenum attachment)
-{
-	GL_CHECK_ERROR(glNamedFramebufferRenderbuffer(m_handle, attachment, GL_RENDERBUFFER, GL_NONE));
-}
-
-void Framebuffer::setName(const std::string_view& name)
-{
-	GL_LABEL_OBJECT(m_handle, GL_FRAMEBUFFER, name);
-}
-
-void Framebuffer::setSize(const glm::ivec2& size)
-{
-	m_size = size;
-}
-
-void Framebuffer::setSampleCount(const int sampleCount)
-{
-	m_sampleCount = sampleCount;
-}
-
-void Framebuffer::setReadBuffer(const GLenum attachment)
-{
-	GL_CHECK_ERROR(glNamedFramebufferReadBuffer(m_handle, attachment));
-}
-
-void Framebuffer::setDrawBuffers(const Span<const GLenum>&& attachments)
-{
-	GL_CHECK_ERROR(glNamedFramebufferDrawBuffers(m_handle, attachments.getCount(), attachments.getData()));
+	m_handle = GL_NONE;
+	m_size = glm::ivec2{ 0 };
 }
 
 GLuint Framebuffer::getHandle()
@@ -134,14 +68,73 @@ GLuint Framebuffer::getHandle()
 	return m_handle;
 }
 
-const glm::ivec2& Framebuffer::getSize() const
+glm::ivec2 Framebuffer::getSize() const
 {
 	return m_size;
 }
 
-int Framebuffer::getSampleCount() const
+bool Framebuffer::isEmpty() const
 {
-	return m_sampleCount;
+	return m_handle == GL_NONE;
+}
+
+void Framebuffer::create(const Span<Texture*>&& colorBuffers, Texture* const depthBuffer, Texture* const stencilBuffer, const GLenum readBuffer)
+{
+	GLuint handle;
+	GL_CHECK_ERROR(glCreateFramebuffers(1, &handle));
+
+	m_handle = handle;
+
+	const std::size_t count{ static_cast<std::size_t>(colorBuffers.getCount()) };
+	std::vector<GLenum> drawBuffers;
+	drawBuffers.reserve(count);
+
+	Texture* texture{ nullptr };
+
+	for (std::size_t i{ 0 }; i < count; ++i)
+	{
+		texture = colorBuffers[i];
+
+		ONEC_ASSERT(texture != nullptr, "Texture must not be nullptr");
+
+		const GLenum attachment{ drawBuffers.emplace_back(GL_COLOR_ATTACHMENT0 + static_cast<GLenum>(i)) };
+
+		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, attachment, texture->getHandle(), 0));
+	}
+
+	if (depthBuffer != nullptr)
+	{
+		texture = depthBuffer;
+		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, GL_DEPTH_ATTACHMENT, texture->getHandle(), 0));
+	}
+
+	if (stencilBuffer != nullptr)
+	{
+		texture = stencilBuffer;
+		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, GL_STENCIL_ATTACHMENT, texture->getHandle(), 0));
+	}
+
+	GL_CHECK_ERROR(glNamedFramebufferReadBuffer(handle, readBuffer));
+	GL_CHECK_ERROR(glNamedFramebufferDrawBuffers(handle, static_cast<int>(count), drawBuffers.data()));
+	GL_CHECK_FRAMEBUFFER(handle, GL_READ_FRAMEBUFFER);
+	GL_CHECK_FRAMEBUFFER(handle, GL_DRAW_FRAMEBUFFER);
+
+	if (texture != nullptr)
+	{
+		m_size = texture->getSize();
+	}
+	else
+	{
+		m_size = glm::ivec2{ 0 };
+	}
+}
+
+void Framebuffer::destroy()
+{
+	if (!isEmpty())
+	{
+		GL_CHECK_ERROR(glDeleteFramebuffers(1, &m_handle));
+	}
 }
 
 }

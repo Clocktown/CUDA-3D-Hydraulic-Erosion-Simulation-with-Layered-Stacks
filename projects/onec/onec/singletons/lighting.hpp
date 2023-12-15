@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../components/light.hpp"
-#include "../device/lighting.hpp"
+#include "../uniforms/lighting.hpp"
 #include "../graphics/buffer.hpp"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -13,8 +13,8 @@ struct Lighting
 {
 	static constexpr GLuint uniformBufferLocation{ 1 };
 
-	device::Lighting uniforms;
-	Buffer uniformBuffer;
+	uniform::Lighting uniforms;
+	Buffer uniformBuffer{ sizeof(uniform::Lighting) };
 };
 
 }

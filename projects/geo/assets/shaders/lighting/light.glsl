@@ -29,6 +29,12 @@ struct DirectionalLight
 	vec3 color;
 };
 
+struct AmbientLight
+{
+	vec3 color;
+	float strength;
+};
+
 vec3 applyReinhardToneMap(const vec3 radiance)
 {
 	return radiance / (radiance + 1.0f);
@@ -73,6 +79,11 @@ vec3 getSpotLightIrradiance(const SpotLight spotLight, const vec3 direction, con
 vec3 getDirectionalLightIrradiance(const DirectionalLight directionalLight, const vec3 direction, const vec3 normal)
 {
 	return max(dot(-direction, normal), 0.0f) * directionalLight.strength * directionalLight.color;
+}
+
+vec3 getAmbientLightIrradiance(const AmbientLight ambientLight)
+{
+	return ambientLight.strength * ambientLight.color;
 }
 
 #endif

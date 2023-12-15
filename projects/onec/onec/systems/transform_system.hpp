@@ -6,25 +6,19 @@
 namespace onec
 {
 
-class TransformSystem
+template<typename... Includes, typename... Excludes>
+void updateModelMatrices(entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
+
+namespace internal
 {
-public:
-	template<typename... Includes, typename... Excludes>
-	static void update(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
-private:
-	template<typename... Includes, typename... Excludes>
-	static void updateLocalToParent(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
 
-	template<typename... Includes, typename... Excludes>
-	static void updateLocalToWorld(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
+template<typename... Includes, typename... Excludes>
+void updateModelMatrices(entt::entity entity, const glm::mat4& parentToWorld, entt::exclude_t<Excludes...> excludes);
 
-	template<typename... Includes, typename... Excludes>
-	static void updateLocalToWorld(const entt::entity entity, const glm::mat4& parentToWorld, const entt::exclude_t<Excludes...> excludes = entt::exclude_t>{});
+template<typename Matrix, typename... Includes, typename... Excludes>
+void updateModelMatrices(entt::exclude_t<Excludes...> excludes);
 
-	template<typename Matrix, typename... Includes, typename... Excludes>
-	static void updateMatrices(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
-};
-
+}
 }
 
 #include "transform_system.inl"

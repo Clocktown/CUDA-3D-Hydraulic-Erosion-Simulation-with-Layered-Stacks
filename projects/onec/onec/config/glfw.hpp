@@ -6,11 +6,11 @@
 #include <GLFW/glfw3.h>
 
 #ifdef ONEC_DEBUG
-#   define GLFW_CHECK_ERROR(function) function; onec::internal::glfwCheckError(__FILE__, __LINE__)
+#   define GLFW_CHECK_ERROR(code) code; onec::internal::glfwCheckError(__FILE__, __LINE__)
 #endif
 
 #ifdef ONEC_RELEASE
-#   define GLFW_CHECK_ERROR(function) function
+#   define GLFW_CHECK_ERROR(code) code
 #endif
 
 namespace onec
@@ -18,7 +18,7 @@ namespace onec
 namespace internal
 {
 
-void glfwCheckError(const char* const file, const int line);
+void glfwCheckError(const char* file, int line);
 
 }
 }

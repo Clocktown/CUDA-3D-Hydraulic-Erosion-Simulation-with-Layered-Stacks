@@ -1,16 +1,22 @@
 #include "vertex_array.hpp"
-#include "buffer.hpp"
 #include "../config/gl.hpp"
 #include <glad/glad.h>
 #include <utility>
 #include <string>
+#include <type_traits>
 
 namespace onec
 {
 
-VertexArray::VertexArray()
+VertexArray::VertexArray() :
+	m_handle{ GL_NONE }
 {
-	GL_CHECK_ERROR(glCreateVertexArrays(1, &m_handle));
+
+}
+
+VertexArray::VertexArray(const Span<const VertexAttribute>&& vertexAttributes)
+{
+	create(std::forward<const Span<const VertexAttribute>&&>(vertexAttributes));
 }
 
 VertexArray::VertexArray(VertexArray&& other) noexcept :
@@ -18,78 +24,71 @@ VertexArray::VertexArray(VertexArray&& other) noexcept :
 {
 
 }
-
 VertexArray::~VertexArray()
 {
-	GL_CHECK_ERROR(glDeleteVertexArrays(1, &m_handle));
+	destroy();
 }
 
 VertexArray& VertexArray::operator=(VertexArray&& other) noexcept
 {
 	if (this != &other)
 	{
-		GL_CHECK_ERROR(glDeleteVertexArrays(1, &m_handle));
+		destroy();
 		m_handle = std::exchange(other.m_handle, GL_NONE);
 	}
 
 	return *this;
 }
 
-void VertexArray::bind() const
+void VertexArray::initialize(const Span<const VertexAttribute>&& vertexAttributes)
 {
-	GL_CHECK_ERROR(glBindVertexArray(m_handle));
+	destroy();
+	create(std::forward<const Span<const VertexAttribute>&&>(vertexAttributes));
 }
 
-void VertexArray::unbind() const
+void VertexArray::release()
 {
-	GL_CHECK_ERROR(glBindVertexArray(GL_NONE));
-}
-
-void VertexArray::setName(const std::string_view& name)
-{
-	GL_LABEL_OBJECT(m_handle, GL_VERTEX_ARRAY, name);
-}
-
-void VertexArray::setVertexAttributeFormat(const int index, const int count, const GLenum type, const bool isNormalized, const int relativeOffset)
-{
-	ONEC_ASSERT(index >= 0, "Index must be greater than or equal to 0");
-	ONEC_ASSERT(relativeOffset >= 0, "Relative stride must be greater than or equal to 0");
-
-	GL_CHECK_ERROR(glVertexArrayAttribFormat(m_handle, static_cast<GLuint>(index), count, type, isNormalized, static_cast<GLuint>(relativeOffset)));
-}
-
-void VertexArray::setVertexAttributeLocation(const int index, const GLuint location)
-{
-	ONEC_ASSERT(index >= 0, "Index must be greater than or equal to 0");
-
-	GL_CHECK_ERROR(glVertexArrayAttribBinding(m_handle, location, static_cast<GLuint>(index)));
-}
-
-void VertexArray::setVertexAttributeDivisor(const int index, const int divisor)
-{
-	ONEC_ASSERT(index >= 0, "Index must be greater than or equal to 0");
-	ONEC_ASSERT(divisor >= 0, "Divisor must be greater than or equal to 0");
-
-	GL_CHECK_ERROR(glVertexArrayBindingDivisor(m_handle, static_cast<GLuint>(index), static_cast<GLuint>(divisor)));
-}
-
-void VertexArray::enableVertexAttribute(const int index)
-{
-	ONEC_ASSERT(index >= 0, "Index must be greater than or equal to 0");
-	
-	GL_CHECK_ERROR(glEnableVertexArrayAttrib(m_handle, static_cast<GLuint>(index)));
-}
-
-void VertexArray::disableVertexAttribute(const int index)
-{
-	ONEC_ASSERT(index >= 0, "Index must be greater than or equal to 0");
-
-	GL_CHECK_ERROR(glDisableVertexArrayAttrib(m_handle, static_cast<GLuint>(index)));
+	destroy();
+	m_handle = 0;
 }
 
 GLuint VertexArray::getHandle()
 {
 	return m_handle;
+}
+
+bool VertexArray::isEmpty() const
+{
+	return m_handle == GL_NONE;
+}
+
+void VertexArray::create(const Span<const VertexAttribute>&& vertexAttributes)
+{
+	GLuint handle;
+	GL_CHECK_ERROR(glCreateVertexArrays(1, &handle));
+
+	m_handle = handle;
+
+	const std::size_t count{ static_cast<std::size_t>(vertexAttributes.getCount()) };
+
+	for (std::size_t i{ 0 }; i < count; ++i)
+	{
+		const VertexAttribute& vertexAttribute{ vertexAttributes[i] };
+		const GLuint binding{ static_cast<GLuint>(vertexAttribute.binding) };
+		const GLuint location{ static_cast<GLuint>(i) };
+		
+		GL_CHECK_ERROR(glVertexArrayAttribBinding(handle, location, binding));
+		GL_CHECK_ERROR(glVertexArrayAttribFormat(handle, location, vertexAttribute.count, vertexAttribute.type, vertexAttribute.isNormalized, static_cast<GLuint>(vertexAttribute.relativeOffset)));
+		GL_CHECK_ERROR(glEnableVertexArrayAttrib(handle, location));
+	}
+}
+
+void VertexArray::destroy()
+{
+	if (!isEmpty())
+	{
+		GL_CHECK_ERROR(glDeleteVertexArrays(1, &m_handle));
+	}
 }
 
 }

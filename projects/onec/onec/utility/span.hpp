@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <initializer_list>
 #include <type_traits>
 #include <concepts>
@@ -13,18 +14,19 @@ class Span
 {
 public:
 	Span();
-	Span(Type* const data, const int count);
-	Span(Type* const first, Type* const last);
-	Span(const std::initializer_list<Type>& data) requires std::is_const_v<Type>;
+	Span(Type* data, int count);
+	Span(Type* first, Type* last);
+	Span(std::initializer_list<Type> initializerList) requires std::is_const_v<Type>;
 
-	template<size_t count>
-	Span(Type(&data)[count]);
+	template<std::size_t Count>
+	Span(Type(&array)[Count]);
 
 	template<typename Container> 
 	requires std::ranges::contiguous_range<Container> && std::convertible_to<typename Container::value_type*, Type*>
-	Span(Container& data);
+	Span(Container& container);
 
-	operator Span<const Type>() const;
+	Type& operator[](std::size_t index) const;
+	operator Span<const Type>() const requires (!std::is_const_v<Type>);
 
 	Type* begin() const;
 	Type* end() const;
@@ -40,23 +42,23 @@ private:
 };
 
 template<typename Type>
-auto asBytes(const Span<Type>&& data);
+auto asBytes(const Span<Type>&& span);
 
 template<typename Type>
-auto asBytes(Type* const data, const int count);
+auto asBytes(Type* data, int count);
 
 template<typename Type>
-auto asBytes(Type* const first, Type* const last);
+auto asBytes(Type* first, Type* last);
 
 template<typename Type>
-auto asBytes(const std::initializer_list<Type>& data);
+auto asBytes(std::initializer_list<Type> initializerList);
 
-template<typename Type, size_t count>
-auto asBytes(Type(&data)[count]);
+template<typename Type, std::size_t Count>
+auto asBytes(Type(&array)[Count]);
 
 template<typename Container>
 requires std::ranges::contiguous_range<Container>
-auto asBytes(Container& data);
+auto asBytes(Container& container);
 
 }
 

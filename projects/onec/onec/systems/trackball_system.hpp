@@ -3,9 +3,6 @@
 namespace onec
 {
 
-struct TrackballSystem
-{
-	static void update();
-};
+void updateTrackball();
 
 }

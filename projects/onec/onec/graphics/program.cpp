@@ -1,17 +1,24 @@
 #include "program.hpp"
-#include "shader.hpp"
 #include "../config/gl.hpp"
+#include "../utility/io.hpp"
+#include "../utility/span.hpp"
 #include <glad/glad.h>
+#include <utility>
 #include <string>
-#include <vector>
+#include <type_traits>
 
 namespace onec
 {
 
 Program::Program() :
-	m_handle{ glCreateProgram() }
+	m_handle{ GL_NONE }
 {
 
+}
+
+Program::Program(const Span<const std::filesystem::path>&& files)
+{
+	create(std::forward<const Span<const std::filesystem::path>&&>(files));
 }
 
 Program::Program(Program&& other)  noexcept :
@@ -22,65 +29,83 @@ Program::Program(Program&& other)  noexcept :
 
 Program::~Program()
 {
-	GL_CHECK_ERROR(glDeleteProgram(m_handle));
+	destroy();
 }
 
 Program& Program::operator=(Program&& other) noexcept
 {
 	if (this != &other)
 	{
-		GL_CHECK_ERROR(glDeleteProgram(m_handle));
+		destroy();
 		m_handle = std::exchange(other.m_handle, GL_NONE);
 	}
 
 	return *this;
 }
 
-void Program::use() const
+void Program::initialize(const Span<const std::filesystem::path>&& files)
 {
-	GL_CHECK_ERROR(glUseProgram(m_handle));
+	destroy();
+	create(std::forward<const Span<const std::filesystem::path>&&>(files));
 }
 
-void Program::disuse() const
+void Program::release()
 {
-	GL_CHECK_ERROR(glUseProgram(GL_NONE));
-}
-
-void Program::link()
-{
-	GL_CHECK_ERROR(glLinkProgram(m_handle));
-	GL_CHECK_PROGRAM(m_handle);
-
-	GLint shaderCount;
-	GL_CHECK_ERROR(glGetProgramiv(m_handle, GL_ATTACHED_SHADERS, &shaderCount));
-
-	std::vector<GLuint> shaders(static_cast<size_t>(shaderCount));
-	GL_CHECK_ERROR(glGetAttachedShaders(m_handle, shaderCount, nullptr, shaders.data()));
-
-	for (const GLuint shaderHandle : shaders)
-	{
-		GL_CHECK_ERROR(glDetachShader(m_handle, shaderHandle));
-	}
-}
-
-void Program::attachShader(const Shader& shader)
-{
-	GL_CHECK_ERROR(glAttachShader(m_handle, const_cast<Shader&>(shader).getHandle()));
-}
-
-void Program::detachShader(const Shader& shader)
-{
-	GL_CHECK_ERROR(glDetachShader(m_handle, const_cast<Shader&>(shader).getHandle()));
-}
-
-void Program::setName(const std::string_view& name)
-{
-	GL_LABEL_OBJECT(m_handle, GL_PROGRAM, name);
+	destroy();
+	m_handle = GL_NONE;
 }
 
 GLuint Program::getHandle()
 {
 	return m_handle;
+}
+
+bool Program::isEmpty() const
+{
+	return m_handle == GL_NONE;
+}
+
+void Program::create(const Span<const std::filesystem::path>&& files)
+{
+	const GLuint handle{ glCreateProgram() };
+
+	m_handle = handle;
+
+	std::vector<GLuint> shaders;
+	shaders.reserve(static_cast<std::size_t>(files.getCount()));
+
+	for (const std::filesystem::path& file : files)
+	{
+		GLenum type;
+		const std::string source{ readShader(file, type) };
+		const GLuint shader{ shaders.emplace_back(glCreateShader(type)) };
+
+		const char* const data{ source.data() };
+		const int count{ static_cast<int>(source.size()) };
+		GL_CHECK_ERROR(glShaderSource(shader, 1, &data, &count));
+
+		GL_CHECK_ERROR(glCompileShader(shader));
+		GL_CHECK_SHADER(shader);
+
+		GL_CHECK_ERROR(glAttachShader(handle, shader));
+	}
+
+	GL_CHECK_ERROR(glLinkProgram(handle));
+	GL_CHECK_PROGRAM(handle);
+
+	for (const GLuint shader : shaders)
+	{
+		GL_CHECK_ERROR(glDetachShader(handle, shader));
+		GL_CHECK_ERROR(glDeleteShader(shader));
+	}
+}
+
+void Program::destroy()
+{
+	if (!isEmpty())
+	{
+		GL_CHECK_ERROR(glDeleteProgram(m_handle));
+	}
 }
 
 }

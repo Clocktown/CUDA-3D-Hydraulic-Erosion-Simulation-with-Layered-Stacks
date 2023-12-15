@@ -1,4 +1,5 @@
 #version 460
+#extension GL_ARB_bindless_texture : require
 
 #include "material.glsl"
 #include "geometry_to_fragment.glsl"
@@ -20,7 +21,7 @@ PhongBRDF getPhongBRDF()
 {
     int cellType;
 
-	for (cellType = bedrockIndex; cellType < waterIndex; ++cellType) 
+	for (cellType = BEDROCK; cellType < WATER; ++cellType) 
 	{
 		if (geometryToFragment.v <= flatGeometryToFragment.maxV[cellType]) 
 	    {
@@ -28,16 +29,12 @@ PhongBRDF getPhongBRDF()
 	    }
 	}
 
-	if (geometryToFragment.v > flatGeometryToFragment.maxV[cellType]) 
-	{
-	    discard;
-	}
-
 	PhongBRDF phongBRDF;
-	phongBRDF.diffuseColor = sRGBToLinear(color[cellType].rgb);
-	phongBRDF.diffuseReflectance = 0.99f;
+	phongBRDF.diffuseColor = sRGBToLinear(color[cellType].xyz);
+	phongBRDF.diffuseReflectance = 0.96f;
 	phongBRDF.specularColor = vec3(1.0f);
 	phongBRDF.specularReflectance = 0.0f;
+	phongBRDF.ambientReflectance = 0.04f;
 	phongBRDF.shininess = 40.0f;
 	phongBRDF.position = geometryToFragment.position;
 	phongBRDF.normal = normalize(geometryToFragment.normal);
@@ -50,7 +47,7 @@ void main()
     const PhongBRDF phongBRDF = getPhongBRDF();
 	const vec3 viewDirection = normalize(viewToWorld[3].xyz - phongBRDF.position);
 
-	vec3 radiance = 0.01f * phongBRDF.diffuseColor;
+	vec3 radiance = getAmbientLightRadiance(ambientLight, phongBRDF);
 
 	for (int i = 0; i < pointLightCount; ++i)
 	{

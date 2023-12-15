@@ -10,6 +10,7 @@ struct PhongBRDF
 	float diffuseReflectance;
 	vec3 specularColor;
 	float specularReflectance;
+	float ambientReflectance;
 	float shininess;
 	vec3 emissionColor;
 	float emissionStrength;
@@ -61,6 +62,11 @@ vec3 getDirectionalLightRadiance(const DirectionalLight directionalLight, const 
 		                  getDirectionalLightIrradiance(directionalLight, directionalLight.direction, phongBRDF.normal);
 
 	return radiance;
+}
+
+vec3 getAmbientLightRadiance(const AmbientLight ambientLight, const PhongBRDF phongBRDF)
+{
+	return phongBRDF.ambientReflectance * phongBRDF.diffuseColor * getAmbientLightIrradiance(ambientLight);
 }
 
 vec3 getEmissionRadiance(const PhongBRDF phongBRDF, const vec3 direction)

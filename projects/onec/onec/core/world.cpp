@@ -1,16 +1,12 @@
 #include "world.hpp"
 #include "../config/config.hpp"
 #include <entt/entt.hpp>
+#include <xmemory>
+#include <string>
+
 
 namespace onec
 {
-
-World::World(const std::string_view& name) :
-	m_name{ name },
-	m_singleton{ m_registry.create() }
-{
-	
-}
 
 entt::entity World::addEntity()
 {
@@ -19,35 +15,22 @@ entt::entity World::addEntity()
 
 void World::removeEntity(const entt::entity entity)
 {
-	ONEC_ASSERT(entity != m_singleton, "Singleton cannot be destroyed");
-
 	m_registry.destroy(entity);
 }
 
 void World::removeEntities()
 {
 	m_registry.clear();
-	m_singleton = m_registry.create();
+}
+
+void World::removeSingletons()
+{
+	m_registry.ctx() = entt::internal::registry_context<std::allocator<entt::entity>>{ std::allocator<entt::entity>{} };
 }
 
 void World::removeSystems()
 {
-	m_systems.clear();
-}
-
-void World::setName(const std::string_view& name)
-{
-	m_name = name;
-}
-
-const std::string& World::getName() const
-{
-	return m_name;
-}
-
-entt::entity World::getSingleton() const
-{
-	return m_singleton;
+	m_dispatcher.clear();
 }
 
 int World::getEntityCount() const
@@ -57,13 +40,13 @@ int World::getEntityCount() const
 
 bool World::hasEntities() const
 {
-	return m_registry.storage<entt::entity>()->empty();
+	return m_registry.storage<entt::entity>()->in_use() > 0;
 }
 
 bool World::hasEntity(const entt::entity entity) const
 {
-	auto* entities{ m_registry.storage<entt::entity>() };
-	return entities->contains(entity) && (entities->index(entity) < entities->in_use());
+	auto* storage{ m_registry.storage<entt::entity>() };
+	return storage->contains(entity) && storage->index(entity) < storage->in_use();
 }
 
 World& getWorld()

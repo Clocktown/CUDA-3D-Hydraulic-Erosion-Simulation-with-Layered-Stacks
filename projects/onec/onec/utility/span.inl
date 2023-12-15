@@ -1,4 +1,6 @@
 #include "span.hpp"
+#include "../config/config.hpp"
+#include <cstddef>
 #include <initializer_list>
 #include <type_traits>
 #include <ranges>
@@ -31,18 +33,18 @@ inline Span<Type>::Span(Type* const first, Type* const last) :
 }
 
 template<typename Type>
-inline Span<Type>::Span(const std::initializer_list<Type>& data) requires std::is_const_v<Type> :
-m_data{ std::addressof(*data.begin()) },
-m_count{ static_cast<int>(data.size()) }
+inline Span<Type>::Span(const std::initializer_list<Type> initializerList) requires std::is_const_v<Type> :
+    m_data{ std::addressof(*initializerList.begin()) },
+    m_count{ static_cast<int>(initializerList.size()) }
 {
 
 }
 
 template<typename Type>
-template<size_t count>
-inline Span<Type>::Span(Type(&data)[count]) :
-	m_data{ data },
-	m_count{ static_cast<int>(count) }
+template<std::size_t Count>
+inline Span<Type>::Span(Type(&array)[Count]) :
+	m_data{ array },
+	m_count{ static_cast<int>(Count) }
 {
 
 }
@@ -50,17 +52,25 @@ inline Span<Type>::Span(Type(&data)[count]) :
 template<typename Type>
 template<typename Container>
 requires std::ranges::contiguous_range<Container> && std::convertible_to<typename Container::value_type*, Type*>
-Span<Type>::Span(Container& data) :
-	m_data{ data.data() },
-	m_count{ static_cast<int>(data.size()) }
+Span<Type>::Span(Container& container) :
+	m_data{ container.data() },
+	m_count{ static_cast<int>(container.size()) }
 {
 
 }
 
 template<typename Type> 
-inline Span<Type>::operator Span<const Type>() const
+inline Span<Type>::operator Span<const Type>() const requires (!std::is_const_v<Type>)
 {
 	return Span<const Type>{ m_data, m_count };
+}
+
+template<typename Type>
+inline Type& Span<Type>::operator[](std::size_t index) const
+{
+	ONEC_ASSERT(index < static_cast<std::size_t>(m_count), "Index must be smaller than count");
+
+	return m_data[index];
 }
 
 template<typename Type>
@@ -72,7 +82,7 @@ inline Type* Span<Type>::begin() const
 template<typename Type>
 inline Type* Span<Type>::end() const
 {
-	return m_data + static_cast<size_t>(m_count);
+	return m_data + static_cast<std::size_t>(m_count);
 }
 
 template<typename Type>
@@ -106,15 +116,15 @@ inline bool Span<Type>::isEmpty() const
 }
 
 template<typename Type>
-auto asBytes(const Span<Type>&& data)
+auto asBytes(const Span<Type>&& span)
 {
 	if constexpr (std::is_const_v<Type>)
 	{
-		return Span<const std::byte>{ reinterpret_cast<const std::byte*>(data.getData()), data.getByteCount() };
+		return Span<const std::byte>{ reinterpret_cast<const std::byte*>(span.getData()), span.getByteCount() };
 	}
 	else
 	{
-		return Span<std::byte>{ reinterpret_cast<std::byte*>(data.getData()), data.getByteCount() };
+		return Span<std::byte>{ reinterpret_cast<std::byte*>(span.getData()), span.getByteCount() };
 	}
 }
 
@@ -131,22 +141,22 @@ auto asBytes(Type* const first, Type* const last)
 }
 
 template<typename Type>
-auto asBytes(const std::initializer_list<Type>& data)
+auto asBytes(const std::initializer_list<Type> initializerList)
 {
-	return asBytes(Span<const Type>{ data });
+	return asBytes(Span<const Type>{ initializerList });
 }
 
-template<typename Type, size_t count>
-auto asBytes(Type(&data)[count])
+template<typename Type, std::size_t Count>
+auto asBytes(Type(&data)[Count])
 {
 	return asBytes(Span<Type>{ data });
 }
 
 template<typename Container>
 requires std::ranges::contiguous_range<Container>
-auto asBytes(Container& data)
+auto asBytes(Container& container)
 {
-	return asBytes(Span<typename Container::value_type>{ data });
+	return asBytes(Span<typename Container::value_type>{ container });
 }
 
 }

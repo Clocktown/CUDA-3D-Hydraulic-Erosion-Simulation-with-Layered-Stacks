@@ -5,13 +5,12 @@
 #include "../components/transform.hpp"
 #include "../components/render_mesh.hpp"
 #include "../singletons/mesh_renderer.hpp"
-#include "../device/mesh_renderer.hpp"
-#include "../graphics/mesh.hpp"
-#include "../graphics/material.hpp"
+#include "../uniforms/mesh_renderer.hpp"
 #include "../graphics/program.hpp"
 #include "../graphics/render_state.hpp"
-#include "../graphics/bind_group.hpp"
 #include "../graphics/vertex_array.hpp"
+#include "../graphics/mesh.hpp"
+#include "../graphics/material.hpp"
 #include <entt/entt.hpp>
 #include <vector>
 
@@ -19,22 +18,23 @@ namespace onec
 {
 
 template<typename ...Includes, typename ...Excludes>
-inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes)
+inline void renderMeshes(const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
 
 	ONEC_ASSERT(world.hasSingleton<MeshRenderer>(), "World must have a mesh renderer singleton");
 
 	MeshRenderer& meshRenderer{ *world.getSingleton<MeshRenderer>() };
-	meshRenderer.vertexArray.bind();
-	meshRenderer.uniformBuffer.bind(GL_UNIFORM_BUFFER, meshRenderer.uniformBufferLocation);
+	const GLuint vertexArray{ meshRenderer.vertexArray.getHandle() };
 
-	device::MeshRenderer uniforms;
+	GL_CHECK_ERROR(glBindVertexArray(vertexArray));
+	GL_CHECK_ERROR(glBindBufferBase(GL_UNIFORM_BUFFER, meshRenderer.uniformBufferLocation, meshRenderer.uniformBuffer.getHandle()));
+	
+	uniform::MeshRenderer uniforms;
 	Mesh* activeMesh{ nullptr };
 	Material* activeMaterial{ nullptr };
-	const Program* activeProgram{ nullptr };
+	Program* activeProgram{ nullptr };
 	const RenderState* activeRenderState{ nullptr };
-	const BindGroup* activeBindGroup{ nullptr };
 
 	const auto view{ world.getView<LocalToWorld, RenderMesh, Includes...>(excludes) };
 
@@ -50,14 +50,13 @@ inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes
 		if (renderMesh.mesh.get() != activeMesh)
 		{
 			activeMesh = renderMesh.mesh.get();
-
-			GL_CHECK_ERROR(glVertexArrayElementBuffer(meshRenderer.vertexArray.getHandle(), activeMesh->indexBuffer.getHandle()));
-			GL_CHECK_ERROR(glVertexArrayVertexBuffer(meshRenderer.vertexArray.getHandle(), 0, activeMesh->positionBuffer.getHandle(), 0, sizeof(glm::vec3)));
-			GL_CHECK_ERROR(glVertexArrayVertexBuffer(meshRenderer.vertexArray.getHandle(), 1, activeMesh->vertexPropertyBuffer.getHandle(), 0, sizeof(VertexProperties)));
+	
+			GL_CHECK_ERROR(glVertexArrayElementBuffer(vertexArray, activeMesh->indexBuffer.getHandle()));
+			GL_CHECK_ERROR(glVertexArrayVertexBuffer(vertexArray, 0, activeMesh->positionBuffer.getHandle(), 0, sizeof(glm::vec3)));
+			GL_CHECK_ERROR(glVertexArrayVertexBuffer(vertexArray, 1, activeMesh->vertexPropertyBuffer.getHandle(), 0, sizeof(VertexProperties)));
 		}
 
-		const glm::mat4& localToWorld{ view.get<LocalToWorld>(entity).localToWorld };
-		uniforms.localToWorld = localToWorld;
+		uniforms.localToWorld = view.get<LocalToWorld>(entity).localToWorld;
 		uniforms.worldToLocal = glm::inverse(uniforms.localToWorld);
 		meshRenderer.uniformBuffer.upload(asBytes(&uniforms, 1));
 
@@ -82,28 +81,69 @@ inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes
 				ONEC_ASSERT(material->renderState != nullptr, "Material must have a render state");
 
 				activeMaterial = material;
-				activeMaterial->uniformBuffer.bind(GL_UNIFORM_BUFFER, meshRenderer.materialBufferLocation);
 
-				const Program* const program{ material->program.get() };
+				GL_CHECK_ERROR(glBindBufferBase(GL_UNIFORM_BUFFER, meshRenderer.materialBufferLocation, activeMaterial->uniformBuffer.getHandle()));
+
+				Program* const program{ material->program.get() };
 				const RenderState* const renderState{ material->renderState.get() };
-				const BindGroup* const bindGroup{ material->bindGroup.get() };
 
 				if (program != activeProgram)
 				{
 					activeProgram = program;
-					activeProgram->use();
+					GL_CHECK_ERROR(glUseProgram(activeProgram->getHandle()));
 				}
 
 				if (renderState != activeRenderState)
 				{
 					activeRenderState = renderState;
-					activeRenderState->use();
-				}
 
-				if (bindGroup != nullptr && bindGroup != activeBindGroup)
-				{
-					activeBindGroup = bindGroup;
-					activeBindGroup->bind();
+					GL_CHECK_ERROR(glColorMask(activeRenderState->colorMask.x, activeRenderState->colorMask.y, activeRenderState->colorMask.z, activeRenderState->colorMask.w));
+
+					if (activeRenderState->isDepthTestEnabled)
+					{
+						GL_CHECK_ERROR(glEnable(GL_DEPTH_TEST));
+						GL_CHECK_ERROR(glDepthMask(activeRenderState->depthMask));
+						GL_CHECK_ERROR(glDepthFunc(activeRenderState->depthFunction));
+					}
+					else
+					{
+						GL_CHECK_ERROR(glDisable(GL_DEPTH_TEST));
+					}
+
+					if (activeRenderState->isStencilTestEnabled)
+					{
+						GL_CHECK_ERROR(glEnable(GL_STENCIL_TEST));
+						GL_CHECK_ERROR(glStencilFunc(activeRenderState->stencilFunction, activeRenderState->stencilReference, activeRenderState->stencilMask));
+						GL_CHECK_ERROR(glStencilOp(activeRenderState->stencilFailOperation, activeRenderState->stencilDepthFailOperation, activeRenderState->stencilPassOperation));
+					}
+					else
+					{
+						GL_CHECK_ERROR(glDisable(GL_STENCIL_TEST));
+					}
+
+					if (activeRenderState->isBlendingEnabled)
+					{
+						GL_CHECK_ERROR(glEnable(GL_BLEND));
+						GL_CHECK_ERROR(glBlendEquation(activeRenderState->blendEquation));
+						GL_CHECK_ERROR(glBlendFunc(activeRenderState->blendSourceFactor, activeRenderState->blendDestinationFactor));
+						GL_CHECK_ERROR(glBlendColor(activeRenderState->blendColor.x, activeRenderState->blendColor.y, activeRenderState->blendColor.z, activeRenderState->blendColor.w));
+					}
+					else
+					{
+						GL_CHECK_ERROR(glDisable(GL_BLEND));
+					}
+
+					if (activeRenderState->isCullingEnabled)
+					{
+						GL_CHECK_ERROR(glEnable(GL_CULL_FACE));
+						GL_CHECK_ERROR(glCullFace(activeRenderState->cullFace));
+					}
+					else
+					{
+						GL_CHECK_ERROR(glDisable(GL_CULL_FACE));
+					}
+
+					GL_CHECK_ERROR(glPolygonMode(GL_FRONT_AND_BACK, activeRenderState->polygonMode));
 				}
 			}
 
@@ -117,7 +157,25 @@ inline void MeshRenderSystem::update(const entt::exclude_t<Excludes...> excludes
 
 	if (activeRenderState != nullptr)
 	{
-		activeRenderState->disuse();
+		GL_CHECK_ERROR(glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
+
+		GL_CHECK_ERROR(glDisable(GL_DEPTH_TEST));
+		GL_CHECK_ERROR(glDepthMask(GL_TRUE));
+		GL_CHECK_ERROR(glDepthFunc(GL_LESS));
+
+		GL_CHECK_ERROR(glDisable(GL_STENCIL_TEST));
+		GL_CHECK_ERROR(glStencilFunc(GL_ALWAYS, 0, std::numeric_limits<unsigned int>::max()));
+		GL_CHECK_ERROR(glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP));
+
+		GL_CHECK_ERROR(glDisable(GL_BLEND));
+		GL_CHECK_ERROR(glBlendEquation(GL_FUNC_ADD));
+		GL_CHECK_ERROR(glBlendFunc(GL_ONE, GL_ZERO));
+		GL_CHECK_ERROR(glBlendColor(0.0f, 0.0f, 0.0f, 0.0f));
+
+		GL_CHECK_ERROR(glDisable(GL_CULL_FACE));
+		GL_CHECK_ERROR(glCullFace(GL_BACK));
+
+		GL_CHECK_ERROR(glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
 	}
 }
 

@@ -13,7 +13,7 @@ public:
 	Application(const Application& other) = delete;
 	Application(Application&& other) = delete;
 	
-	~Application();
+	~Application() = default;
 
 	Application& operator=(const Application& other) = delete;
 	Application& operator=(Application&& other) = delete;
@@ -21,18 +21,16 @@ public:
 	void run();
 	void exit();
 
-	void setName(const std::string_view& name);
+	void setName(std::string_view name);
 	void setDirectory(const std::filesystem::path& directory);
-	void setVSyncCount(const int vSyncCount);
-	void setTargetFrameRate(const int targetFrameRate);
-	void setTimeScale(const double timeScale);
-	void setMaxDeltaTime(const double maxDeltaTime);
-	void setFixedDeltaTime(const double fixedDeltaTime);
+	void setTargetFrameRate(int targetFrameRate);
+	void setTimeScale(double timeScale);
+	void setMaxDeltaTime(double maxDeltaTime);
+	void setFixedDeltaTime(double fixedDeltaTime);
 
 	const std::string& getName() const;
 	const std::filesystem::path& getDirectory() const;
 	int getFrameCount() const;
-	int getVSyncCount() const;
 	int getTargetFrameRate() const;
 	double getFrameRate() const;
 	double getTimeScale() const;
@@ -43,17 +41,16 @@ public:
 	double getFixedDeltaTime() const;
 	double getUnscaledTime() const;
 	double getUnscaledDeltaTime() const;
+	double getRealTime() const;
 	bool isRunning() const;
-	bool isVSyncEnabled() const;
 private:
-	static Application& get(const std::string_view* const name);
+	static Application& get(const std::string_view* name);
 
-	explicit Application(const std::string_view* const name);
+	explicit Application(const std::string_view* name);
 
 	std::string m_name;
 	std::filesystem::path m_directory{ std::filesystem::current_path() };
 	int m_frameCount{ 0 };
-	int m_vSyncCount{ 1 };
 	double m_targetFrameRate{ 60.0 };
 	double m_frameRate{ 0.0 };
 	double m_timeScale{ 1.0 };
@@ -65,33 +62,12 @@ private:
 	double m_unscaledTime{ 0.0 };
 	double m_unscaledDeltaTime{ 0.0 };
 	bool m_isRunning{ false };
-	bool m_shouldExit{ false };
 
-	friend Application& createApplication(const std::string_view& name, const glm::ivec2& size, const int sampleCount);
+	friend Application& createApplication(std::string_view name, glm::ivec2 size, int sampleCount);
 	friend Application& getApplication();
 };
 
-struct OnStart
-{
-
-};
-
-struct OnUpdate
-{
-
-};
-
-struct OnFixedUpdate
-{
-
-};
-
-struct OnExit
-{
-
-};
-
-Application& createApplication(const std::string_view& name = "Application", const glm::ivec2& size = glm::vec2{ 1280, 720 }, const int sampleCount = 0);
+Application& createApplication(std::string_view name = "Application", glm::ivec2 size = glm::vec2{ 1280, 720 }, int sampleCount = 0);
 Application& getApplication();
 
 }

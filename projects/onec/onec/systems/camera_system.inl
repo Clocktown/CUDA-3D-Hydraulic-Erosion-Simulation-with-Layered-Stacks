@@ -13,27 +13,13 @@
 namespace onec
 {
 
-template<typename ...Includes, typename ...Excludes>
-inline void CameraSystem::update(const entt::exclude_t<Excludes...> excludes)
-{
-	updateParentToView<Includes...>(excludes);
-	updateWorldToView<Includes...>(excludes);
-	updateViewToClip<Includes...>(excludes);
-}
-
 template<typename... Includes, typename... Excludes>
-inline void CameraSystem::updateParentToView(const entt::exclude_t<Excludes...> excludes)
+inline void updateViewMatrices(const entt::exclude_t<Excludes...> excludes)
 {
-	updateMatrices<ParentToView, Parent, Includes...>(excludes);
-}
+	internal::updateViewMatrices<ParentToView, Parent, Includes...>(excludes);
+	internal::updateViewMatrices<WorldToView, Includes...>(entt::exclude<Parent, Excludes...>);
 
-template<typename... Includes, typename... Excludes>
-inline void CameraSystem::updateWorldToView(const entt::exclude_t<Excludes...> excludes)
-{
 	World& world{ getWorld() };
-
-	updateMatrices<WorldToView, Includes...>(entt::exclude<Parent, Excludes...>);
-
 	const auto view{ world.getView<Parent, ParentToView, WorldToView, Includes...>(excludes) };
 
 	for (const entt::entity entity : view)
@@ -51,7 +37,7 @@ inline void CameraSystem::updateWorldToView(const entt::exclude_t<Excludes...> e
 }
 
 template<typename... Includes, typename... Excludes>
-inline void CameraSystem::updateViewToClip(const entt::exclude_t<Excludes...> excludes)
+inline void updateProjectionMatrices(const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
 
@@ -75,7 +61,7 @@ inline void CameraSystem::updateViewToClip(const entt::exclude_t<Excludes...> ex
 			const OrthographicCamera& orthographicCamera{ view.get<OrthographicCamera>(entity) };
 
 			glm::mat4& viewToClip{ view.get<ViewToClip>(entity).viewToClip };
-			viewToClip = glm::ortho(orthographicOffset.x, orthographicCamera.scale * orthographicSize.x, orthographicOffset.y, orthographicCamera.scale * orthographicSize.y, orthographicCamera.nearPlane, orthographicCamera.farPlane);
+			viewToClip = glm::ortho(orthographicOffset.x, orthographicCamera.orthographicScale * orthographicSize.x, orthographicOffset.y, orthographicCamera.orthographicScale * orthographicSize.y, orthographicCamera.nearPlane, orthographicCamera.farPlane);
 		}
 	}
 
@@ -92,11 +78,14 @@ inline void CameraSystem::updateViewToClip(const entt::exclude_t<Excludes...> ex
 	}
 }
 
+namespace internal
+{
+
 template<typename Matrix, typename... Includes, typename... Excludes>
-inline void CameraSystem::updateMatrices(const entt::exclude_t<Excludes...> excludes)
+inline void updateViewMatrices(const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
-	
+
 	{
 		const auto view{ world.getView<Position, Matrix, Includes...>(entt::exclude<Rotation, Excludes...>) };
 
@@ -105,9 +94,9 @@ inline void CameraSystem::updateMatrices(const entt::exclude_t<Excludes...> excl
 			const glm::vec3& position{ view.get<Position>(entity).position };
 
 			glm::mat4& matrix{ reinterpret_cast<glm::mat4&>(view.get<Matrix>(entity)) };
-			matrix[0] = glm::vec4{ 0.0f };
-			matrix[1] = glm::vec4{ 0.0f };
-			matrix[2] = glm::vec4{ 0.0f };
+			matrix[0] = glm::vec4{ 1.0f, 0.0f, 0.0f, 0.0f };
+			matrix[1] = glm::vec4{ 0.0f, 1.0f, 0.0f, 0.0f };
+			matrix[2] = glm::vec4{ 0.0f, 0.0f, 1.0f, 0.0f };
 			matrix[3] = glm::vec4{ -position, 1.0f };
 		}
 	}
@@ -123,7 +112,7 @@ inline void CameraSystem::updateMatrices(const entt::exclude_t<Excludes...> excl
 			matrix = glm::mat4_cast(glm::conjugate(rotation));
 		}
 	}
-	
+
 	{
 		const auto view{ world.getView<Position, Rotation, Matrix, Includes...>(excludes) };
 
@@ -138,4 +127,5 @@ inline void CameraSystem::updateMatrices(const entt::exclude_t<Excludes...> excl
 	}
 }
 
+}
 }

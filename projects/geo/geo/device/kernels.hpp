@@ -10,6 +10,7 @@ namespace device
 
 void initialization(const Launch& launch, const Simulation& simulation);
 void rain(const Launch& launch, const Simulation& simulation);
+void water(const Launch& launch, const Simulation& simulation);
 
 }
 }

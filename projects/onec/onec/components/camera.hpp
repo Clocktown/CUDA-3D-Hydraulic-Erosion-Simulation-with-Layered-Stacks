@@ -14,7 +14,7 @@ struct PerspectiveCamera
 
 struct OrthographicCamera
 {
-	float scale{ 6.0f };
+	float orthographicScale{ 6.0f };
 	float nearPlane{ 0.1f };
 	float farPlane{ 1000.0f };
 };

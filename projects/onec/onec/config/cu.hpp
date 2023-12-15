@@ -4,41 +4,42 @@
 #include <cuda_runtime.h>
 
 #if !defined(__CUDACC__) && !defined(__CUDABE__)
-#   define CU_ERROR(message) ONEC_ERROR(message)
-#   define CU_ASSERT(condition, message) ONEC_ASSERT(condition, message)
 #   define CU_INLINE inline
 #   define CU_HOST_DEVICE
-#   define CU_IF_HOST(function) function
-#   define CU_IF_DEVICE(function)
+#   define CU_CONSTEXPR constexpr
+#   define CU_IF_HOST(code) code
+#   define CU_IF_DEVICE(code)
 #else
 #   ifdef ONEC_DEBUG
-#       define CU_ERROR(message) printf("ONEC Error: %s\nFile: %s\nLine: %i\n", message, __FILE__, __LINE__); __trap()
-#       define CU_ASSERT(condition, message) if (!(condition))\
-                                             {\
-                                                 CU_ERROR(message);\
-                                             }\
-                                             static_cast<void>(0)
-#   endif
+#       include <stdio.h>
 
-#   ifdef ONEC_RELEASE
-#       define CU_ERROR(message) 
-#       define CU_ASSERT(condition, message)
+#       undef ONEC_ERROR
+#       undef ONEC_ASSERT
+
+#       define ONEC_ERROR(message) printf("ONEC Error\nDescription: %s\nFile: %s\nLine: %i\n", message, __FILE__, __LINE__);\
+                                   __trap()
+#       define ONEC_ASSERT(condition, message) if (!(condition))\
+                                               {\
+                                                   ONEC_ERROR(message);\
+                                               }\
+                                               static_cast<void>(0)
 #   endif
 
 #   define CU_INLINE __forceinline__
-#   define CU_HOST_DEVICE __host__ __device__
-#   define CU_IF_HOST(function) 
-#   define CU_IF_DEVICE(function) function
+#   define CU_HOST_DEVICE __device__
+#   define CU_CONSTEXPR 
+#   define CU_IF_HOST(code) 
+#   define CU_IF_DEVICE(code) code
 #endif
 
 #ifdef ONEC_DEBUG
-#   define CU_CHECK_ERROR(function) onec::internal::cuCheckError(function, __FILE__, __LINE__)
-#   define CU_CHECK_KERNEL(kernel) kernel; CU_CHECK_ERROR(cudaDeviceSynchronize())
+#   define CU_CHECK_ERROR(code) code; onec::internal::cuCheckError(__FILE__, __LINE__)
+#   define CU_CHECK_KERNEL(...) __VA_ARGS__; onec::internal::cuCheckError(__FILE__, __LINE__); CU_CHECK_ERROR(cudaDeviceSynchronize())
 #endif
 
 #ifdef ONEC_RELEASE
-#   define CU_CHECK_ERROR(function) function
-#   define CU_CHECK_KERNEL(kernel) kernel
+#   define CU_CHECK_ERROR(code) code
+#   define CU_CHECK_KERNEL(...) __VA_ARGS__
 #endif
 
 namespace onec
@@ -46,7 +47,7 @@ namespace onec
 namespace internal
 {
 
-void cuCheckError(const cudaError_t error, const char* const file, const int line);
+void cuCheckError(const char* file, int line);
 
 }
 }

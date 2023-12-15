@@ -5,13 +5,8 @@
 namespace onec
 {
 
-struct MeshRenderSystem
-{
-	static void start();
-
-	template<typename... Includes, typename... Excludes>
-	static void update(const entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
-};
+template<typename... Includes, typename... Excludes>
+void renderMeshes(entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
 
 }
 

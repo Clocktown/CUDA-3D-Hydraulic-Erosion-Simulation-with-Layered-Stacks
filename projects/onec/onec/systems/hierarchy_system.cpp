@@ -10,7 +10,7 @@
 namespace onec
 {
 
-void HierarchySystem::update()
+void updateHierarchy()
 {
 	World& world{ getWorld() };
 	std::unordered_map<entt::entity, std::vector<entt::entity>> map;
@@ -24,7 +24,7 @@ void HierarchySystem::update()
 
 			ONEC_ASSERT(world.hasEntity(parent), "Parent must refer to an existing entity");
 			ONEC_ASSERT(world.hasComponent<LocalToWorld>(parent), "Parent must have local to world component");
-
+;
 			world.addComponent<Children>(parent);
 
 			std::vector<entt::entity>& children{ map.try_emplace(parent).first->second };
@@ -37,11 +37,11 @@ void HierarchySystem::update()
 
 		for (const entt::entity entity : view)
 		{
-			const auto it{ map.find(entity) };
+			const auto iterator{ map.find(entity) };
 
-			if (it != map.end())
+			if (iterator != map.end())
 			{
-				view.get<Children>(entity).children = std::move(it->second);
+				view.get<Children>(entity).children = std::move(iterator->second);
 			}
 			else
 			{

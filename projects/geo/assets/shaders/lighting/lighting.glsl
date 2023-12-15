@@ -12,6 +12,7 @@ layout(binding = 1, std140) uniform LightingBuffer
 	PointLight pointLights[maxPointLightCount];
 	SpotLight spotLights[maxSpotLightCount];
 	DirectionalLight directionalLights[maxDirectionalLightCount];
+	AmbientLight ambientLight;
 	int pointLightCount;
 	int spotLightCount;
 	int directionalLightCount;

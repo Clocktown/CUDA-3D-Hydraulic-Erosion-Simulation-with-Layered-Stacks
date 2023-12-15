@@ -1,9 +1,9 @@
 #include "application.hpp"
-#include "window.hpp"
-#include "input.hpp"
 #include "world.hpp"
+#include "window.hpp"
 #include "../config/config.hpp"
 #include "../config/glfw.hpp"
+#include "../events/application.hpp"
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -26,102 +26,93 @@ Application::Application(const std::string_view* const name)
 	ONEC_ASSERT(name != nullptr, "Failed to get application");
 	
 	m_name = *name;
-
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-
-	[[maybe_unused]] bool status{ ImGui_ImplGlfw_InitForOpenGL(getWindow().getHandle(), true) };
-
-	ONEC_ASSERT(status, "Failed to initialize ImGui for GLFW");
-
-	status = ImGui_ImplOpenGL3_Init("#version 460");
-
-	ONEC_ASSERT(status, "Failed to initialize ImGui for OpenGL");
-}
-
-Application::~Application()
-{
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
 }
 
 void Application::run()
 {
-	ONEC_ASSERT(!m_isRunning, "Application is already running");
+	ONEC_ASSERT(!m_isRunning, "Application must not be running");
 
 	m_isRunning = true;
-	m_shouldExit = false;
-	
+
 	Window& window{ getWindow() };
-	Input& input{ getInput() };
+	window.open();
+
 	World& world{ getWorld() };
-
-	GLFW_CHECK_ERROR(glfwSetTime(0.0));
-
 	world.dispatch<OnStart>();
 	
 	const double delay{ glfwGetTime() };
+	double time{ 0.0 };
+	double fixedTime{ 0.0 };
+	double unscaledTime{ 0.0 };
 
-	while (!m_shouldExit && !window.shouldClose())
+	while (window.isOpen())
 	{
-		const double unscaledDeltaTime{ glfwGetTime() - delay - m_unscaledTime };
+		const double unscaledDeltaTime{ glfwGetTime() - unscaledTime - delay };
 		
-		if (isVSyncEnabled() || m_targetFrameRate <= 0 || unscaledDeltaTime * m_targetFrameRate >= 1.0)
+		if (window.getSwapInterval() != 0 || m_targetFrameRate <= 0 || unscaledDeltaTime * m_targetFrameRate >= 1.0)
 		{
-			ONEC_ASSERT(unscaledDeltaTime != 0.0, "Unscaled delta time cannot be equal to 0");
-
-			m_frameRate = 1.0 / unscaledDeltaTime;
-			m_deltaTime = glm::min(m_timeScale * unscaledDeltaTime, m_maxDeltaTime);
-			m_time += m_deltaTime;
-			m_unscaledTime += unscaledDeltaTime;
-			m_unscaledDeltaTime = unscaledDeltaTime;
-
-			input.poll();
+			window.pollEvents();
 
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			const double maxFixedTime{ m_time - m_fixedDeltaTime };
+			const double deltaTime{ glm::min(m_timeScale * unscaledDeltaTime, m_maxDeltaTime) };
+			time += deltaTime;
 
-			while (m_fixedTime <= maxFixedTime)
+			unscaledTime += unscaledDeltaTime;
+
+			ONEC_ASSERT(unscaledDeltaTime != 0.0, "Unscaled delta time must not be equal to 0");
+
+			m_frameRate = 1.0 / unscaledDeltaTime;
+			m_time = time;
+			m_deltaTime = deltaTime;
+			m_unscaledTime = unscaledTime;
+			m_unscaledDeltaTime = unscaledDeltaTime;
+
+			double fixedDeltaTime{ m_fixedDeltaTime };
+
+			while (fixedTime <= time - fixedDeltaTime)
 			{
-				m_fixedTime += m_fixedDeltaTime;
-				world.dispatch<OnFixedUpdate>();
+				fixedTime += fixedDeltaTime;
+				m_fixedTime = fixedTime;
+
+				world.dispatch(OnFixedUpdate{ static_cast<float>(fixedDeltaTime) });
+
+				fixedDeltaTime = m_fixedDeltaTime;
 			}
 			
-			world.dispatch<OnUpdate>();
+			world.dispatch(OnUpdate{ static_cast<float>(deltaTime) });
 
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			
-			GLFW_CHECK_ERROR(glfwSwapBuffers(window.getHandle()));
+			window.swapBuffers();
 
 			++m_frameCount;
 		}
 	}
 
-	GLFW_CHECK_ERROR(glfwSetWindowShouldClose(window.getHandle(), GLFW_TRUE));
+	m_frameRate = 0.0;
+	m_deltaTime = 0.0;
+	m_unscaledDeltaTime = 0.0;
 
 	world.dispatch<OnExit>();
 
 	m_frameCount = 0;
-	m_frameRate = 0.0;
 	m_time = 0.0;
-	m_deltaTime = 0.0;
 	m_fixedTime = 0.0;
 	m_unscaledTime = 0.0;
-	m_unscaledDeltaTime = 0.0;
 	m_isRunning = false;
 }
 
 void Application::exit()
 {
-	m_shouldExit = true;
+	Window& window{ getWindow() };
+	window.close();
 }
 
-void Application::setName(const std::string_view& name)
+void Application::setName(const std::string_view name)
 {
 	m_name = name;
 }
@@ -129,12 +120,6 @@ void Application::setName(const std::string_view& name)
 void Application::setDirectory(const std::filesystem::path& directory)
 {
 	m_directory = directory;
-}
-
-void Application::setVSyncCount(const int vSyncCount)
-{
-	m_vSyncCount = vSyncCount;
-	GLFW_CHECK_ERROR(glfwSwapInterval(m_vSyncCount));
 }
 
 void Application::setTargetFrameRate(const int targetFrameRate)
@@ -170,11 +155,6 @@ const std::filesystem::path& Application::getDirectory() const
 int Application::getFrameCount() const
 {
 	return m_frameCount;
-}
-
-int Application::getVSyncCount() const
-{
-	return m_vSyncCount;
 }
 
 int Application::getTargetFrameRate() const
@@ -227,17 +207,17 @@ double Application::getUnscaledDeltaTime() const
 	return m_unscaledDeltaTime;
 }
 
+double Application::getRealTime() const
+{
+	return glfwGetTime();
+}
+
 bool Application::isRunning() const
 {
 	return m_isRunning;
 }
 
-bool Application::isVSyncEnabled() const
-{
-	return m_vSyncCount != 0;
-}
-
-Application& createApplication(const std::string_view& name, const glm::ivec2& size, const int sampleCount)
+Application& createApplication(const std::string_view name, const glm::ivec2 size, const int sampleCount)
 {
 	createWindow(name, size, sampleCount);
 	return Application::get(&name);

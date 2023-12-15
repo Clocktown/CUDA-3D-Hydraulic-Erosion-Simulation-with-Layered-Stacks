@@ -8,7 +8,7 @@
 namespace onec
 {
 
-void ViewportSystem::update()
+void updateViewport()
 {
 	const Window& window{ getWindow() };
 	

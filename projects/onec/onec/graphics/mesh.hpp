@@ -1,7 +1,7 @@
 #pragma once
 
+#include "buffer.hpp"
 #include "../components/aabb.hpp"
-#include "../graphics/buffer.hpp"
 #include <glm/glm.hpp>
 #include <assimp/postprocess.h>
 #include <filesystem>
@@ -27,7 +27,7 @@ struct VertexProperties
 struct Mesh
 {
 	explicit Mesh() = default;
-	explicit Mesh(const std::filesystem::path& file, const unsigned int flags = 0);
+	explicit Mesh(const std::filesystem::path& file, unsigned int flags = 0);
 
 	std::vector<SubMesh> subMeshes;
 	std::vector<unsigned int> indices;

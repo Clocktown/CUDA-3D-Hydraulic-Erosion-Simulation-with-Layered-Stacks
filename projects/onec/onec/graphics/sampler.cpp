@@ -8,9 +8,15 @@
 namespace onec
 {
 
-Sampler::Sampler()
+Sampler::Sampler() :
+	m_handle{ GL_NONE }
 {
-	GL_CHECK_ERROR(glCreateSamplers(1, &m_handle));
+
+}
+
+Sampler::Sampler(const SamplerState& state)
+{
+	create(state);
 }
 
 Sampler::Sampler(Sampler&& other) noexcept :
@@ -21,83 +27,30 @@ Sampler::Sampler(Sampler&& other) noexcept :
 
 Sampler::~Sampler()
 {
-	GL_CHECK_ERROR(glDeleteSamplers(1, &m_handle));
+	destroy();
 }
 
 Sampler& Sampler::operator=(Sampler&& other) noexcept
 {
 	if (this != &other)
 	{
-		GL_CHECK_ERROR(glDeleteSamplers(1, &m_handle));
+		destroy();
 		m_handle = std::exchange(other.m_handle, GL_NONE);
 	}
 
 	return *this;
 }
 
-void Sampler::bind(const GLuint unit) const
+void Sampler::initialize(const SamplerState& state)
 {
-	GL_CHECK_ERROR(glBindSampler(unit, m_handle));
+	destroy();
+	create(state);
 }
 
-void Sampler::unbind(const GLuint unit) const
+void Sampler::release()
 {
-	GL_CHECK_ERROR(glBindSampler(unit, GL_NONE));
-}
-
-void Sampler::setName(const std::string_view& name)
-{
-	GL_LABEL_OBJECT(m_handle, GL_SAMPLER, name);
-}
-
-void Sampler::setMinFilter(const GLenum minFilter)
-{
-	GL_CHECK_ERROR(glSamplerParameterIuiv(m_handle, GL_TEXTURE_MIN_FILTER, &minFilter));
-}
-
-void Sampler::setMagFilter(const GLenum magFilter)
-{
-	GL_CHECK_ERROR(glSamplerParameterIuiv(m_handle, GL_TEXTURE_MAG_FILTER, &magFilter));
-}
-
-void Sampler::setWrapModeS(const GLenum wrapModeS)
-{
-	GL_CHECK_ERROR(glSamplerParameterIuiv(m_handle, GL_TEXTURE_WRAP_S, &wrapModeS));
-}
-
-void Sampler::setWrapModeT(const GLenum wrapModeT)
-{
-	GL_CHECK_ERROR(glSamplerParameterIuiv(m_handle, GL_TEXTURE_WRAP_T, &wrapModeT));
-}
-
-void Sampler::setWrapModeR(const GLenum wrapModeR)
-{
-	GL_CHECK_ERROR(glSamplerParameterIuiv(m_handle, GL_TEXTURE_WRAP_R, &wrapModeR));
-}
-
-void Sampler::setBorderColor(const glm::vec4& borderColor)
-{
-	GL_CHECK_ERROR(glSamplerParameterfv(m_handle, GL_TEXTURE_BORDER_COLOR, &borderColor.x));
-}
-
-void Sampler::setLODBias(const float lodBias)
-{
-	GL_CHECK_ERROR(glSamplerParameterfv(m_handle, GL_TEXTURE_LOD_BIAS, &lodBias));
-}
-
-void Sampler::setMinLOD(const float minLOD)
-{
-	GL_CHECK_ERROR(glSamplerParameterfv(m_handle, GL_TEXTURE_MIN_LOD, &minLOD));
-}
-
-void Sampler::setMaxLOD(const float maxLOD)
-{
-	GL_CHECK_ERROR(glSamplerParameterfv(m_handle, GL_TEXTURE_MAX_LOD, &maxLOD));
-}
-
-void Sampler::setMaxAnisotropy(const float maxAnisotropy)
-{
-	GL_CHECK_ERROR(glSamplerParameterfv(m_handle, GL_TEXTURE_MAX_ANISOTROPY, &maxAnisotropy));
+	destroy();
+	m_handle = GL_NONE;
 }
 
 GLuint Sampler::getHandle()
@@ -105,4 +58,37 @@ GLuint Sampler::getHandle()
 	return m_handle;
 }
 
+bool Sampler::isEmpty() const
+{
+	return m_handle == GL_NONE;
 }
+
+void Sampler::create(const SamplerState& state)
+{
+	GLuint handle;
+	GL_CHECK_ERROR(glCreateSamplers(1, &handle));
+
+	m_handle = handle;
+
+	GL_CHECK_ERROR(glSamplerParameterIuiv(handle, GL_TEXTURE_MIN_FILTER, &state.minFilter));
+	GL_CHECK_ERROR(glSamplerParameterIuiv(handle, GL_TEXTURE_MAG_FILTER, &state.magFilter));
+	GL_CHECK_ERROR(glSamplerParameterIuiv(handle, GL_TEXTURE_WRAP_S, &state.wrapMode.x));
+	GL_CHECK_ERROR(glSamplerParameterIuiv(handle, GL_TEXTURE_WRAP_T, &state.wrapMode.y));
+	GL_CHECK_ERROR(glSamplerParameterIuiv(handle, GL_TEXTURE_WRAP_R, &state.wrapMode.z));
+	GL_CHECK_ERROR(glSamplerParameterfv(handle, GL_TEXTURE_BORDER_COLOR, &state.borderColor.x));
+	GL_CHECK_ERROR(glSamplerParameterfv(handle, GL_TEXTURE_LOD_BIAS, &state.levelOfDetailBias));
+	GL_CHECK_ERROR(glSamplerParameterfv(handle, GL_TEXTURE_MIN_LOD, &state.minLevelOfDetail));
+	GL_CHECK_ERROR(glSamplerParameterfv(handle, GL_TEXTURE_MAX_LOD, &state.maxLevelOfDetail));
+	GL_CHECK_ERROR(glSamplerParameterfv(handle, GL_TEXTURE_MAX_ANISOTROPY, &state.maxAnisotropy));
+}
+
+void Sampler::destroy()
+{
+	if (!isEmpty())
+	{
+		GL_CHECK_ERROR(glDeleteSamplers(1, &m_handle));
+	}
+}
+
+}
+

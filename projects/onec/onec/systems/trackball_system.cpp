@@ -1,7 +1,7 @@
 #include "trackball_system.hpp"
 #include "../config/config.hpp"
-#include "../core/input.hpp"
 #include "../core/world.hpp"
+#include "../core/window.hpp"
 #include "../components/hierarchy.hpp"
 #include "../components/transform.hpp"
 #include "../components/camera.hpp"
@@ -14,7 +14,7 @@
 namespace onec
 {
 
-void TrackballSystem::update()
+void updateTrackball()
 {
 	World& world{ getWorld() };
 	ActiveCamera* const activeCamera{ world.getSingleton<ActiveCamera>() };
@@ -26,7 +26,7 @@ void TrackballSystem::update()
 
 	const entt::entity camera{ activeCamera->activeCamera };
 
-	ONEC_ASSERT(!world.hasComponent<Parent>(camera), "Camera cannot have a parent component");
+	ONEC_ASSERT(!world.hasComponent<Parent>(camera), "Camera must not have a parent component");
 	
 	Trackball* const trackball{ world.getComponent<Trackball>(camera) };
 
@@ -38,12 +38,12 @@ void TrackballSystem::update()
 	ONEC_ASSERT(world.hasComponent<Position>(camera), "Camera must have a position component");
 	ONEC_ASSERT(world.hasComponent<Rotation>(camera), "Camera must have a rotation component");
 
-	glm::vec3& newPosition{ world.getComponent<Position>(camera)->position };
-	glm::quat& newRotation{ world.getComponent<Rotation>(camera)->rotation };
+	glm::vec3& currentPosition{ world.getComponent<Position>(camera)->position };
+	glm::quat& currentRotation{ world.getComponent<Rotation>(camera)->rotation };
 
 	glm::vec3 target{ trackball->target };
-	glm::vec3 position{ newPosition };
-	glm::quat rotation{ newRotation };
+	glm::vec3 position{ currentPosition };
+	glm::quat rotation{ currentRotation };
 	glm::mat3 localToWorld;
 	glm::vec3 positionToTarget;
 	float distance;
@@ -62,22 +62,22 @@ void TrackballSystem::update()
 	else
 	{
 		localToWorld = glm::mat3_cast(rotation);
-		positionToTarget = glm::vec3{ 0.0f, 0.0f, 0.0f };
+		positionToTarget = glm::vec3{ 0.0f };
 		distance = 0.0f;
 	}
 
-	const Input& input{ getInput() };
-	const glm::vec2& mouseDelta{ input.getMouseDelta() };
-	const float mouseScrollDelta{ input.getMouseScrollDelta().y };
+	const Window& window{ getWindow() };
+	const glm::vec2 mouseDelta{ window.getMouseDelta() };
+	const float mouseScrollDelta{ window.getMouseScrollDelta().y };
 
-	if (input.isKeyDown(trackball->panKey))
+	if (window.isKeyDown(trackball->panKey))
 	{
 		const glm::vec3 translation{ -trackball->panSensitivity * (mouseDelta.x * localToWorld[0] - mouseDelta.y * localToWorld[1]) };
 
 		position += translation;
 		target += translation;
 
-		newPosition = position;
+		currentPosition = position;
 		trackball->target = target;
 	}
 
@@ -90,26 +90,26 @@ void TrackballSystem::update()
 		positionToTarget = target - position;
 		distance = glm::length(positionToTarget);
 
-		newPosition = position;
+		currentPosition = position;
 	}
 
-	if (input.isKeyDown(trackball->orbitKey))
+	if (window.isKeyDown(trackball->orbitKey))
 	{
-		const float pitch{ glm::degrees(glm::asin(positionToTarget.y / (distance + glm::epsilon<float>()))) };
+		const float pitch{ glm::asin(positionToTarget.y / (distance + glm::epsilon<float>())) };
 		float pitchDelta{ -trackball->orbitSensitivity * mouseDelta.y };
-
-		pitchDelta = glm::clamp(pitch + pitchDelta, -89.5f, 89.5f) - pitch;
+		
+		pitchDelta = glm::clamp(pitch + pitchDelta, glm::radians(-89.5f), glm::radians(89.5f)) - pitch;
 		
 		const float yawDelta{ -trackball->orbitSensitivity * mouseDelta.x };
 
-		rotation = glm::angleAxis(glm::radians(pitchDelta), localToWorld[0]) * rotation;
-		rotation = glm::angleAxis(glm::radians(yawDelta), glm::vec3{ 0.0f, 1.0f, 0.0f }) * rotation;
+		rotation = glm::angleAxis(pitchDelta, localToWorld[0]) * rotation;
+		rotation = glm::angleAxis(yawDelta, glm::vec3{ 0.0f, 1.0f, 0.0f }) * rotation;
 		position = target + distance * (rotation * glm::vec3{ 0.0f, 0.0f, 1.0f });
 
-		newPosition = position;
+		currentPosition = position;
 	}
 
-	newRotation = rotation;
+	currentRotation = rotation;
 }
 
 }

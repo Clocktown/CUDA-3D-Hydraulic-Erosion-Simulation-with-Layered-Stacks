@@ -7,10 +7,24 @@
 namespace onec
 {
 
+struct SamplerState
+{
+	GLenum minFilter{ GL_NEAREST_MIPMAP_LINEAR };
+	GLenum magFilter{ GL_LINEAR };
+	glm::vec<3, GLenum> wrapMode{ GL_REPEAT };
+	glm::vec4 borderColor{ 0.0f };
+	float levelOfDetailBias{ 0.0f };
+	float minLevelOfDetail{ -1000.0f };
+	float maxLevelOfDetail{ 1000.0f };
+	float maxAnisotropy{ 1.0f };
+};
+
 class Sampler
 {
 public:
 	explicit Sampler();
+	explicit Sampler(const SamplerState& state);
+
 	Sampler(const Sampler& other) = delete;
 	Sampler(Sampler&& other) noexcept;
 
@@ -19,23 +33,15 @@ public:
 	Sampler& operator=(const Sampler& other) = delete;
 	Sampler& operator=(Sampler&& other) noexcept;
 
-	void bind(const GLuint unit) const;
-	void unbind(const GLuint unit) const;
-
-	void setName(const std::string_view& name);
-	void setMinFilter(const GLenum minFilter);
-	void setMagFilter(const GLenum magFilter);
-	void setWrapModeS(const GLenum wrapModeS);
-	void setWrapModeT(const GLenum wrapModeT);
-	void setWrapModeR(const GLenum wrapModeR);
-	void setBorderColor(const glm::vec4& borderColor);
-	void setLODBias(const float lodBias);
-	void setMinLOD(const float minLOD);
-	void setMaxLOD(const float maxLOD);
-	void setMaxAnisotropy(const float maxAnisotropy);
+	void initialize(const SamplerState& state);
+	void release();
 
 	GLuint getHandle();
+	bool isEmpty() const;
 private:
+	void create(const SamplerState& state);
+	void destroy();
+
 	GLuint m_handle;
 };
 

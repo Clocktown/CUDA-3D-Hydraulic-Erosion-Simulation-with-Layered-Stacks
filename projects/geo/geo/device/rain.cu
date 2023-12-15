@@ -1,36 +1,55 @@
 #include "kernels.hpp"
-#include "grid.hpp"
+#include "common.hpp"
 #include <onec/config/cu.hpp>
+#include <onec/cu/launch.hpp>
+#include <onec/mathematics/grid.hpp>
 
 namespace geo
 {
 namespace device
 {
 
+__forceinline__ __device__ int findTopLayer(const glm::ivec3 cell, const Simulation& simulation)
+{
+	int z{ cell.z };
+
+	for (int i{ 0 }; i < simulation.gridSize.z; ++i)
+	{
+		const glm::i8vec4 info{ simulation.infoArray.read<glm::i8vec4>(cell) };
+
+		if (info[ABOVE] <= 0)
+		{
+			break;
+		}
+
+		z = info[ABOVE];
+	}
+
+	return z;
+}
+
 __global__ void rainKernel(Simulation simulation)
 {
-	const glm::ivec3 index{ getGlobalIndex3D() };
-	const glm::ivec3 stride{ getGridStride3D() };
+	const glm::ivec2 index{ onec::cu::getGlobalIndex() };
 
-	glm::ivec3 cell;
-
-	for (cell.x = index.x; cell.x < simulation.gridSize.x; cell.x += stride.x)
+	if (onec::isOutside(index, simulation.gridSize))
 	{
-		for (cell.y = index.y; cell.y < simulation.gridSize.y; cell.y += stride.y)
-		{
-			cell.z = findTopLayer(glm::ivec3{ cell.x, cell.y, 0 }, simulation);
-
-			glm::vec4 height{ simulation.heightSurface.read<glm::vec4>(cell) };
-			height[waterIndex] += 0.001f * simulation.rain.amount * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
-
-			simulation.heightSurface.write(cell, height);
-		}
+		return;
 	}
+
+	glm::ivec3 cell{ index, 0 };
+
+	cell.z = findTopLayer(cell, simulation);
+
+	glm::vec4 height{ simulation.heightArray.read<glm::vec4>(cell) };
+	height[WATER] += simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
+
+	simulation.heightArray.write(cell, height);
 }
 
 void rain(const Launch& launch, const Simulation& simulation)
 {
-	rainKernel<<<launch.gridStride2D.gridSize, launch.gridStride2D.blockSize>>>(simulation);
+	rainKernel<<<launch.gridSize, launch.blockSize>>>(simulation);
 }
 
 }

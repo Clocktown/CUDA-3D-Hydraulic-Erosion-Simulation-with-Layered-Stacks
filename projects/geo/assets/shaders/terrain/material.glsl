@@ -3,24 +3,21 @@
 
 #include "../mesh_renderer/mesh_renderer.glsl"
 
-const int belowIndex = 0;
-const int aboveIndex = 1;
+#define BELOW 0
+#define ABOVE 1
 
-const int bedrockIndex = 0;
-const int sandIndex = 1;
-const int waterIndex = 2;
-const int maxHeightIndex = 3;
+#define BEDROCK 0
+#define SAND 1
+#define WATER 2
+#define MAX_HEIGHT 3
 
 layout(binding = materialBufferLocation, std140) uniform MaterialBuffer
 {
-	ivec2 gridSize;
-	float gridScale;
-	int maxLayerCount;
 	vec4 color[3];
+    ivec3 gridSize;
+    float gridScale;
+	isampler3D infoMap;
+	sampler3D heightMap;
 };
-
-layout(binding = 0) uniform isampler3D infoMap;
-layout(binding = 1) uniform sampler3D heightMap;
-layout(binding = 2) uniform sampler3D waterVelocityMap;
 
 #endif

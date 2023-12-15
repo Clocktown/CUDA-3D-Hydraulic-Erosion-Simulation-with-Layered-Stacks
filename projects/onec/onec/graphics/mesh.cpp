@@ -9,6 +9,7 @@
 #include <limits>
 #include <filesystem>
 #include <vector>
+#include <type_traits>
 
 namespace onec
 {
@@ -36,13 +37,17 @@ Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags)
 		hasVertexProperties |= mesh.HasNormals() || mesh.HasTangentsAndBitangents() || mesh.HasTextureCoords(0);
 	}
 
+	std::vector<SubMesh> subMeshes;
+	std::vector<unsigned int> indices;
+	std::vector<glm::vec3> positions;
+	std::vector<VertexProperties> vertexProperties;
 	subMeshes.reserve(scene->mNumMeshes);
 	indices.reserve(indexCount);
 	positions.reserve(vertexCount);
 	vertexProperties.resize(hasVertexProperties * static_cast<size_t>(vertexCount));
 
-	aabb.min = glm::vec3{ std::numeric_limits<float>::max() };
-	aabb.max = glm::vec3{ std::numeric_limits<float>::min() };
+	AABB aabb{ glm::vec3{ std::numeric_limits<float>::max() },
+		       glm::vec3{ std::numeric_limits<float>::min() } };
 
 	for (unsigned int i{ 0 }; i < scene->mNumMeshes; ++i)
 	{
@@ -86,6 +91,12 @@ Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags)
 	indexBuffer.initialize(asBytes(indices));
 	positionBuffer.initialize(asBytes(positions));
 	vertexPropertyBuffer.initialize(asBytes(vertexProperties));
+
+	this->subMeshes = std::move(subMeshes);
+	this->indices = std::move(indices);
+	this->positions = std::move(positions);
+	this->vertexProperties = std::move(vertexProperties);
+	this->aabb = aabb;
 }
 
 }

@@ -4,7 +4,6 @@
 #include <glad/glad.h>
 #include <cuda_runtime.h>
 #include <glm/glm.hpp>
-#include <ctime>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -42,7 +41,7 @@ std::string readFile(const std::filesystem::path& file)
 	return data;
 }
 
-std::string& readShader(const std::filesystem::path& file, std::unordered_map<std::filesystem::path, std::string>& includes, const std::regex& regex)
+std::string& readShader(const std::regex& regex, const std::filesystem::path& file, std::unordered_map<std::filesystem::path, std::string>& includes)
 {
 	ONEC_ASSERT(file == file.lexically_normal(), "File must be lexically normal");
 
@@ -50,11 +49,11 @@ std::string& readShader(const std::filesystem::path& file, std::unordered_map<st
 
 	ONEC_ASSERT(stream.is_open(), "Failed to open file (" + file.string() + ")");
 
-	auto it{ includes.find(file) };
+	auto iterator{ includes.find(file) };
 
-	if (it != includes.end())
+	if (iterator != includes.end())
 	{
-		return it->second;
+		return iterator->second;
 	}
 
 	const std::string fileNumber{ std::to_string(includes.size()) };
@@ -74,17 +73,17 @@ std::string& readShader(const std::filesystem::path& file, std::unordered_map<st
 		if (std::regex_match(line, match, regex))
 		{
 			const std::filesystem::path include{ (file.parent_path() / match[1].str()).lexically_normal() };
-			it = includes.find(include);
+			iterator = includes.find(include);
 
 			source += "#line 1 " + std::to_string(static_cast<int>(includes.size() - 1)) + "\n";
 
-			if (it != includes.end())
+			if (iterator != includes.end())
 			{
-				source += it->second;
+				source += iterator->second;
 			}
 			else
 			{
-				source += readShader(include, includes, regex);
+				source += readShader(regex, include, includes);
 			}
 
 			source += "#line " + std::to_string(lineCount) + " " + fileNumber + "\n";
@@ -96,14 +95,6 @@ std::string& readShader(const std::filesystem::path& file, std::unordered_map<st
 	}
 	
 	return includes.emplace(file, std::move(source)).first->second;
-}
-
-std::string readShader(const std::filesystem::path& file)
-{
-	std::unordered_map<std::filesystem::path, std::string> includes;
-	const std::regex regex{ " *# *include *\"(.*)\"" };
-
-	return readShader(file.lexically_normal(), includes, regex);
 }
 
 std::string readShader(const std::filesystem::path& file, GLenum& type)
@@ -137,10 +128,14 @@ std::string readShader(const std::filesystem::path& file, GLenum& type)
 	else
 	{
 		ONEC_ERROR("File extension must either be .vert, .tesc, .tese, .geom, .frag or .comp");
-		ONEC_IF_RELEASE(type = GL_NONE);
+
+		type = GL_NONE;
 	}
 
-	return readShader(file);
+	const std::regex regex{ " *# *include *\"(.*)\"" };
+	std::unordered_map<std::filesystem::path, std::string> includes;
+	
+	return readShader(regex, file.lexically_normal(), includes);
 }
 
 std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::path& file, glm::ivec2& size, int& channelCount, const int requestedChannelCount)
@@ -257,19 +252,25 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 			break;
 		case 3:
 		{
-			const size_t pixelCount{ static_cast<size_t>(size.x) * static_cast<size_t>(size.y) };
-			float* const modifiedData{ static_cast<float*>(malloc(pixelCount * sizeof(float4))) };
+			const size_t count{ static_cast<size_t>(size.x) * static_cast<size_t>(size.y) };
+			const size_t byteCount{ 4 * count };
+			float* const paddedData{ static_cast<float*>(malloc(byteCount)) };
 
-			for (size_t i{ 0 }, j{ 0 }; i < 4 * pixelCount; i += 4)
+			ONEC_ASSERT(paddedData != nullptr, "Failed to allocate memory");
+
+			size_t i{ 0 };
+			size_t j{ 0 };
+
+			while (i < byteCount)
 			{
-				modifiedData[i] = data[j++];
-				modifiedData[i + 1] = data[j++];
-				modifiedData[i + 2] = data[j++];
-				modifiedData[i + 3] = 1.0f;
+				paddedData[i++] = data[j++];
+				paddedData[i++] = data[j++];
+				paddedData[i++] = data[j++];
+				paddedData[i++] = 255;
 			}
 
 			free(data);
-			data = modifiedData;
+			data = paddedData;
 		}
 		case 4:
 			format = cudaCreateChannelDesc<float4>();
@@ -300,23 +301,23 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 		{
 			const size_t count{ static_cast<size_t>(size.x) * static_cast<size_t>(size.y) };
 			const size_t byteCount{ 4 * count };
-			unsigned char* const modifiedData{ static_cast<unsigned char*>(malloc(byteCount)) };
+			unsigned char* const paddedData{ static_cast<unsigned char*>(malloc(byteCount)) };
 
-			ONEC_ASSERT(modifiedData != nullptr, "Failed to allocate memory");
+			ONEC_ASSERT(paddedData != nullptr, "Failed to allocate memory");
 
 			size_t i{ 0 };
 			size_t j{ 0 };
 
 			while (i < byteCount)
 			{
-				modifiedData[i++] = data[j++];
-				modifiedData[i++] = data[j++];
-				modifiedData[i++] = data[j++];
-				modifiedData[i++] = 255;
+				paddedData[i++] = data[j++];
+				paddedData[i++] = data[j++];
+				paddedData[i++] = data[j++];
+				paddedData[i++] = 255;
 			}
 
 			free(data);
-			data = modifiedData;
+			data = paddedData;
 		}
 		case 4:
 			format = cudaCreateChannelDesc<uchar4>();
@@ -331,7 +332,7 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 	}
 }
 
-void writeImage(const std::filesystem::path& file, const Span<const std::byte>&& data, const glm::ivec2& size, const int channelCount)
+void writeImage(const std::filesystem::path& file, const Span<const std::byte>&& source, const glm::ivec2 size, const int channelCount)
 {
 	ONEC_ASSERT(file.extension() == ".png", "File extension must be .png");
 
@@ -342,23 +343,23 @@ void writeImage(const std::filesystem::path& file, const Span<const std::byte>&&
 
 	if (extension == ".png")
 	{
-		status = stbi_write_png(file.string().c_str(), size.x, size.y, channelCount, data.getData(), 0);
+		status = stbi_write_png(file.string().c_str(), size.x, size.y, channelCount, source.getData(), 0);
 	}
 	else if (extension == ".jpg")
 	{
-		status = stbi_write_jpg(file.string().c_str(), size.x, size.y, channelCount, data.getData(), 0);
+		status = stbi_write_jpg(file.string().c_str(), size.x, size.y, channelCount, source.getData(), 0);
 	}
 	else if (extension == ".bmp")
 	{
-		status = stbi_write_bmp(file.string().c_str(), size.x, size.y, channelCount, data.getData());
+		status = stbi_write_bmp(file.string().c_str(), size.x, size.y, channelCount, source.getData());
 	}
 	else if (extension == ".tga")
 	{
-		status = stbi_write_tga(file.string().c_str(), size.x, size.y, channelCount, data.getData());
+		status = stbi_write_tga(file.string().c_str(), size.x, size.y, channelCount, source.getData());
 	}
 	else if (extension == ".hdr")
 	{
-		status = stbi_write_hdr(file.string().c_str(), size.x, size.y, channelCount, reinterpret_cast<const float*>(data.getData()));
+		status = stbi_write_hdr(file.string().c_str(), size.x, size.y, channelCount, reinterpret_cast<const float*>(source.getData()));
 	}
 	else
 	{
@@ -366,38 +367,6 @@ void writeImage(const std::filesystem::path& file, const Span<const std::byte>&&
 	}
 
 	ONEC_ASSERT(status == 1, "Failed to write file (" + file.string() + ")");
-}
-
-std::string getDateTime(const std::string_view& format)
-{
-	if (format.empty())
-	{
-		return std::string{};
-	}
-
-	tm tm;
-	const time_t time{ std::time(nullptr) };
-	localtime_s(&tm, &time);
-
-	std::vector<char> dateTime(32);
-	size_t count;
-
-	do
-	{
-		count = strftime(dateTime.data(), dateTime.size(), format.data(), &tm);
-
-		if (count == 0)
-		{
-			dateTime.resize(2 * dateTime.size());
-		}
-		else
-		{
-			break;
-		}
-	}
-	while (true);
-
-	return std::string{ dateTime.data(), count };
 }
 
 }

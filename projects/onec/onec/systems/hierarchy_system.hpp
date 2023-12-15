@@ -3,9 +3,6 @@
 namespace onec
 {
 
-struct HierarchySystem
-{
-	static void update();
-};
+void updateHierarchy();
 
 }

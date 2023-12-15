@@ -12,25 +12,12 @@ namespace onec
 {
 
 template<typename... Includes, typename... Excludes>
-inline void TransformSystem::update(const entt::exclude_t<Excludes...> excludes)
+inline void updateModelMatrices(const entt::exclude_t<Excludes...> excludes)
 {
-	updateLocalToParent<Includes...>(excludes);
-	updateLocalToWorld<Includes...>(excludes);
-}
+	internal::updateModelMatrices<LocalToParent, Parent, Includes...>(excludes);
+	internal::updateModelMatrices<LocalToWorld, Includes...>(entt::exclude<Parent, Excludes...>);
 
-template<typename... Includes, typename... Excludes>
-inline void TransformSystem::updateLocalToParent(const entt::exclude_t<Excludes...> excludes)
-{
-	updateMatrices<LocalToParent, Parent, Includes...>(excludes);
-}
-
-template<typename... Includes, typename... Excludes>
-inline void TransformSystem::updateLocalToWorld(const entt::exclude_t<Excludes...> excludes)
-{
 	World& world{ getWorld() };
-
-	updateMatrices<LocalToWorld, Includes...>(entt::exclude<Parent, Excludes...>);
-
 	const auto view{ world.getView<Children, LocalToWorld, Includes...>(entt::exclude<Parent, Excludes...>) };
 
 	for (const entt::entity entity : view)
@@ -40,13 +27,16 @@ inline void TransformSystem::updateLocalToWorld(const entt::exclude_t<Excludes..
 
 		for (const entt::entity child : children)
 		{
-			updateLocalToWorld<Includes...>(child, localToWorld, excludes);
+			internal::updateModelMatrices<Includes...>(child, localToWorld, excludes);
 		}
 	}
 }
 
+namespace internal
+{
+
 template<typename... Includes, typename... Excludes>
-inline void TransformSystem::updateLocalToWorld(const entt::entity entity, const glm::mat4& parentToWorld, const entt::exclude_t<Excludes...> excludes)
+inline void updateModelMatrices(const entt::entity entity, const glm::mat4& parentToWorld, const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
 
@@ -68,13 +58,13 @@ inline void TransformSystem::updateLocalToWorld(const entt::entity entity, const
 	{
 		for (const entt::entity child : *children)
 		{
-			updateLocalToWorld(child, localToWorld, excludes);
+			internal::updateModelMatrices(child, localToWorld, excludes);
 		}
 	}
 }
 
 template<typename Matrix, typename... Includes, typename... Excludes>
-inline void TransformSystem::updateMatrices([[maybe_unused]] const entt::exclude_t<Excludes...> excludes)
+inline void updateModelMatrices([[maybe_unused]] const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
 
@@ -238,4 +228,5 @@ inline void TransformSystem::updateMatrices([[maybe_unused]] const entt::exclude
 	}
 }
 
+}
 }

@@ -1,16 +1,26 @@
 #pragma once
 
-#include "buffer.hpp"
+#include "../utility/span.hpp"
 #include <glad/glad.h>
 #include <string>
 
 namespace onec
 {
 
+struct VertexAttribute
+{
+	int binding;
+	int count;
+	GLenum type;
+	int relativeOffset{ 0 };
+	bool isNormalized{ false };
+};
+
 class VertexArray
 {
 public:
 	explicit VertexArray();
+	explicit VertexArray(const Span<const VertexAttribute>&& vertexAttributes);
 	VertexArray(const VertexArray& other) = delete;
 	VertexArray(VertexArray&& other) noexcept;
 
@@ -19,18 +29,15 @@ public:
 	VertexArray& operator=(const VertexArray& other) = delete;
 	VertexArray& operator=(VertexArray&& other) noexcept;
 
-	void bind() const;
-	void unbind() const;
-
-	void setName(const std::string_view& name);
-	void setVertexAttributeFormat(const int index, const int count, const GLenum type, const bool isNormalized = false, const int relativeOffset = 0);
-	void setVertexAttributeLocation(const int index, const GLuint location);
-	void setVertexAttributeDivisor(const int index, const int divisor);
-	void enableVertexAttribute(const int index);
-	void disableVertexAttribute(const int index);
+	void initialize(const Span<const VertexAttribute>&& vertexAttributes);
+	void release();
 
 	GLuint getHandle();
+	bool isEmpty() const;
 private:
+	void create(const Span<const VertexAttribute>&& vertexAttributes);
+	void destroy();
+
 	GLuint m_handle;
 };
 

@@ -3,9 +3,6 @@
 namespace onec
 {
 
-struct ViewportSystem
-{
-	static void update();
-};
+void updateViewport();
 
 }

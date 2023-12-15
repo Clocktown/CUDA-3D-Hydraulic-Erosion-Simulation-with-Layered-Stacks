@@ -1,7 +1,9 @@
 #pragma once
 
+#include "vertex_array.hpp"
 #include "../utility/span.hpp"
 #include <glad/glad.h>
+#include <cuda_runtime.h>
 #include <string>
 
 namespace onec
@@ -11,35 +13,38 @@ class Buffer
 {
 public:
 	explicit Buffer();
-	explicit Buffer(const int count);
-	explicit Buffer(const Span<const std::byte>&& data);
-	Buffer(const Buffer& other);
+	explicit Buffer(int count, bool createBindlessHandle = false, bool createGraphicsResource = false);
+	explicit Buffer(const Span<const std::byte>&& source, bool createBindlessHandle = false, bool createGraphicsResource = false);
+	Buffer(const Buffer& other) = delete;
 	Buffer(Buffer&& other) noexcept;
 
 	~Buffer();
 
-	Buffer& operator=(const Buffer& other);
+	Buffer& operator=(const Buffer& other) = delete;
 	Buffer& operator=(Buffer&& other) noexcept;
-	
-	void bind(const GLenum target, const GLuint location);
-	void unbind(const GLenum target, const GLuint location);
-	void initialize(const int count);
-	void initialize(const Span<const std::byte>&& data);
-	void release();
-	void upload(const Span<const std::byte>&& data);
-	void upload(const Span<const std::byte>&& data, const int count);
-	void upload(const Span<const std::byte>&& data, const int offset, const int count);
-	void download(const Span<std::byte>&& data) const;
-	void download(const Span<std::byte>&& data, const int count) const;
-	void download(const Span<std::byte>&& data, const int offset, const int count) const;
 
-	void setName(const std::string_view& name);
+	void initialize(int count, bool createBindlessHandle = false, bool createGraphicsResource = false);
+	void initialize(const Span<const std::byte>&& source, bool createBindlessHandle = false, bool createGraphicsResource = false);
+	void release();
+	void upload(const Span<const std::byte>&& source);
+	void upload(const Span<const std::byte>&& source, int count);
+	void upload(const Span<const std::byte>&& source, int offset, int count);
+	void download(const Span<std::byte>&& destination) const;
+	void download(const Span<std::byte>&& destination, int count) const;
+	void download(const Span<std::byte>&& destination, int offset, int count) const;
 
 	GLuint getHandle();
+	GLuint64EXT getBindlessHandle();
+	cudaGraphicsResource_t getGraphicsResource();
 	int getCount() const;
 	bool isEmpty() const;
 private:
+	void create(const Span<const std::byte>&& source, bool createBindlessHandle, bool createGraphicsResource);
+	void destroy();
+
 	GLuint m_handle;
+	GLuint64EXT m_bindlessHandle;
+	cudaGraphicsResource_t m_graphicsResource;
 	int m_count;
 };
 

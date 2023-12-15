@@ -1,65 +1,40 @@
 #include "buffer.hpp"
 #include "../config/gl.hpp"
+#include "../config/cu.hpp"
 #include "../utility/span.hpp"
 #include <glad/glad.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
 #include <utility>
 #include <string>
+#include <type_traits>
 
 namespace onec
 {
 
-Buffer::Buffer() : 
+Buffer::Buffer() :
 	m_handle{ GL_NONE },
+	m_bindlessHandle{ GL_NONE },
+	m_graphicsResource{},
 	m_count{ 0 }
 {
 
 }
 
-Buffer::Buffer(const int count) :
-	m_count{ count }
+Buffer::Buffer(const int count, const bool createBindlessHandle, const bool createGraphicsResource)
 {
-	if (m_count != 0)
-	{
-		GL_CHECK_ERROR(glCreateBuffers(1, &m_handle));
-		GL_CHECK_ERROR(glNamedBufferStorage(m_handle, m_count, nullptr, GL_DYNAMIC_STORAGE_BIT));
-	}
-	else
-	{
-		m_handle = GL_NONE;
-	}
+	create(Span<const std::byte>{ nullptr, count }, createBindlessHandle, createGraphicsResource);
 }
 
-Buffer::Buffer(const Span<const std::byte>&& data) :
-	m_count{ data.getCount() }
+Buffer::Buffer(const Span<const std::byte>&& source, const bool createBindlessHandle, const bool createGraphicsResource)
 {
-	if (m_count != 0)
-	{
-		GL_CHECK_ERROR(glCreateBuffers(1, &m_handle));
-		GL_CHECK_ERROR(glNamedBufferStorage(m_handle, m_count, data.getData(), GL_DYNAMIC_STORAGE_BIT));
-	}
-	else
-	{
-		m_handle = GL_NONE;
-	}
-}
-
-Buffer::Buffer(const Buffer& other) :
-	m_count{ other.m_count }
-{
-	if (!other.isEmpty())
-	{
-		GL_CHECK_ERROR(glCreateBuffers(1, &m_handle));
-		GL_CHECK_ERROR(glNamedBufferStorage(m_handle, m_count, nullptr, GL_DYNAMIC_STORAGE_BIT));
-		GL_CHECK_ERROR(glCopyNamedBufferSubData(other.m_handle, m_handle, 0, 0, m_count));
-	}
-	else
-	{
-		m_handle = GL_NONE;
-	}
+	create(std::forward<const Span<const std::byte>&&>(source), createBindlessHandle, createGraphicsResource);
 }
 
 Buffer::Buffer(Buffer&& other) noexcept :
 	m_handle{ std::exchange(other.m_handle, GL_NONE) },
+	m_bindlessHandle{ std::exchange(other.m_bindlessHandle, GL_NONE) },
+	m_graphicsResource{ std::exchange(other.m_graphicsResource, cudaGraphicsResource_t{}) },
 	m_count{ std::exchange(other.m_count, 0) }
 {
 
@@ -67,142 +42,89 @@ Buffer::Buffer(Buffer&& other) noexcept :
 
 Buffer::~Buffer()
 {
-	if (!isEmpty())
-	{
-		GL_CHECK_ERROR(glDeleteBuffers(1, &m_handle));
-	}
-}
-
-Buffer& Buffer::operator=(const Buffer& other)
-{
-	if (this != &other)
-	{
-		initialize(other.m_count);
-
-		if (!other.isEmpty())
-		{
-			GL_CHECK_ERROR(glCopyNamedBufferSubData(other.m_handle, m_handle, 0, 0, m_count));
-		}
-	}
-
-	return *this;
+	destroy();
 }
 
 Buffer& Buffer::operator=(Buffer&& other) noexcept
 {
 	if (this != &other)
 	{
-		release();
+		destroy();
 
 		m_handle = std::exchange(other.m_handle, GL_NONE);
+		m_bindlessHandle = std::exchange(other.m_bindlessHandle, GL_NONE);
+		m_graphicsResource = std::exchange(other.m_graphicsResource, cudaGraphicsResource_t{});
 		m_count = std::exchange(other.m_count, 0);
 	}
 
 	return *this;
 }
 
-void Buffer::bind(const GLenum target, const GLuint location)
+void Buffer::initialize(const int count, const bool createBindlessHandle, const bool createGraphicsResource)
 {
-	GL_CHECK_ERROR(glBindBufferBase(target, location, m_handle));
+	destroy();
+	create(Span<const std::byte>{ nullptr, count }, createBindlessHandle, createGraphicsResource);
 }
 
-void Buffer::unbind(const GLenum target, const GLuint location)
+void Buffer::initialize(const Span<const std::byte>&& source, const bool createBindlessHandle, const bool createGraphicsResource)
 {
-	GL_CHECK_ERROR(glBindBufferBase(target, location, GL_NONE));
-}
-
-void Buffer::initialize(const int count)
-{
-	if (m_count == count)
-	{
-		return;
-	}
-
-	if (!isEmpty())
-	{
-		GL_CHECK_ERROR(glDeleteBuffers(1, &m_handle));
-	}
-
-	m_count = count;
-
-	if (m_count != 0)
-	{
-		GL_CHECK_ERROR(glCreateBuffers(1, &m_handle));
-		GL_CHECK_ERROR(glNamedBufferStorage(m_handle, m_count, nullptr, GL_DYNAMIC_STORAGE_BIT));
-	}
-}
-
-void Buffer::initialize(const Span<const std::byte>&& data)
-{
-	if (m_count == data.getCount())
-	{
-		GL_CHECK_ERROR(glNamedBufferSubData(m_handle, 0, m_count, data.getData()));
-		return;
-	}
-
-	if (!isEmpty())
-	{
-		GL_CHECK_ERROR(glDeleteBuffers(1, &m_handle));
-	}
-
-	m_count = data.getCount();
-
-	if (m_count != 0)
-	{
-		GL_CHECK_ERROR(glCreateBuffers(1, &m_handle));
-		GL_CHECK_ERROR(glNamedBufferStorage(m_handle, m_count, data.getData(), GL_DYNAMIC_STORAGE_BIT));
-	}
+	destroy();
+	create(std::forward<const Span<const std::byte>&&>(source), createBindlessHandle, createGraphicsResource);
 }
 
 void Buffer::release()
 {
-	if (!isEmpty())
-	{
-		GL_CHECK_ERROR(glDeleteBuffers(1, &m_handle));
+	destroy();
 
-		m_handle = GL_NONE;
-		m_count = 0;
-	}
+	m_handle = GL_NONE;
+	m_bindlessHandle = GL_NONE;
+	m_graphicsResource = cudaGraphicsResource_t{};
+	m_count = 0;
 }
 
-void Buffer::upload(const Span<const std::byte>&& data)
+void Buffer::upload(const Span<const std::byte>&& source)
 {
-	GL_CHECK_ERROR(glNamedBufferSubData(m_handle, 0, m_count, data.getData()));
+	GL_CHECK_ERROR(glNamedBufferSubData(m_handle, 0, source.getCount(), source.getData()));
 }
 
-void Buffer::upload(const Span<const std::byte>&& data, const int count)
+void Buffer::upload(const Span<const std::byte>&& source, const int count)
 {
-	GL_CHECK_ERROR(glNamedBufferSubData(m_handle, 0, count, data.getData()));
+	GL_CHECK_ERROR(glNamedBufferSubData(m_handle, 0, count, source.getData()));
 }
 
-void Buffer::upload(const Span<const std::byte>&& data, const int offset, const int count)
+void Buffer::upload(const Span<const std::byte>&& source, const int offset, const int count)
 {
-	GL_CHECK_ERROR(glNamedBufferSubData(m_handle, offset, count, data.getData()));
+	GL_CHECK_ERROR(glNamedBufferSubData(m_handle, offset, count, source.getData()));
 }
 
-void Buffer::download(const Span<std::byte>&& data) const
+void Buffer::download(const Span<std::byte>&& destination) const
 {
-	GL_CHECK_ERROR(glGetNamedBufferSubData(m_handle, 0, m_count, data.getData()));
+	GL_CHECK_ERROR(glGetNamedBufferSubData(m_handle, 0, destination.getCount(), destination.getData()));
 }
 
-void Buffer::download(const Span<std::byte>&& data, const int count) const
+void Buffer::download(const Span<std::byte>&& destination, const int count) const
 {
-	GL_CHECK_ERROR(glGetNamedBufferSubData(m_handle, 0, count, data.getData()));
+	GL_CHECK_ERROR(glGetNamedBufferSubData(m_handle, 0, count, destination.getData()));
 }
 
-void Buffer::download(const Span<std::byte>&& data, const int offset, const int count) const
+void Buffer::download(const Span<std::byte>&& destination, const int offset, const int count) const
 {
-	GL_CHECK_ERROR(glGetNamedBufferSubData(m_handle, offset, count, data.getData()));
-}
-
-void Buffer::setName(const std::string_view& name)
-{
-	GL_LABEL_OBJECT(m_handle, GL_BUFFER, name);
+	GL_CHECK_ERROR(glGetNamedBufferSubData(m_handle, offset, count, destination.getData()));
 }
 
 GLuint Buffer::getHandle()
 {
 	return m_handle;
+}
+
+GLuint64EXT Buffer::getBindlessHandle()
+{
+	return m_bindlessHandle;
+}
+
+cudaGraphicsResource_t Buffer::getGraphicsResource()
+{
+	return m_graphicsResource;
 }
 
 int Buffer::getCount() const
@@ -212,7 +134,64 @@ int Buffer::getCount() const
 
 bool Buffer::isEmpty() const
 {
-	return m_handle == GL_NONE;
+	return m_count == 0;
+}
+
+void Buffer::create(const Span<const std::byte>&& source, const bool createBindlessHandle, const bool createGraphicsResource)
+{
+	if (!source.isEmpty())
+	{
+		GLuint handle;
+		GL_CHECK_ERROR(glCreateBuffers(1, &handle));
+		GL_CHECK_ERROR(glNamedBufferStorage(handle, source.getCount(), source.getData(), GL_DYNAMIC_STORAGE_BIT));
+
+		m_handle = handle;
+		m_count = source.getCount();
+
+		if (createGraphicsResource)
+		{
+			cudaGraphicsResource_t graphicsResource;
+			CU_CHECK_ERROR(cudaGraphicsGLRegisterBuffer(&graphicsResource, handle, cudaGraphicsMapFlagsNone));
+
+			m_graphicsResource = graphicsResource;
+		}
+		else
+		{
+			m_graphicsResource = cudaGraphicsResource_t{};
+		}
+
+		if (createBindlessHandle)
+		{	
+			GL_CHECK_ERROR(glGetNamedBufferParameterui64vNV(handle, GL_BUFFER_GPU_ADDRESS_NV, &m_bindlessHandle));
+			GL_CHECK_ERROR(glMakeNamedBufferResidentNV(handle, GL_READ_WRITE));
+		}
+		else
+		{
+			m_bindlessHandle = GL_NONE;
+		}
+	}
+	else
+	{
+		m_handle = GL_NONE;
+		m_bindlessHandle = GL_NONE;
+		m_graphicsResource = cudaGraphicsResource_t{};
+		m_count = 0;
+	}
+}
+
+void Buffer::destroy()
+{
+	if (!isEmpty())
+	{
+		const cudaGraphicsResource_t graphicsResource{ m_graphicsResource };
+
+		if (graphicsResource != cudaGraphicsResource_t{})
+		{
+			CU_CHECK_ERROR(cudaGraphicsUnregisterResource(graphicsResource));
+		}
+
+		GL_CHECK_ERROR(glDeleteBuffers(1, &m_handle));
+	}
 }
 
 }

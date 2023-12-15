@@ -1,4 +1,5 @@
 #version 460
+#extension GL_ARB_bindless_texture : require
 
 #include "material.glsl"
 #include "vertex_to_geometry.glsl"
@@ -6,11 +7,11 @@
 
 layout (triangles) in;
 in VertexToGeometry vertexToGeometry[];
-in FlatVertexToGeometry flatVertexToGeometry[];
+in flat FlatVertexToGeometry flatVertexToGeometry[];
 
 layout (triangle_strip, max_vertices = 3) out;
 out GeometryToFragment geometryToFragment;
-out FlatGeometryToFragment flatGeometryToFragment;
+out flat FlatGeometryToFragment flatGeometryToFragment;
 
 void main()
 {
