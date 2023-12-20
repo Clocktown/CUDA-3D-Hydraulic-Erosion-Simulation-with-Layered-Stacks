@@ -19,14 +19,11 @@ layout(location = 0) out vec4 fragmentColor;
 
 PhongBRDF getPhongBRDF()
 {
-    int cellType;
+    int cellType = BEDROCK;
 
-	for (cellType = BEDROCK; cellType < WATER; ++cellType) 
+	while (geometryToFragment.v > flatGeometryToFragment.maxV[cellType] + epsilon && cellType++ < WATER) 
 	{
-		if (geometryToFragment.v <= flatGeometryToFragment.maxV[cellType]) 
-	    {
-	        break;
-	    }
+
 	}
 
 	PhongBRDF phongBRDF;

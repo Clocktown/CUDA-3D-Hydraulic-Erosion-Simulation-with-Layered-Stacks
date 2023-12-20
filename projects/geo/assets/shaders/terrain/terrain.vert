@@ -65,24 +65,26 @@ void main()
         return;
     }
 
+    const float rTotalHeight = 1.0f / totalHeight;
+
     flatVertexToGeometry.cell = cell;
     flatVertexToGeometry.maxV[BEDROCK] = height[BEDROCK];
-    flatVertexToGeometry.maxV[SAND] = flatVertexToGeometry.maxV[BEDROCK] + height[SAND];
-    flatVertexToGeometry.maxV.xy /= flatVertexToGeometry.maxV[SAND] + height[WATER];
+    flatVertexToGeometry.maxV[SAND] = height[BEDROCK] + height[SAND];
+    flatVertexToGeometry.maxV.xy *= rTotalHeight;
     flatVertexToGeometry.maxV[WATER] = 1.0f;
 
     flatVertexToGeometry.isValid = true;
 
     const vec3 scale = vec3(gridScale, 0.5f * totalHeight, gridScale);
-    offset.x = gridScale * (cell.x + 0.5f);
+    offset.x = gridScale * (cell.x + 0.5f - 0.5f * gridSize.x);
     offset.y += scale.y;
-    offset.z = gridScale * (cell.y + 0.5f);
+    offset.z = gridScale * (cell.y + 0.5f - 0.5f * gridSize.y);
 
-    vertexToGeometry.position = offset + scale * position - gridScale * vec3(float(gridSize.x / 2), 0.0f, float(gridSize.y / 2));
-    vertexToGeometry.v = uv.x;
+    vertexToGeometry.v = 0.5f * position.y + 0.5f;
+    vertexToGeometry.position = offset + scale * position;
     vertexToGeometry.position = (localToWorld * vec4(vertexToGeometry.position, 1.0f)).xyz;
     
-    const mat3 normalMatrix = mat3(transpose(worldToLocal));
+    const mat3 normalMatrix = transpose(mat3(worldToLocal));
     vertexToGeometry.normal = normalMatrix * normal;
    
     gl_Position = worldToClip * vec4(vertexToGeometry.position, 1.0f);

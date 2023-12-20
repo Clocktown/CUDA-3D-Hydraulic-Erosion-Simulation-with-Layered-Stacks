@@ -80,7 +80,6 @@ void start()
 	world.addSingleton<onec::Lighting>();
 	world.addSingleton<onec::MeshRenderer>();
 	world.addSingleton<onec::Gravity>();
-	world.addSingleton<geo::Rain>();
 
 	addDirectionalLight();
 

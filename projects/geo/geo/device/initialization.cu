@@ -21,8 +21,9 @@ __global__ void initializationKernel(Simulation simulation)
 
 	for (; cell.z < simulation.gridSize.z; ++cell.z)
 	{
-		simulation.infoArray.write(cell, char4{ 0, 0, 0, 0 });
-		simulation.heightArray.write(cell, float4{ 0.0f, 0.0f, 0.0f, 0.0f });
+		simulation.infoArray.write(cell, glm::i8vec4{ 0 });
+		simulation.heightArray.write(cell, glm::vec4{ index.x / 16, index.y / 16, 0.0f, 0.0f });
+		simulation.outflowArray.write(cell, glm::vec4{ 0.0f });
 	}
 }
 

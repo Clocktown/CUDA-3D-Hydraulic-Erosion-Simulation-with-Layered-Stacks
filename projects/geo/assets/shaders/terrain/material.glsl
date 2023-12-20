@@ -13,7 +13,7 @@
 
 layout(binding = materialBufferLocation, std140) uniform MaterialBuffer
 {
-	vec4 color[3];
+	vec3 color[3];
     ivec3 gridSize;
     float gridScale;
 	isampler3D infoMap;

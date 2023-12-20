@@ -1,7 +1,6 @@
 #include "ui_system.hpp"
 #include "../components/simulation.hpp"
 #include "../singletons/ui.hpp"
-#include "../singletons/rain.hpp"
 #include "../graphics/material.hpp"
 #include <imgui.h>
 #include <limits>
@@ -25,7 +24,7 @@ void updateApplicationUI(UI& ui)
 			application.setTargetFrameRate(targetFrameRate);
 		}
 
-		if (ImGui::DragFloat("Fixed Delta Time [s]", &fixedDeltaTime, 0.01f, 0.001f, 2.0f))
+		if (ImGui::DragFloat("Fixed Delta Time", &fixedDeltaTime, 0.01f, 0.001f, 2.0f, "%.3fs"))
 		{
 			application.setFixedDeltaTime(fixedDeltaTime);
 		}
@@ -52,13 +51,13 @@ void updateCameraUI(UI& ui)
 
 		float fieldOfView{ glm::degrees(perspectiveCamera.fieldOfView) };
 
-		if (ImGui::DragFloat("Field Of View [deg]", &fieldOfView, 0.1f, 0.367f, 173.0f))
+		if (ImGui::DragFloat("Field Of View", &fieldOfView, 0.1f, 0.367f, 173.0f, "%.3fdeg"))
 		{
 			perspectiveCamera.fieldOfView = glm::radians(fieldOfView);
 		}
 
-		ImGui::DragFloat("Near Plane [m]", &perspectiveCamera.nearPlane, 0.01f, 0.001f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Far Plane [m]", &perspectiveCamera.farPlane, 0.5f, 0.001f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Near Plane", &perspectiveCamera.nearPlane, 0.01f, 0.001f, std::numeric_limits<float>::max(), "%.3fm");
+		ImGui::DragFloat("Far Plane", &perspectiveCamera.farPlane, 0.5f, 0.001f, std::numeric_limits<float>::max(), "%.3fm");
 
 		ImGui::TreePop();
 	}
@@ -90,7 +89,7 @@ void updateTerrainUI(UI& ui)
 		}
 
 		ImGui::DragInt2("Grid Size", &ui.terrain.gridSize.x, 0.5f, 16, 4096);
-		ImGui::DragFloat("Grid Scale [m]", &ui.terrain.gridScale, 0.01f, 0.001f, 10.0f);
+		ImGui::DragFloat("Grid Scale", &ui.terrain.gridScale, 0.01f, 0.001f, 10.0f, "%.3fm");
 		ImGui::DragInt("Max Layer Count", &ui.terrain.gridSize.z, 0.5f, 1, std::numeric_limits<int>::max());
 
 		ImGui::TreePop();
@@ -104,8 +103,8 @@ void updateSimulationUI(UI& ui)
 		onec::World& world{ onec::getWorld() };
 		const entt::entity entity{ ui.terrain.entity };
 
+		ONEC_ASSERT(world.hasComponent<Simulation>(entity), "Terrain must have a simulation component");
 		ONEC_ASSERT(world.hasSingleton<onec::Gravity>(), "World must have a gravity singleton");
-		ONEC_ASSERT(world.hasSingleton<Rain>(), "World must have a rain singleton");
 
 		const bool isPaused{ world.hasComponent<onec::Disabled<Simulation>>(entity) };
 
@@ -124,9 +123,18 @@ void updateSimulationUI(UI& ui)
 			}
 		}
 
-		ImGui::DragFloat("Gravity [m/s^2]", &world.getSingleton<onec::Gravity>()->gravity.y, 0.1f);
-		ImGui::DragFloat("Rain [m/(m^2 * s)]", &world.getSingleton<Rain>()->rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
+		Simulation& simulation{ *world.getComponent<Simulation>(entity) };
 
+		ImGui::DragFloat("Gravity", &world.getSingleton<onec::Gravity>()->gravity.y, 0.1f, 0.0f, 0.0f, "%.3fm/s^2");
+		ImGui::DragFloat("Rain", &simulation.data.rain, 0.01f, 0.0f, std::numeric_limits<float>::max(), "%.3fm/(m^2 * s)");
+
+		float evaporation{ 100.0f * simulation.data.evaporation };
+
+		if (ImGui::DragFloat("Evaporation", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max(), "%.3f%%/s"))
+		{
+			simulation.data.evaporation = 0.01f * evaporation;
+		}
+		
 		ImGui::TreePop();
 	}
 }

@@ -31,7 +31,6 @@
     <ClInclude Include="geo\device\simulation.hpp" />
     <ClInclude Include="geo\geo.hpp" />
     <ClInclude Include="geo\device\kernels.hpp" />
-    <ClInclude Include="geo\singletons\rain.hpp" />
     <ClInclude Include="geo\singletons\ui.hpp" />
     <ClInclude Include="geo\systems\simulation_system.hpp" />
     <ClInclude Include="geo\systems\ui_system.hpp" />
@@ -60,7 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="geo\device\initialization.cu" />
-    <CudaCompile Include="geo\device\rain.cu" />
+    <CudaCompile Include="geo\device\water.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{695316DC-1EBC-4708-B3ED-3C5DD7EF64A2}</ProjectGuid>
@@ -113,7 +112,6 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -134,7 +132,6 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
     </CudaCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

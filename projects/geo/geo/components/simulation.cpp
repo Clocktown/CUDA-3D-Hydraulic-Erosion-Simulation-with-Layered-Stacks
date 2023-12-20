@@ -21,6 +21,11 @@ Simulation::Simulation(const std::shared_ptr<Terrain>& terrain) :
 	launch.gridSize.x = static_cast<unsigned int>(glm::ceil(static_cast<float>(gridSize.x) / static_cast<float>(launch.blockSize.x)));
 	launch.gridSize.y = static_cast<unsigned int>(glm::ceil(static_cast<float>(gridSize.y) / static_cast<float>(launch.blockSize.y)));
 
+	outflowArray.initialize(gridSize, cudaCreateChannelDesc<float4>(), cudaArrayDefault, nullptr, true);
+	velocityArray.initialize(gridSize, cudaCreateChannelDesc<float2>(), cudaArrayDefault, nullptr, true);
+	data.outflowArray.surfaceObject = outflowArray.getSurfaceObject();
+	data.velocityArray.surfaceObject = velocityArray.getSurfaceObject();
+
 	map();
 
 	device::initialization(launch, data);
