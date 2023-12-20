@@ -75,7 +75,7 @@ void main()
 
     flatVertexToGeometry.isValid = true;
 
-    const vec3 scale = vec3(gridScale, 0.5f * totalHeight, gridScale);
+    const vec3 scale = 0.5f * vec3(gridScale, totalHeight, gridScale);
     offset.x = gridScale * (cell.x + 0.5f - 0.5f * gridSize.x);
     offset.y += scale.y;
     offset.z = gridScale * (cell.y + 0.5f - 0.5f * gridSize.y);
