@@ -25,7 +25,7 @@ public:
 	requires std::ranges::contiguous_range<Container> && std::convertible_to<typename Container::value_type*, Type*>
 	Span(Container& container);
 
-	Type& operator[](std::size_t index) const;
+	Type& operator[](int index) const;
 	operator Span<const Type>() const requires (!std::is_const_v<Type>);
 
 	Type* begin() const;

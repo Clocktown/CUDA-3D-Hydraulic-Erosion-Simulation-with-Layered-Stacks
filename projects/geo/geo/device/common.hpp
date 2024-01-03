@@ -4,6 +4,7 @@
 
 #define BELOW 0
 #define ABOVE 1
+#define INVALID_INDEX -1
 
 #define BEDROCK 0
 #define SAND 1

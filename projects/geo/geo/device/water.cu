@@ -2,7 +2,7 @@
 #include "common.hpp"
 #include <onec/config/cu.hpp>
 #include <onec/cu/launch.hpp>
-#include <onec/mathematics/grid.hpp>
+#include <onec/utility/grid.hpp>
 #include <glm/gtc/constants.hpp>
 
 namespace geo
@@ -10,21 +10,16 @@ namespace geo
 namespace device
 {
 
-__forceinline__ __device__ int findTopLayer(const glm::ivec3 cell, const Simulation& simulation)
+__forceinline__ __device__ int findTopLayer(glm::ivec3 index, const Simulation& simulation)
 {
-	int z{ cell.z };
+	glm::int8 z;
 
-	for (int i{ 0 }; i < simulation.gridSize.z; ++i)
+	do
 	{
-		const glm::i8vec4 info{ simulation.infoArray.read<glm::i8vec4>(cell) };
-
-		if (info[ABOVE] <= 0)
-		{
-			break;
-		}
-
-		z = info[ABOVE];
+		z = index.z;
+		index.z = simulation.infoArray.read<glm::i8vec4>(index)[ABOVE];
 	}
+	while (index.z != INVALID_INDEX);
 
 	return z;
 }
@@ -46,109 +41,162 @@ __global__ void rainKernel(Simulation simulation)
 	simulation.heightArray.write(index, height);
 }
 
-__global__ void outflowKernel(Simulation simulation)
+__global__ void fluxKernel(Simulation simulation)
 {
-	const glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
 
 	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{
 		return;
 	}
 
-	const glm::vec4 height{ simulation.heightArray.read<glm::vec4>(index) };
-	const float solidHeight{ height[BEDROCK] + height[SAND] };
-	const float totalHeight{ solidHeight + height[WATER] };
-	glm::vec4 outflow{ simulation.outflowArray.read<glm::vec4>(index) };
-	float totalOutflow{ 0.0f };
-
-	struct Neighbor
+	do
 	{
-		glm::ivec3 index;
-		glm::vec4 height;
-		float solidHeight;
-		float totalHeight;
-	};
+		const glm::vec4 height{ simulation.heightArray.read<glm::vec4>(index) };
+		const float solidHeight{ height[BEDROCK] + height[SAND] };
+		const float totalHeight{ solidHeight + height[WATER] };
+		glm::i8vec4 flow;
+		glm::vec4 flux{ simulation.fluxArray.read<glm::vec4>(index) };
+		float totalFlux{ 0.0f };
 
-	const Neighborhood neighborhood;
-	Neighbor neighbor;
-	neighbor.index.z = 0;
-
-	for (int i{ 0 }; i < neighborhood.count; ++i)
-	{
-		neighbor.index.x = index.x + neighborhood.offsets[i].x;
-		neighbor.index.y = index.y + neighborhood.offsets[i].y;
-
-		if (onec::isOutside(glm::ivec2{ neighbor.index }, glm::ivec2{ simulation.gridSize }))
+		struct Neighbor
 		{
-			outflow[i] = 0.0f;
-			continue;
+			glm::ivec3 index;
+			glm::vec4 height;
+			float solidHeight;
+			float totalHeight;
+		};
+
+		const Neighborhood neighborhood;
+		Neighbor neighbor;
+
+		for (int i{ 0 }; i < neighborhood.count; ++i)
+		{
+			neighbor.index.x = index.x + neighborhood.offsets[i].x;
+			neighbor.index.y = index.y + neighborhood.offsets[i].y;
+
+			if (onec::isOutside(glm::ivec2{ neighbor.index }, glm::ivec2{ simulation.gridSize }))
+			{
+				flow[i] = INVALID_INDEX;
+				flux[i] = 0.0f;
+
+				continue;
+			}
+
+			neighbor.index.z = 0;
+
+			do
+			{
+				neighbor.height = simulation.heightArray.read<glm::vec4>(neighbor.index);
+				neighbor.solidHeight = neighbor.height[BEDROCK] + neighbor.height[SAND];
+				neighbor.totalHeight = neighbor.solidHeight + neighbor.height[WATER];
+
+				if (totalHeight < neighbor.height[MAX_HEIGHT])
+				{
+					const float heightDifference{ totalHeight - neighbor.totalHeight };
+					//const float heightDifference{ totalHeight - glm::max(neighbor.totalHeight, solidHeight) }; // 2013 Interaction with Dynamic Large Bodies in Efficient, Real-Time Water Simulation
+					
+					flow[i] = neighbor.index.z;
+					flux[i] = (heightDifference > 0.0f) *
+						      glm::max(flux[i] - heightDifference * simulation.gravity * simulation.gridScale * simulation.deltaTime, 0.0f);
+					
+					totalFlux += flux[i];
+					
+					break;
+				}
+
+				neighbor.index.z = simulation.infoArray.read<glm::i8vec4>(neighbor.index)[ABOVE];
+
+				if (neighbor.index.z == INVALID_INDEX)
+				{
+					flow[i] = INVALID_INDEX;
+					flux[i] = 0.0f;
+
+					break;
+				}
+			}
+			while (true);
 		}
 
-		neighbor.height = simulation.heightArray.read<glm::vec4>(neighbor.index);
-		neighbor.solidHeight = neighbor.height[BEDROCK] + neighbor.height[SAND];
-		neighbor.totalHeight = neighbor.solidHeight + neighbor.height[WATER];
+		flux *= glm::min(height[WATER] * simulation.gridScale * simulation.gridScale / ((totalFlux + glm::epsilon<float>()) * simulation.deltaTime), 1.0f);
 
-		const float heightDifference{ totalHeight - neighbor.totalHeight };
+		simulation.flowArray.write(index, flow);
+		simulation.fluxArray.write(index, flux);
 
-		outflow[i] = (heightDifference > 0.0f) *  
-			         glm::max(outflow[i] - heightDifference * simulation.gravity * simulation.gridScale * simulation.deltaTime, 0.0f);
-		totalOutflow += outflow[i];
+		index.z = simulation.infoArray.read<glm::i8vec4>(index)[ABOVE];
 	}
-
-	outflow *= glm::min(height[WATER] * simulation.gridScale * simulation.gridScale / ((totalOutflow + glm::epsilon<float>()) * simulation.deltaTime), 1.0f);
-
-	simulation.outflowArray.write(index, outflow);
+	while (index.z != INVALID_INDEX);
 }
 
 __global__ void waterKernel(Simulation simulation)
 {
-	const glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
 
 	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{
 		return;
 	}
 
-	glm::vec4 height{ simulation.heightArray.read<glm::vec4>(index) };
-	const glm::vec4 outflow{ simulation.outflowArray.read<glm::vec4>(index) };
-	float flux{ -(outflow[RIGHT] + outflow[UP] + outflow[LEFT] + outflow[DOWN]) };
-
-	struct Neighbor
+	do
 	{
-		glm::ivec3 index;
-		glm::vec4 outflow;
-	};
+		glm::vec4 height{ simulation.heightArray.read<glm::vec4>(index) };
+		const glm::vec4 flux{ simulation.fluxArray.read<glm::vec4>(index) };
+		float totalFlux{ -(flux[RIGHT] + flux[UP] + flux[LEFT] + flux[DOWN]) };
 
-	const Neighborhood neighborhood;
-	Neighbor neighbor;
-	neighbor.index.z = 0;
-
-	for (int i{ 0 }; i < neighborhood.count; ++i)
-	{
-		neighbor.index.x = index.x + neighborhood.offsets[i].x;
-		neighbor.index.y = index.y + neighborhood.offsets[i].y;
-
-		if (onec::isOutside(glm::ivec2{ neighbor.index }, glm::ivec2{ simulation.gridSize }))
+		struct Neighbor
 		{
-			continue;
+			glm::ivec3 index;
+			glm::i8vec4 flow;
+			glm::vec4 flux;
+		};
+
+		const Neighborhood neighborhood;
+		Neighbor neighbor;
+
+		for (int i{ 0 }; i < neighborhood.count; ++i)
+		{
+			neighbor.index.x = index.x + neighborhood.offsets[i].x;
+			neighbor.index.y = index.y + neighborhood.offsets[i].y;
+
+			if (onec::isOutside(glm::ivec2{ neighbor.index }, glm::ivec2{ simulation.gridSize }))
+			{
+				continue;
+			}
+
+			const int direction{ (i + 2) % 4 };
+			neighbor.index.z = 0;
+
+			do
+			{
+				neighbor.flow = simulation.flowArray.read<glm::i8vec4>(neighbor.index);
+
+				if (neighbor.flow[direction] == index.z)
+				{
+					neighbor.flux = simulation.fluxArray.read<glm::vec4>(neighbor.index);
+					totalFlux += neighbor.flux[direction];
+				}
+
+				neighbor.index.z = simulation.infoArray.read<glm::i8vec4>(neighbor.index)[ABOVE];
+			}
+			while (neighbor.index.z != INVALID_INDEX);
 		}
+		
+		totalFlux *= simulation.deltaTime * simulation.rGridScale * simulation.rGridScale;
+		
+		height[WATER] = glm::min(height[WATER] + totalFlux, height[MAX_HEIGHT] - height[BEDROCK] - height[SAND]);
+		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
 
-		neighbor.outflow = simulation.outflowArray.read<glm::vec4>(neighbor.index);
-		flux += neighbor.outflow[(i + 2) % 4];
+		simulation.heightArray.write(index, height);
+
+		index.z = simulation.infoArray.read<glm::i8vec4>(index)[ABOVE];
 	}
-
-	flux *= simulation.deltaTime * simulation.rGridScale * simulation.rGridScale;
-
-	height[WATER] += flux;
-	height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
-
-	simulation.heightArray.write(index, height);
+	while (index.z != INVALID_INDEX);
 }
 
 void water(const Launch& launch, const Simulation& simulation)
 {
 	rainKernel<<<launch.gridSize, launch.blockSize>>>(simulation);
-	outflowKernel<<<launch.gridSize, launch.blockSize>>>(simulation);
+	fluxKernel<<<launch.gridSize, launch.blockSize>>>(simulation);
 	waterKernel<<<launch.gridSize, launch.blockSize>>>(simulation);
 }
 

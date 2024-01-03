@@ -24,7 +24,7 @@ void updateApplicationUI(UI& ui)
 			application.setTargetFrameRate(targetFrameRate);
 		}
 
-		if (ImGui::DragFloat("Fixed Delta Time", &fixedDeltaTime, 0.01f, 0.001f, 2.0f, "%.3fs"))
+		if (ImGui::DragFloat("Fixed Delta Time [s]", &fixedDeltaTime, 0.01f, 0.001f, std::numeric_limits<float>::max()))
 		{
 			application.setFixedDeltaTime(fixedDeltaTime);
 		}
@@ -51,13 +51,13 @@ void updateCameraUI(UI& ui)
 
 		float fieldOfView{ glm::degrees(perspectiveCamera.fieldOfView) };
 
-		if (ImGui::DragFloat("Field Of View", &fieldOfView, 0.1f, 0.367f, 173.0f, "%.3fdeg"))
+		if (ImGui::DragFloat("Field Of View [deg]", &fieldOfView, 0.1f, 0.367f, 173.0f))
 		{
 			perspectiveCamera.fieldOfView = glm::radians(fieldOfView);
 		}
 
-		ImGui::DragFloat("Near Plane", &perspectiveCamera.nearPlane, 0.01f, 0.001f, std::numeric_limits<float>::max(), "%.3fm");
-		ImGui::DragFloat("Far Plane", &perspectiveCamera.farPlane, 0.5f, 0.001f, std::numeric_limits<float>::max(), "%.3fm");
+		ImGui::DragFloat("Near Plane [m]", &perspectiveCamera.nearPlane, 0.01f, 0.001f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Far Plane [m]", &perspectiveCamera.farPlane, 0.5f, 0.001f, std::numeric_limits<float>::max());
 
 		ImGui::TreePop();
 	}
@@ -89,7 +89,7 @@ void updateTerrainUI(UI& ui)
 		}
 
 		ImGui::DragInt2("Grid Size", &ui.terrain.gridSize.x, 0.5f, 16, 4096);
-		ImGui::DragFloat("Grid Scale", &ui.terrain.gridScale, 0.01f, 0.001f, 10.0f, "%.3fm");
+		ImGui::DragFloat("Grid Scale [m]", &ui.terrain.gridScale, 0.01f, 0.001f, 10.0f);
 		ImGui::DragInt("Max Layer Count", &ui.terrain.gridSize.z, 0.5f, 1, std::numeric_limits<int>::max());
 
 		ImGui::TreePop();
@@ -125,12 +125,12 @@ void updateSimulationUI(UI& ui)
 
 		Simulation& simulation{ *world.getComponent<Simulation>(entity) };
 
-		ImGui::DragFloat("Gravity", &world.getSingleton<onec::Gravity>()->gravity.y, 0.1f, 0.0f, 0.0f, "%.3fm/s^2");
-		ImGui::DragFloat("Rain", &simulation.data.rain, 0.01f, 0.0f, std::numeric_limits<float>::max(), "%.3fm/(m^2 * s)");
+		ImGui::DragFloat("Gravity [m/s^2]", &world.getSingleton<onec::Gravity>()->gravity.y, 0.1f, 0.0f, 0.0f);
+		ImGui::DragFloat("Rain [m/(m^2 * s)]", &simulation.data.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
 
 		float evaporation{ 100.0f * simulation.data.evaporation };
 
-		if (ImGui::DragFloat("Evaporation", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max(), "%.3f%%/s"))
+		if (ImGui::DragFloat("Evaporation [%/s]", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max()))
 		{
 			simulation.data.evaporation = 0.01f * evaporation;
 		}

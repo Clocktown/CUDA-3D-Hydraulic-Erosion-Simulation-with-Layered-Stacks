@@ -20,7 +20,8 @@ struct Simulation
 	device::Launch launch;
 	onec::cu::Array infoArray;
 	onec::cu::Array heightArray;
-	onec::cu::Array outflowArray;
+	onec::cu::Array flowArray;
+	onec::cu::Array fluxArray;
 	onec::cu::Array velocityArray;
 };
 

@@ -58,10 +58,10 @@
 #include "cu/array.hpp"
 #include "cu/launch.hpp"
 
-#include "mathematics/common.hpp"
-#include "mathematics/grid.hpp"
-#include "mathematics/color.hpp"
-
 #include "utility/io.hpp"
 #include "utility/time.hpp"
+#include "utility/stopwatch.hpp"
 #include "utility/span.hpp"
+#include "utility/math.hpp"
+#include "utility/grid.hpp"
+#include "utility/color.hpp"

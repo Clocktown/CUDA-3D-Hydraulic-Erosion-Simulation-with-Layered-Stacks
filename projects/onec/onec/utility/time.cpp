@@ -1,4 +1,5 @@
 #include "time.hpp"
+#include "../config/config.hpp"
 #include <errno.h>
 #include <ctime>
 #include <string>
@@ -42,7 +43,7 @@ std::tm getDateTime()
 
 	const errno_t error{ localtime_s(&dateTime, &time) };
 
-	ONEC_ASSERT(error == 0, "Failed to get date time");
+	ONEC_ASSERT(error == errno_t{}, "Failed to get date time");
 
 	return dateTime;
 }

@@ -45,7 +45,6 @@
     <ClInclude Include="onec\graphics\vertex_array.hpp" />
     <ClInclude Include="onec\mathematics\color.hpp" />
     <ClInclude Include="onec\mathematics\common.hpp" />
-    <ClInclude Include="onec\mathematics\grid.hpp" />
     <ClInclude Include="onec\onec.hpp" />
     <ClInclude Include="onec\singletons\camera.hpp" />
     <ClInclude Include="onec\singletons\gravity.hpp" />
@@ -66,8 +65,12 @@
     <ClInclude Include="onec\systems\trackball_system.hpp" />
     <ClInclude Include="onec\systems\transform_system.hpp" />
     <ClInclude Include="onec\systems\viewport_system.hpp" />
+    <ClInclude Include="onec\utility\color.hpp" />
+    <ClInclude Include="onec\utility\grid.hpp" />
     <ClInclude Include="onec\utility\io.hpp" />
+    <ClInclude Include="onec\utility\math.hpp" />
     <ClInclude Include="onec\utility\span.hpp" />
+    <ClInclude Include="onec\utility\stopwatch.hpp" />
     <ClInclude Include="onec\utility\time.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -99,12 +102,15 @@
     <None Include="onec\cu\time.inl" />
     <None Include="onec\mathematics\color.inl" />
     <None Include="onec\mathematics\common.inl" />
-    <None Include="onec\mathematics\grid.inl" />
     <None Include="onec\systems\camera_system.inl" />
     <None Include="onec\systems\lighting_system.inl" />
     <None Include="onec\systems\mesh_render_system.inl" />
     <None Include="onec\systems\transform_system.inl" />
+    <None Include="onec\utility\color.inl" />
+    <None Include="onec\utility\grid.inl" />
+    <None Include="onec\utility\math.inl" />
     <None Include="onec\utility\span.inl" />
+    <None Include="onec\utility\stopwatch.inl" />
     <None Include="onec\utility\time.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -147,6 +153,7 @@
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ObjectFileName>$(IntDir)%(RelativeDir)/</ObjectFileName>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -166,6 +173,7 @@
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ObjectFileName>$(IntDir)%(RelativeDir)/</ObjectFileName>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

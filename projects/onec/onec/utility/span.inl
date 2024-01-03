@@ -2,6 +2,7 @@
 #include "../config/config.hpp"
 #include <cstddef>
 #include <initializer_list>
+#include <xutility>
 #include <type_traits>
 #include <ranges>
 
@@ -21,7 +22,7 @@ inline Span<Type>::Span(Type* const data, const int count) :
 	m_data{ data },
 	m_count{ count }
 {
-
+	ONEC_ASSERT(count >= 0, "Count must be greater than or equal to 0");
 }
 
 template<typename Type>
@@ -29,12 +30,12 @@ inline Span<Type>::Span(Type* const first, Type* const last) :
 	m_data{ first },
 	m_count{ static_cast<int>(last - first) }
 {
-
+	ONEC_ASSERT(first <= last, "First and last must form a valid range");
 }
 
 template<typename Type>
 inline Span<Type>::Span(const std::initializer_list<Type> initializerList) requires std::is_const_v<Type> :
-    m_data{ std::addressof(*initializerList.begin()) },
+    m_data{ std::to_address(initializerList.begin()) },
     m_count{ static_cast<int>(initializerList.size()) }
 {
 
@@ -66,9 +67,9 @@ inline Span<Type>::operator Span<const Type>() const requires (!std::is_const_v<
 }
 
 template<typename Type>
-inline Type& Span<Type>::operator[](std::size_t index) const
+inline Type& Span<Type>::operator[](const int index) const
 {
-	ONEC_ASSERT(index < static_cast<std::size_t>(m_count), "Index must be smaller than count");
+	ONEC_ASSERT(index >= 0 && index < m_count, "Index must refer to an existing element");
 
 	return m_data[index];
 }
@@ -82,7 +83,7 @@ inline Type* Span<Type>::begin() const
 template<typename Type>
 inline Type* Span<Type>::end() const
 {
-	return m_data + static_cast<std::size_t>(m_count);
+	return m_data + m_count;
 }
 
 template<typename Type>

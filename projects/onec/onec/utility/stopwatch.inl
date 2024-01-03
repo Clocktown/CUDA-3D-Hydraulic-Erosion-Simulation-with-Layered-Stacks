@@ -1,4 +1,4 @@
-#include "time.hpp"
+#include "stopwatch.hpp"
 #include "../config/config.hpp"
 #include <chrono>
 
@@ -6,9 +6,9 @@ namespace onec
 {
 
 template<typename Period>
-inline void Timer<Period>::start()
+inline void Stopwatch<Period>::start()
 {
-	ONEC_ASSERT(m_state == State::Stopped, "Timer must be stopped");
+	ONEC_ASSERT(m_state == State::Stopped, "Stopwatch must be stopped");
 
 	m_state = State::Running;
 	m_time = 0.0;
@@ -16,18 +16,18 @@ inline void Timer<Period>::start()
 }
 
 template<typename Period>
-inline void Timer<Period>::resume()
+inline void Stopwatch<Period>::resume()
 {
-	ONEC_ASSERT(m_state == State::Paused, "Timer must be paused");
+	ONEC_ASSERT(m_state == State::Paused, "Stopwatch must be paused");
 
 	m_state = State::Running;
 	m_start = std::chrono::steady_clock::now();
 }
 
 template<typename Period>
-inline void Timer<Period>::pause()
+inline void Stopwatch<Period>::pause()
 {
-	ONEC_ASSERT(m_state == State::Running, "Timer must be running");
+	ONEC_ASSERT(m_state == State::Running, "Stopwatch must be running");
 
 	const std::chrono::duration<double, Period> duration{ std::chrono::steady_clock::now() - m_start };
 
@@ -36,9 +36,9 @@ inline void Timer<Period>::pause()
 }
 
 template<typename Period>
-inline void Timer<Period>::stop()
+inline void Stopwatch<Period>::stop()
 {
-	ONEC_ASSERT(m_state != State::Stopped, "Timer must not be stopped");
+	ONEC_ASSERT(m_state != State::Stopped, "Stopwatch must not be stopped");
 
 	if (m_state == State::Running)
 	{
@@ -50,7 +50,7 @@ inline void Timer<Period>::stop()
 }
 
 template<typename Period>
-inline double Timer<Period>::getTime() const
+inline double Stopwatch<Period>::getTime() const
 {
 	if (m_state == State::Running)
 	{
@@ -62,19 +62,19 @@ inline double Timer<Period>::getTime() const
 }
 
 template<typename Period>
-inline bool Timer<Period>::isStopped() const
+inline bool Stopwatch<Period>::isStopped() const
 {
 	return m_state == State::Stopped;
 }
 
 template<typename Period>
-inline bool Timer<Period>::isPaused() const
+inline bool Stopwatch<Period>::isPaused() const
 {
 	return m_state == State::Paused;
 }
 
 template<typename Period>
-inline bool Timer<Period>::isRunning() const
+inline bool Stopwatch<Period>::isRunning() const
 {
 	return m_state == State::Running;
 }
