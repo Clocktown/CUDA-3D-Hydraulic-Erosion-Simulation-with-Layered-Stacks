@@ -6,8 +6,8 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <utility>
-#include <string>
 #include <type_traits>
+#include <vector>
 
 namespace onec
 {
@@ -19,9 +19,9 @@ Framebuffer::Framebuffer() :
 
 }
 
-Framebuffer::Framebuffer(const Span<Texture*>&& colorBuffers, Texture* const depthBuffer, Texture* const stencilBuffer, const GLenum readBuffer)
+Framebuffer::Framebuffer(const glm::ivec2 size, const Span<const FramebufferAttachment>&& colorBuffers, const FramebufferAttachment* const depthBuffer, const FramebufferAttachment* const stencilBuffer, const GLenum readBuffer)
 {
-	create(std::forward<const Span<Texture*>&&>(colorBuffers), depthBuffer, stencilBuffer, readBuffer);
+	create(size, std::forward<const Span<const FramebufferAttachment>>(colorBuffers), depthBuffer, stencilBuffer, readBuffer);
 }
 
 Framebuffer::Framebuffer(Framebuffer&& other)  noexcept :
@@ -49,10 +49,10 @@ Framebuffer& Framebuffer::operator=(Framebuffer&& other) noexcept
 	return *this;
 }
 
-void Framebuffer::initialize(const Span<Texture*>&& colorBuffers, Texture* const depthBuffer, Texture* const stencilBuffer, const GLenum readBuffer)
+void Framebuffer::initialize(const glm::ivec2 size, const Span<const FramebufferAttachment>&& colorBuffers, const FramebufferAttachment* const depthBuffer, const FramebufferAttachment* const stencilBuffer, const GLenum readBuffer)
 {
 	destroy();
-	create(std::forward<const Span<Texture*>&&>(colorBuffers), depthBuffer, stencilBuffer, readBuffer);
+	create(size, std::forward<const Span<const FramebufferAttachment>>(colorBuffers), depthBuffer, stencilBuffer, readBuffer);
 }
 
 void Framebuffer::release()
@@ -73,60 +73,97 @@ glm::ivec2 Framebuffer::getSize() const
 	return m_size;
 }
 
+const Texture& Framebuffer::getColorBuffer(const int index) const
+{
+	ONEC_ASSERT(index >= 0, "Index must be greater than or equal to zero");
+	ONEC_ASSERT(index < getColorBufferCount(), "Index must be smaller than color buffer count");
+
+	return m_colorBuffers[static_cast<std::size_t>(index)];
+}
+
+Texture& Framebuffer::getColorBuffer(const int index)
+{
+	return m_colorBuffers[static_cast<std::size_t>(index)];
+}
+
+int Framebuffer::getColorBufferCount() const
+{
+	return static_cast<int>(m_colorBuffers.size());
+}
+
+const Texture& Framebuffer::getDepthBuffer() const
+{
+	return m_depthBuffer;
+}
+
+Texture& Framebuffer::getDepthBuffer()
+{
+	return m_depthBuffer;
+}
+
+const Texture& Framebuffer::getStencilBuffer() const
+{
+	return m_stencilBuffer;
+}
+
+Texture& Framebuffer::getStencilBuffer()
+{
+	return m_stencilBuffer;
+}
+
 bool Framebuffer::isEmpty() const
 {
 	return m_handle == GL_NONE;
 }
 
-void Framebuffer::create(const Span<Texture*>&& colorBuffers, Texture* const depthBuffer, Texture* const stencilBuffer, const GLenum readBuffer)
+void Framebuffer::create(const glm::ivec2 size, const Span<const FramebufferAttachment>&& colorBuffers, const FramebufferAttachment* const depthBuffer, const FramebufferAttachment* const stencilBuffer, const GLenum readBuffer)
 {
 	GLuint handle;
 	GL_CHECK_ERROR(glCreateFramebuffers(1, &handle));
+	GL_CHECK_ERROR(glNamedFramebufferParameteri(handle, GL_FRAMEBUFFER_DEFAULT_WIDTH, size.x));
+	GL_CHECK_ERROR(glNamedFramebufferParameteri(handle, GL_FRAMEBUFFER_DEFAULT_HEIGHT, size.y));
 
 	m_handle = handle;
+	m_size = size;
 
-	const std::size_t count{ static_cast<std::size_t>(colorBuffers.getCount()) };
+	const int count{ colorBuffers.getCount() };
+	const std::size_t capacity{ static_cast<std::size_t>(count) };
+
 	std::vector<GLenum> drawBuffers;
-	drawBuffers.reserve(count);
+	drawBuffers.reserve(capacity);
 
-	Texture* texture{ nullptr };
+	m_colorBuffers.reserve(capacity);
 
-	for (std::size_t i{ 0 }; i < count; ++i)
+	for (int i{ 0 }; i < count; ++i)
 	{
-		texture = colorBuffers[i];
-
-		ONEC_ASSERT(texture != nullptr, "Texture must not be nullptr");
-
 		const GLenum attachment{ drawBuffers.emplace_back(GL_COLOR_ATTACHMENT0 + static_cast<GLenum>(i)) };
+		const FramebufferAttachment& descriptor{ colorBuffers[i] };
 
-		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, attachment, texture->getHandle(), 0));
+		Texture& colorBuffer{ m_colorBuffers.emplace_back(GL_TEXTURE_2D, glm::ivec3{ size, 0 }, descriptor.format, descriptor.mipCount, descriptor.samplerState, descriptor.createBindlessHandle, descriptor.createBindlessImageHandle, descriptor.createGraphicsResource) };
+
+		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, attachment, colorBuffer.getHandle(), 0));
 	}
 
 	if (depthBuffer != nullptr)
 	{
-		texture = depthBuffer;
-		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, GL_DEPTH_ATTACHMENT, texture->getHandle(), 0));
+		const FramebufferAttachment& descriptor{ *depthBuffer };
+		m_depthBuffer.initialize(GL_TEXTURE_2D, glm::ivec3{ size, 0 }, descriptor.format, descriptor.mipCount, descriptor.samplerState, descriptor.createBindlessHandle, descriptor.createBindlessImageHandle, descriptor.createGraphicsResource);
+		
+		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, GL_DEPTH_ATTACHMENT, m_depthBuffer.getHandle(), 0));
 	}
 
 	if (stencilBuffer != nullptr)
 	{
-		texture = stencilBuffer;
-		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, GL_STENCIL_ATTACHMENT, texture->getHandle(), 0));
+		const FramebufferAttachment& descriptor{ *stencilBuffer };
+		m_stencilBuffer.initialize(GL_TEXTURE_2D, glm::ivec3{ size, 0 }, descriptor.format, descriptor.mipCount, descriptor.samplerState, descriptor.createBindlessHandle, descriptor.createBindlessImageHandle, descriptor.createGraphicsResource);
+
+		GL_CHECK_ERROR(glNamedFramebufferTexture(handle, GL_STENCIL_ATTACHMENT, m_stencilBuffer.getHandle(), 0));
 	}
 
 	GL_CHECK_ERROR(glNamedFramebufferReadBuffer(handle, readBuffer));
-	GL_CHECK_ERROR(glNamedFramebufferDrawBuffers(handle, static_cast<int>(count), drawBuffers.data()));
+	GL_CHECK_ERROR(glNamedFramebufferDrawBuffers(handle, colorBuffers.getCount(), drawBuffers.data()));
 	GL_CHECK_FRAMEBUFFER(handle, GL_READ_FRAMEBUFFER);
 	GL_CHECK_FRAMEBUFFER(handle, GL_DRAW_FRAMEBUFFER);
-
-	if (texture != nullptr)
-	{
-		m_size = texture->getSize();
-	}
-	else
-	{
-		m_size = glm::ivec2{ 0 };
-	}
 }
 
 void Framebuffer::destroy()
@@ -134,6 +171,10 @@ void Framebuffer::destroy()
 	if (!isEmpty())
 	{
 		GL_CHECK_ERROR(glDeleteFramebuffers(1, &m_handle));
+
+		m_colorBuffers.clear();
+		m_depthBuffer.release();
+		m_stencilBuffer.release();
 	}
 }
 

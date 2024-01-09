@@ -10,9 +10,9 @@ namespace onec
 
 struct Material
 {
-	Buffer uniformBuffer;
 	std::shared_ptr<Program> program{ nullptr };
 	std::shared_ptr<RenderState> renderState{ nullptr };
+	Buffer uniformBuffer;
 };
 
 }

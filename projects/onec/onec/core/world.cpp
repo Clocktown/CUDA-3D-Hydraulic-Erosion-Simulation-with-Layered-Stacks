@@ -1,9 +1,6 @@
 #include "world.hpp"
 #include "../config/config.hpp"
 #include <entt/entt.hpp>
-#include <xmemory>
-#include <string>
-
 
 namespace onec
 {
@@ -30,7 +27,7 @@ void World::removeSingletons()
 
 void World::removeSystems()
 {
-	m_dispatcher.clear();
+	m_dispatcher = entt::dispatcher{};
 }
 
 int World::getEntityCount() const

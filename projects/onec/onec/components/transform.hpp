@@ -6,24 +6,11 @@
 namespace onec
 {
 
-struct Position
+struct Transform
 {
 	glm::vec3 position{ 0.0f };
-};
-
-struct Rotation
-{
-	glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
-};
-
-struct Scale
-{
 	float scale{ 1.0f };
-};
-
-struct NonUniformScale
-{
-	glm::vec3 nonUniformScale{ 1.0f };
+	glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
 };
 
 struct LocalToParent

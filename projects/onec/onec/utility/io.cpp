@@ -253,24 +253,26 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 		case 3:
 		{
 			const size_t count{ static_cast<size_t>(size.x) * static_cast<size_t>(size.y) };
-			const size_t byteCount{ 4 * count };
-			float* const paddedData{ static_cast<float*>(malloc(byteCount)) };
+			const size_t floatCount{ 4 * count };
+			float* const paddedData{ static_cast<float*>(malloc(floatCount * sizeof(float))) };
 
 			ONEC_ASSERT(paddedData != nullptr, "Failed to allocate memory");
 
 			size_t i{ 0 };
 			size_t j{ 0 };
 
-			while (i < byteCount)
+			while (i < floatCount)
 			{
 				paddedData[i++] = data[j++];
 				paddedData[i++] = data[j++];
 				paddedData[i++] = data[j++];
-				paddedData[i++] = 255;
+				paddedData[i++] = 1.0f;
 			}
 
 			free(data);
 			data = paddedData;
+
+			[[fallthrough]];
 		}
 		case 4:
 			format = cudaCreateChannelDesc<float4>();
@@ -300,7 +302,7 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 		case 3:
 		{
 			const size_t count{ static_cast<size_t>(size.x) * static_cast<size_t>(size.y) };
-			const size_t byteCount{ 4 * count };
+			const size_t byteCount{ count * sizeof(uchar4) };
 			unsigned char* const paddedData{ static_cast<unsigned char*>(malloc(byteCount)) };
 
 			ONEC_ASSERT(paddedData != nullptr, "Failed to allocate memory");
@@ -318,6 +320,8 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 
 			free(data);
 			data = paddedData;
+
+			[[fallthrough]];
 		}
 		case 4:
 			format = cudaCreateChannelDesc<uchar4>();
@@ -328,14 +332,12 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 			break;
 		}
 
-		return std::unique_ptr<std::byte, decltype(&free)>{ reinterpret_cast<std::byte*>(data), & free };
+		return std::unique_ptr<std::byte, decltype(&free)>{ reinterpret_cast<std::byte*>(data), &free };
 	}
 }
 
 void writeImage(const std::filesystem::path& file, const Span<const std::byte>&& source, const glm::ivec2 size, const int channelCount)
 {
-	ONEC_ASSERT(file.extension() == ".png", "File extension must be .png");
-
 	stbi_flip_vertically_on_write(1);
 	[[maybe_unused]] int status;
 

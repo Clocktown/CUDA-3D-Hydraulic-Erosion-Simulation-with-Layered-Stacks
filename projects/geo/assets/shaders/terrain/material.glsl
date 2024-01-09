@@ -1,7 +1,7 @@
 #ifndef GEO_MATERIAL_GLSL
 #define GEO_MATERIAL_GLSL
 
-#include "../mesh_renderer/mesh_renderer.glsl"
+#include "../mesh_render_pipeline/mesh_render_pipeline.glsl"
 
 #define BELOW 0
 #define ABOVE 1

@@ -3,11 +3,11 @@
 
 #include "material.glsl"
 #include "geometry_to_fragment.glsl"
-#include "../renderer/renderer.glsl"
-#include "../mesh_renderer/mesh_renderer.glsl"
-#include "../lighting/lighting.glsl"
-#include "../lighting/light.glsl"
-#include "../lighting/phong_brdf.glsl"
+#include "../render_pipeline/render_pipeline.glsl"
+#include "../mesh_render_pipeline/mesh_render_pipeline.glsl"
+#include "../environment/environment.glsl"
+#include "../environment/light.glsl"
+#include "../environment/phong_brdf.glsl"
 #include "../math/constants.glsl"
 #include "../math/color.glsl"
 

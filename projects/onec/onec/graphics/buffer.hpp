@@ -4,7 +4,6 @@
 #include "../utility/span.hpp"
 #include <glad/glad.h>
 #include <cuda_runtime.h>
-#include <string>
 
 namespace onec
 {

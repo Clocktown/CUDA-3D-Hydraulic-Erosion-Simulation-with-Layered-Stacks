@@ -14,7 +14,7 @@
     <ClCompile Include="geo\components\simulation.cpp" />
     <ClCompile Include="geo\graphics\material.cpp" />
     <ClCompile Include="geo\graphics\terrain.cpp" />
-    <ClCompile Include="geo\systems\ui_system.cpp" />
+    <ClCompile Include="geo\singletons\ui.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -33,22 +33,20 @@
     <ClInclude Include="geo\device\kernels.hpp" />
     <ClInclude Include="geo\singletons\ui.hpp" />
     <ClInclude Include="geo\systems\simulation_system.hpp" />
-    <ClInclude Include="geo\systems\ui_system.hpp" />
     <ClInclude Include="geo\uniforms\material.hpp" />
     <ClInclude Include="geo\device\array.hpp" />
     <ClInclude Include="geo\graphics\terrain.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\shaders\lighting\light.glsl" />
-    <None Include="assets\shaders\lighting\lighting.glsl" />
-    <None Include="assets\shaders\lighting\phong_brdf.glsl" />
+    <None Include="assets\shaders\environment\light.glsl" />
+    <None Include="assets\shaders\environment\environment.glsl" />
+    <None Include="assets\shaders\environment\phong_brdf.glsl" />
     <None Include="assets\shaders\math\color.glsl" />
     <None Include="assets\shaders\math\constants.glsl" />
-    <None Include="assets\shaders\mesh_renderer\mesh.vert" />
-    <None Include="assets\shaders\mesh_renderer\mesh_renderer.glsl" />
-    <None Include="assets\shaders\mesh_renderer\vertex_attributes.glsl" />
-    <None Include="assets\shaders\mesh_renderer\vertex_to_fragment.glsl" />
-    <None Include="assets\shaders\renderer\renderer.glsl" />
+    <None Include="assets\shaders\mesh_render_pipeline\mesh_render_pipeline.glsl" />
+    <None Include="assets\shaders\mesh_render_pipeline\vertex_attributes.glsl" />
+    <None Include="assets\shaders\mesh_render_pipeline\vertex_to_fragment.glsl" />
+    <None Include="assets\shaders\render_pipeline\render_pipeline.glsl" />
     <None Include="assets\shaders\terrain\geometry_to_fragment.glsl" />
     <None Include="assets\shaders\terrain\material.glsl" />
     <None Include="assets\shaders\terrain\terrain.frag" />

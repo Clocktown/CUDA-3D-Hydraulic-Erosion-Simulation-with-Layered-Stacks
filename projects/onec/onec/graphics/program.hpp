@@ -3,7 +3,6 @@
 #include "../utility/span.hpp"
 #include <glad/glad.h>
 #include <filesystem>
-#include <string>
 
 namespace onec
 {

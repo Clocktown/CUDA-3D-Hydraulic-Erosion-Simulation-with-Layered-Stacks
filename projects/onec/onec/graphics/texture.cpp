@@ -10,7 +10,6 @@
 #include <glm/glm.hpp>
 #include <utility>
 #include <filesystem>
-#include <string>
 #include <type_traits>
 
 namespace onec
@@ -159,7 +158,7 @@ GLuint Texture::getHandle()
 	return m_handle;
 }
 
-GLuint64 Texture::getBindlessHandle() const
+GLuint64 Texture::getBindlessHandle()
 {
 	return m_bindlessHandle;
 }
@@ -346,13 +345,54 @@ void Texture::destroy()
 	}
 }
 
+int getMaxMipCount(const int size)
+{
+	ONEC_ASSERT(size > 0, "Size must be greater than 0");
+
+	return 1 + static_cast<int>(glm::log2(static_cast<float>(size)));
+}
+
+int getMaxMipCount(const glm::ivec2 size)
+{
+	ONEC_ASSERT(size.x > 0, "Size x must be greater than 0");
+	ONEC_ASSERT(size.y >= 0, "Size y must be greater than or equal to 0");
+
+	return 1 + static_cast<int>(glm::log2(static_cast<float>(glm::max(size.x, size.y))));
+}
+
 int getMaxMipCount(const glm::ivec3 size)
 {
+	ONEC_ASSERT(size.x > 0, "Size x must be greater than 0");
+	ONEC_ASSERT(size.y >= 0, "Size y must be greater than or equal to 0");
+	ONEC_ASSERT(size.z >= 0, "Size z must be greater than or equal to 0");
+
 	return 1 + static_cast<int>(glm::log2(static_cast<float>(glm::max(size.x, glm::max(size.y, size.z)))));
 }
 
-glm::vec3 getMipSize(const glm::ivec3 base, const int mipLevel)
+int getMipSize(const int base, int mipLevel)
 {
+	ONEC_ASSERT(base >= 0, "Base must be greater than or equal to 0");
+	ONEC_ASSERT(mipLevel >= 0, "Mip level must be greater than or equal to 0");
+
+	return base / (1 << mipLevel);
+}
+
+glm::ivec2 getMipSize(const glm::ivec2 base, const int mipLevel)
+{
+	ONEC_ASSERT(base.x >= 0, "Base x must be greater than or equal to 0");
+	ONEC_ASSERT(base.y >= 0, "Base y must be greater than or equal to 0");
+	ONEC_ASSERT(mipLevel >= 0, "Mip level must be greater than or equal to 0");
+
+	return base / (1 << mipLevel);
+}
+
+glm::ivec3 getMipSize(const glm::ivec3 base, const int mipLevel)
+{
+	ONEC_ASSERT(base.x >= 0, "Base x must be greater than or equal to 0");
+	ONEC_ASSERT(base.y >= 0, "Base y must be greater than or equal to 0");
+	ONEC_ASSERT(base.z >= 0, "Base z must be greater than or equal to 0");
+	ONEC_ASSERT(mipLevel >= 0, "Mip level must be greater than or equal to 0");
+
 	return base / (1 << mipLevel);
 }
 

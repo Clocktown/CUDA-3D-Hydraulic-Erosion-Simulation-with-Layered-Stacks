@@ -12,7 +12,7 @@
 #   ifdef ONEC_DEBUG
 #       include <stdio.h>
 
-#       undef ONEC_ERROR 
+#       undef ONEC_ERROR
 #       undef ONEC_ASSERT
 
 #       define ONEC_ERROR(message) printf("ONEC Error\nDescription: %s\nFile: %s\nLine: %i\n", message, __FILE__, __LINE__)

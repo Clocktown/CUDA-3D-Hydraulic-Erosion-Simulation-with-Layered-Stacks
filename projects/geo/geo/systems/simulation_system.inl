@@ -7,7 +7,7 @@ namespace geo
 {
 
 template<typename ...Includes, typename ...Excludes>
-void simulate(const float deltaTime, const entt::exclude_t<Excludes...> excludes)
+void updateSimulation(const float deltaTime, const entt::exclude_t<Excludes...> excludes)
 {
 	onec::World& world{ onec::getWorld() };
 

@@ -3,9 +3,9 @@
 
 #include "material.glsl"
 #include "vertex_to_geometry.glsl"
-#include "../renderer/renderer.glsl"
-#include "../mesh_renderer/mesh_renderer.glsl"
-#include "../mesh_renderer/vertex_attributes.glsl"
+#include "../render_pipeline/render_pipeline.glsl"
+#include "../mesh_render_pipeline/mesh_render_pipeline.glsl"
+#include "../mesh_render_pipeline/vertex_attributes.glsl"
 #include "../math/constants.glsl"
 
 out VertexToGeometry vertexToGeometry;

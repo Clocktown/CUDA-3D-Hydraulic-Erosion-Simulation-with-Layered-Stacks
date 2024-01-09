@@ -61,10 +61,30 @@ private:
 	double m_fixedDeltaTime{ 1.0 / 60.0 };
 	double m_unscaledTime{ 0.0 };
 	double m_unscaledDeltaTime{ 0.0 };
-	bool m_isRunning{ false };
+	bool m_running{ false };
 
 	friend Application& createApplication(std::string_view name, glm::ivec2 size, int sampleCount);
 	friend Application& getApplication();
+};
+
+struct OnStart
+{
+
+};
+
+struct OnUpdate
+{
+	float deltaTime;
+};
+
+struct OnFixedUpdate
+{
+	float fixedDeltaTime;
+};
+
+struct OnExit
+{
+
 };
 
 Application& createApplication(std::string_view name = "Application", glm::ivec2 size = glm::vec2{ 1280, 720 }, int sampleCount = 0);

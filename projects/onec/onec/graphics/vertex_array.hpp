@@ -2,14 +2,13 @@
 
 #include "../utility/span.hpp"
 #include <glad/glad.h>
-#include <string>
 
 namespace onec
 {
 
 struct VertexAttribute
 {
-	int binding;
+	GLuint binding;
 	int count;
 	GLenum type;
 	int relativeOffset{ 0 };

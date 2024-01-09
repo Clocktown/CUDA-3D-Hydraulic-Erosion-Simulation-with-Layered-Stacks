@@ -2,7 +2,6 @@
 #include "../config/gl.hpp"
 #include <glad/glad.h>
 #include <utility>
-#include <string>
 #include <type_traits>
 
 namespace onec
@@ -69,12 +68,10 @@ void VertexArray::create(const Span<const VertexAttribute>&& vertexAttributes)
 
 	m_handle = handle;
 
-	const std::size_t count{ static_cast<std::size_t>(vertexAttributes.getCount()) };
-
-	for (std::size_t i{ 0 }; i < count; ++i)
+	for (int i{ 0 }; i < vertexAttributes.getCount(); ++i)
 	{
 		const VertexAttribute& vertexAttribute{ vertexAttributes[i] };
-		const GLuint binding{ static_cast<GLuint>(vertexAttribute.binding) };
+		const GLuint binding{ vertexAttribute.binding };
 		const GLuint location{ static_cast<GLuint>(i) };
 		
 		GL_CHECK_ERROR(glVertexArrayAttribBinding(handle, location, binding));

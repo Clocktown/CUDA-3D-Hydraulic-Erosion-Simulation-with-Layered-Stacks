@@ -6,7 +6,6 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 #include <utility>
-#include <string>
 #include <type_traits>
 
 namespace onec
@@ -28,7 +27,7 @@ Buffer::Buffer(const int count, const bool createBindlessHandle, const bool crea
 
 Buffer::Buffer(const Span<const std::byte>&& source, const bool createBindlessHandle, const bool createGraphicsResource)
 {
-	create(std::forward<const Span<const std::byte>&&>(source), createBindlessHandle, createGraphicsResource);
+	create(std::forward<const Span<const std::byte>>(source), createBindlessHandle, createGraphicsResource);
 }
 
 Buffer::Buffer(Buffer&& other) noexcept :
@@ -69,7 +68,7 @@ void Buffer::initialize(const int count, const bool createBindlessHandle, const 
 void Buffer::initialize(const Span<const std::byte>&& source, const bool createBindlessHandle, const bool createGraphicsResource)
 {
 	destroy();
-	create(std::forward<const Span<const std::byte>&&>(source), createBindlessHandle, createGraphicsResource);
+	create(std::forward<const Span<const std::byte>>(source), createBindlessHandle, createGraphicsResource);
 }
 
 void Buffer::release()
@@ -142,11 +141,12 @@ void Buffer::create(const Span<const std::byte>&& source, const bool createBindl
 	if (!source.isEmpty())
 	{
 		GLuint handle;
+		const int count{ source.getCount() };
 		GL_CHECK_ERROR(glCreateBuffers(1, &handle));
-		GL_CHECK_ERROR(glNamedBufferStorage(handle, source.getCount(), source.getData(), GL_DYNAMIC_STORAGE_BIT));
+		GL_CHECK_ERROR(glNamedBufferStorage(handle, count, source.getData(), GL_DYNAMIC_STORAGE_BIT));
 
 		m_handle = handle;
-		m_count = source.getCount();
+		m_count = count;
 
 		if (createGraphicsResource)
 		{

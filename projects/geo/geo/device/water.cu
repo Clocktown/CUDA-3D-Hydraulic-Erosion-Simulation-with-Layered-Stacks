@@ -1,7 +1,7 @@
 #include "kernels.hpp"
 #include "common.hpp"
 #include <onec/config/cu.hpp>
-#include <onec/cu/launch.hpp>
+#include <onec/cuda/launch.hpp>
 #include <onec/utility/grid.hpp>
 #include <glm/gtc/constants.hpp>
 
@@ -10,8 +10,15 @@ namespace geo
 namespace device
 {
 
-__forceinline__ __device__ int findTopLayer(glm::ivec3 index, const Simulation& simulation)
+__global__ void rainKernel(Simulation simulation)
 {
+	glm::ivec3 index{ glm::ivec2{ onec::cu::getLaunchIndex() }, 0 };
+
+	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
+	{
+		return;
+	}
+
 	glm::int8 z;
 
 	do
@@ -21,21 +28,9 @@ __forceinline__ __device__ int findTopLayer(glm::ivec3 index, const Simulation& 
 	}
 	while (index.z != INVALID_INDEX);
 
-	return z;
-}
+	index.z = z;
 
-__global__ void rainKernel(Simulation simulation)
-{
-	glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
-
-	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
-	{
-		return;
-	}
-
-	index.z = findTopLayer(index, simulation);
 	glm::vec4 height{ simulation.heightArray.read<glm::vec4>(index) };
-
 	height[WATER] += simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
 
 	simulation.heightArray.write(index, height);
@@ -43,7 +38,7 @@ __global__ void rainKernel(Simulation simulation)
 
 __global__ void fluxKernel(Simulation simulation)
 {
-	glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ onec::cu::getLaunchIndex() }, 0 };
 
 	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{
@@ -130,7 +125,7 @@ __global__ void fluxKernel(Simulation simulation)
 
 __global__ void waterKernel(Simulation simulation)
 {
-	glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ onec::cu::getLaunchIndex() }, 0 };
 
 	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{

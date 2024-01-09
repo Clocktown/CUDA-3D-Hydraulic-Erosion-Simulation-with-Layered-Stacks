@@ -1,7 +1,7 @@
 #include "kernels.hpp"
 #include "common.hpp"
 #include <onec/config/cu.hpp>
-#include <onec/cu/launch.hpp>
+#include <onec/cuda/launch.hpp>
 #include <onec/utility/grid.hpp>
 #include <float.h>
 
@@ -12,7 +12,7 @@ namespace device
 
 __global__ void initializationKernel(Simulation simulation)
 {
-	glm::ivec3 index{ glm::ivec2{ onec::cu::getGlobalIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ onec::cu::getLaunchIndex() }, 0 };
 
 	if (onec::isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{

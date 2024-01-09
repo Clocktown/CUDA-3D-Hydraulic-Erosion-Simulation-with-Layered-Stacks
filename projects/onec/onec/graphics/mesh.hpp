@@ -12,8 +12,9 @@ namespace onec
 
 struct SubMesh
 {
-	int indexOffset;
+	GLenum primitiveType{ GL_TRIANGLES };
 	int indexCount;
+	int baseIndex{ 0 };
 	int baseVertex{ 0 };
 };
 
@@ -26,13 +27,12 @@ struct VertexProperties
 
 struct Mesh
 {
+	static constexpr GLenum indexType{ GL_UNSIGNED_INT };
+
 	explicit Mesh() = default;
-	explicit Mesh(const std::filesystem::path& file, unsigned int flags = 0);
+	explicit Mesh(const std::filesystem::path& file, unsigned int flags = 0, bool createBindlessHandles = false, bool createGraphicResources = false);
 
 	std::vector<SubMesh> subMeshes;
-	std::vector<unsigned int> indices;
-	std::vector<glm::vec3> positions;
-	std::vector<VertexProperties> vertexProperties;
 	Buffer indexBuffer;
 	Buffer positionBuffer;
 	Buffer vertexPropertyBuffer;

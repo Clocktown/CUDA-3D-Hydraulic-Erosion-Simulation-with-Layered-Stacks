@@ -6,7 +6,6 @@
 #include <cuda_runtime.h>
 #include <glm/glm.hpp>
 #include <filesystem>
-#include <string>
 
 namespace onec
 {
@@ -35,7 +34,7 @@ public:
 	void download(const Span<std::byte>&& destination, GLenum format, GLenum type, glm::ivec3 offset, glm::ivec3 size, int mipLevel = 0) const;
 	
 	GLuint getHandle();
-	GLuint64 getBindlessHandle() const;
+	GLuint64 getBindlessHandle();
 	GLuint64 getBindlessImageHandle();
 	cudaGraphicsResource_t getGraphicsResource();
 	GLenum getTarget() const;
@@ -58,7 +57,11 @@ private:
 	int m_mipCount;
 };
 
+int getMaxMipCount(int size);
+int getMaxMipCount(glm::ivec2 size);
 int getMaxMipCount(glm::ivec3 size);
-glm::vec3 getMipSize(glm::ivec3 base, int mipLevel);
+int getMipSize(int base, int mipLevel);
+glm::ivec2 getMipSize(glm::ivec2 base, int mipLevel);
+glm::ivec3 getMipSize(glm::ivec3 base, int mipLevel);
 
 }

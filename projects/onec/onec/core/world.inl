@@ -1,10 +1,7 @@
 #include "world.hpp"
-#include "../events/world.hpp"
 #include "../config/config.hpp"
 #include <entt/entt.hpp>
 #include <type_traits>
-#include <memory>
-#include <vector>
 
 namespace onec
 {
@@ -12,13 +9,7 @@ namespace onec
 template<typename Event>
 inline void World::dispatch(Event&& args)
 {
-	const auto& delegates{ getDelegates<std::decay_t<Event>>() };
-	std::decay_t<Event> event{ args };
-
-	for (const auto& system : delegates)
-	{
-		system(event);
-	}
+	m_dispatcher.trigger(std::forward<Event>(args));
 }
 
 template<typename Type, typename... Args>
@@ -43,13 +34,7 @@ inline decltype(auto) World::addSingleton(Args&&... args)
 template<typename Event, auto System, typename... Instance>
 inline void World::addSystem(Instance&&... instance)
 {
-	entt::delegate<void(std::decay_t<Event>&)> delegate;
-	delegate.connect<System>();
-
-	auto& delegates{ getDelegates<std::decay_t<Event>>() };
-	delegates.erase(std::find(delegates.begin(), delegates.end(), delegate), delegates.end());
-	
-	delegates.emplace_back(std::move(delegate));
+	m_dispatcher.sink<Event>().connect<System>(std::forward<Instance>(instance)...);
 
 	if constexpr (internal::OnCreateTrait<Event>::value)
 	{
@@ -96,17 +81,13 @@ inline void World::removeSingleton()
 template<typename Event, auto System, typename... Instance>
 inline void World::removeSystem(Instance&&... instance)
 {
-	entt::delegate<void(std::decay_t<Event>&)> delegate;
-	delegate.connect<system>();
-
-	auto& delegates{ getDelegates<std::decay_t<Event>>() };
-	delegates.erase(std::find(delegates.begin(), delegates.end(), delegate));
+	m_dispatcher.sink<Event>().disconnect<System>(std::forward<Instance>(instance)...);
 }
 
 template<typename Event>
 inline void World::removeSystems()
 {
-	m_dispatcher.erase(entt::type_hash<std::decay_t<Event>>::value());
+	m_dispatcher.sink<Event>().clear();
 }
 
 template<typename Type, typename... Args>
@@ -198,49 +179,19 @@ inline bool World::hasSingleton() const
 template<typename Type>
 inline void World::onCreate([[maybe_unused]] const entt::registry& registry, const entt::entity entity)
 {
-	dispatch(OnCreate<Type>{ entity });
+	m_dispatcher.trigger(OnCreate<Type>{ entity });
 }
 
 template<typename Type>
 inline void World::onModify([[maybe_unused]] const entt::registry& registry, const entt::entity entity)
 {
-	dispatch(OnModify<Type>{ entity });
+	m_dispatcher.trigger(OnModify<Type>{ entity });
 }
 
 template<typename Type>
 inline void World::onDestroy([[maybe_unused]] const entt::registry& registry, const entt::entity entity)
 {
-	dispatch(OnDestroy<Type>{ entity });
-}
-
-template<typename Event>
-inline const std::vector<entt::delegate<void(Event&)>>* World::getDelegates() const
-{
-	static_assert(std::is_same_v<Event, std::decay_t<Event>>, "Event must be decayed");
-
-	const auto iterator{ m_dispatcher.find(entt::type_hash<Event>::value()) };
-
-	if (iterator != m_dispatcher.end())
-	{
-		return static_cast<std::vector<entt::delegate<void(Event&)>>*>(iterator->second.get());
-	}
-
-	return nullptr;
-}
-
-template<typename Event>
-inline std::vector<entt::delegate<void(Event&)>>& World::getDelegates()
-{
-	static_assert(std::is_same_v<Event, std::decay_t<Event>>, "Event must be decayed");
-
-	std::shared_ptr<void>& pointer{ m_dispatcher[entt::type_hash<Event>::value()] };
-
-	if (pointer == nullptr)
-	{
-		pointer = std::make_shared<std::vector<entt::delegate<void(Event&)>>>();
-	}
-
-	return *static_cast<std::vector<entt::delegate<void(Event&)>>*>(pointer.get());
+	m_dispatcher.trigger(OnDestroy<Type>{ entity });
 }
 
 }

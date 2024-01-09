@@ -3,7 +3,6 @@
 #include "../config/config.hpp"
 #include "../config/glfw.hpp"
 #include "../config/gl.hpp"
-#include "../events/window.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -119,7 +118,7 @@ void Window::onMouseScroll([[maybe_unused]] GLFWwindow* const, const double x, c
     }
 }
 
-void Window::onMouseButtonInput([[maybe_unused]] GLFWwindow* const window, const int mouseButton, const int action, [[maybe_unused]] const int modifier)
+void Window::onMouseButtonInput([[maybe_unused]] GLFWwindow* const window, const int mouseButton, const int action, const int modifier)
 {
     if (!ImGui::GetIO().WantCaptureMouse)
     {
@@ -129,15 +128,15 @@ void Window::onMouseButtonInput([[maybe_unused]] GLFWwindow* const window, const
 
             const std::size_t index{ static_cast<std::size_t>(mouseButton) };
             window.m_actions[index] = static_cast<char>(action);
-            window.m_isKeyDown[index] = action == GLFW_PRESS;
+            window.m_keysDown[index] = action == GLFW_PRESS;
         }
 
         World& world{ getWorld() };
-        world.dispatch(OnKeyInput{ mouseButton, action });
+        world.dispatch(OnKeyInput{ mouseButton, action, modifier });
     }
 }
 
-void Window::onKeyInput([[maybe_unused]] GLFWwindow* const, const int key, [[maybe_unused]] const int scancode, const int action, [[maybe_unused]] const int modifier)
+void Window::onKeyInput([[maybe_unused]] GLFWwindow* const, const int key, [[maybe_unused]] const int scancode, const int action, const int modifier)
 {
     if (!ImGui::GetIO().WantCaptureKeyboard)
     {
@@ -147,11 +146,11 @@ void Window::onKeyInput([[maybe_unused]] GLFWwindow* const, const int key, [[may
 
             const std::size_t index{ static_cast<std::size_t>(key) };
             window.m_actions[index] = static_cast<char>(action);
-            window.m_isKeyDown[index] = action == GLFW_PRESS;
+            window.m_keysDown[index] = action == GLFW_PRESS;
         }
 
         World& world{ getWorld() };
-        world.dispatch(OnKeyInput{ key, action });
+        world.dispatch(OnKeyInput{ key, action, modifier });
     }
 }
 
@@ -201,7 +200,7 @@ Window::Window(const std::string_view* const title, const glm::ivec2 size, const
 
     updateMousePosition();
     memset(m_actions.data(), -1, m_actions.size() * sizeof(char));
-    memset(m_isKeyDown.data(), 0, m_isKeyDown.size() * sizeof(bool));
+    memset(m_keysDown.data(), 0, m_keysDown.size() * sizeof(bool));
 
     GLFW_CHECK_ERROR(glfwSetWindowUserPointer(handle, this));
     GLFW_CHECK_ERROR(glfwSetWindowCloseCallback(handle, &onClose));
@@ -390,7 +389,7 @@ bool Window::isKeyReleased(const int key) const
 
 bool Window::isKeyDown(const int key) const
 {
-    return key >= GLFW_MOUSE_BUTTON_1 && key <= GLFW_KEY_LAST && m_isKeyDown[static_cast<std::size_t>(key)];
+    return key >= GLFW_MOUSE_BUTTON_1 && key <= GLFW_KEY_LAST && m_keysDown[static_cast<std::size_t>(key)];
 }
 
 bool Window::isKeyUp(const int key) const

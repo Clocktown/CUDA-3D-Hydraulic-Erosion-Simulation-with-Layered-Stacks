@@ -84,7 +84,7 @@ CU_INLINE CU_HOST_DEVICE glm::ivec2 fastRand(glm::uvec2& seed)
 template<>
 CU_INLINE CU_HOST_DEVICE glm::vec2 fastRand(glm::uvec2& seed)
 {
-	return glm::vec2{ fastRand<glm::uvec2>(seed) } * glm::vec2{ 1.0f / static_cast<float>(UINT_MAX) };
+	return glm::vec2{ fastRand<glm::uvec2>(seed) } *glm::vec2{ 1.0f / static_cast<float>(UINT_MAX) };
 }
 
 template<>
@@ -116,7 +116,7 @@ CU_INLINE CU_HOST_DEVICE glm::ivec3 fastRand(glm::uvec3& seed)
 template<>
 CU_INLINE CU_HOST_DEVICE glm::vec3 fastRand(glm::uvec3& seed)
 {
-	return glm::vec3{ fastRand<glm::uvec3>(seed) } * glm::vec3{ 1.0f / static_cast<float>(UINT_MAX) };
+	return glm::vec3{ fastRand<glm::uvec3>(seed) } *glm::vec3{ 1.0f / static_cast<float>(UINT_MAX) };
 }
 
 template<>
@@ -150,7 +150,7 @@ CU_INLINE CU_HOST_DEVICE glm::ivec4 fastRand(glm::uvec4& seed)
 template<>
 CU_INLINE CU_HOST_DEVICE glm::vec4 fastRand(glm::uvec4& seed)
 {
-	return glm::vec4{ fastRand<glm::uvec4>(seed) } * glm::vec4{ 1.0f / static_cast<float>(UINT_MAX) };
+	return glm::vec4{ fastRand<glm::uvec4>(seed) } *glm::vec4{ 1.0f / static_cast<float>(UINT_MAX) };
 }
 
 template<typename Type>
@@ -161,7 +161,7 @@ CU_INLINE CU_HOST_DEVICE constexpr Type nextPowerOfTwo(const Type value)
 
 	ONEC_ASSERT(value >= 0, "Value must be greater than or equal to 0");
 	ONEC_ASSERT(value < (static_cast<Type>(1) << (std::numeric_limits<Type>::digits - 1)), "The next power of two would exceed the numeric limit");
-	
+
 	Type result{ value - (value != 0) };
 
 	for (int i{ 1 }; i < std::numeric_limits<Type>::digits; i <<= 1)

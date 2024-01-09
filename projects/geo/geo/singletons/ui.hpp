@@ -7,6 +7,8 @@ namespace geo
 
 struct UI
 {
+	void update();
+
 	struct
 	{
 		entt::entity entity{ entt::null };
@@ -19,7 +21,13 @@ struct UI
 		float gridScale{ 1.0f };
 	} terrain;
 ;
-	bool isVisable{ true };
+	bool visable{ true };
+private:
+	void updateApplication();
+	void updateCamera();
+	void updateTerrain();
+	void updateSimulation();
+	void updateRendering();
 };
 
 }

@@ -1,7 +1,7 @@
 #include "mesh.hpp"
+#include "buffer.hpp"
 #include "../config/config.hpp"
 #include "../components/aabb.hpp"
-#include "../graphics/buffer.hpp"
 #include "../utility/span.hpp"
 #include <glm/glm.hpp>
 #include <assimp/scene.h>
@@ -14,7 +14,7 @@
 namespace onec
 {
 
-Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags)
+Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags, const bool createBindlessHandles, const bool createGraphicResources)
 {
 	Assimp::Importer importer;
 	const aiScene* const scene{ importer.ReadFile(file.string(), flags) };
@@ -47,13 +47,16 @@ Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags)
 	vertexProperties.resize(hasVertexProperties * static_cast<size_t>(vertexCount));
 
 	AABB aabb{ glm::vec3{ std::numeric_limits<float>::max() },
-		       glm::vec3{ std::numeric_limits<float>::min() } };
+			   glm::vec3{ std::numeric_limits<float>::min() } };
 
 	for (unsigned int i{ 0 }; i < scene->mNumMeshes; ++i)
 	{
 		const aiMesh& mesh{ *scene->mMeshes[i] };
 
-		subMeshes.emplace_back(static_cast<int>(indices.size()), 3 * static_cast<int>(mesh.mNumFaces), static_cast<int>(positions.size()));
+		subMeshes.push_back({ .primitiveType{ GL_TRIANGLES },
+			                  .indexCount{ 3 * static_cast<int>(mesh.mNumFaces) }, 
+							  .baseIndex{ static_cast<int>(indices.size()) }, 
+							  .baseVertex{ static_cast<int>(positions.size()) } });
 
 		for (unsigned int j{ 0 }; j < mesh.mNumFaces; ++j)
 		{
@@ -88,14 +91,11 @@ Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags)
 		}
 	}
 
-	indexBuffer.initialize(asBytes(indices));
-	positionBuffer.initialize(asBytes(positions));
-	vertexPropertyBuffer.initialize(asBytes(vertexProperties));
+	indexBuffer.initialize(asBytes(indices), createBindlessHandles, createGraphicResources);
+	positionBuffer.initialize(asBytes(positions), createBindlessHandles, createGraphicResources);
+	vertexPropertyBuffer.initialize(asBytes(vertexProperties), createBindlessHandles, createGraphicResources);
 
 	this->subMeshes = std::move(subMeshes);
-	this->indices = std::move(indices);
-	this->positions = std::move(positions);
-	this->vertexProperties = std::move(vertexProperties);
 	this->aabb = aabb;
 }
 

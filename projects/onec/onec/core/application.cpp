@@ -1,9 +1,8 @@
 #include "application.hpp"
-#include "world.hpp"
 #include "window.hpp"
+#include "world.hpp"
 #include "../config/config.hpp"
 #include "../config/glfw.hpp"
-#include "../events/application.hpp"
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -30,9 +29,9 @@ Application::Application(const std::string_view* const name)
 
 void Application::run()
 {
-	ONEC_ASSERT(!m_isRunning, "Application must not be running");
+	ONEC_ASSERT(!isRunning(), "Application must not be running");
 
-	m_isRunning = true;
+	m_running = true;
 
 	Window& window{ getWindow() };
 	window.open();
@@ -103,7 +102,7 @@ void Application::run()
 	m_time = 0.0;
 	m_fixedTime = 0.0;
 	m_unscaledTime = 0.0;
-	m_isRunning = false;
+	m_running = false;
 }
 
 void Application::exit()
@@ -214,7 +213,7 @@ double Application::getRealTime() const
 
 bool Application::isRunning() const
 {
-	return m_isRunning;
+	return m_running;
 }
 
 Application& createApplication(const std::string_view name, const glm::ivec2 size, const int sampleCount)

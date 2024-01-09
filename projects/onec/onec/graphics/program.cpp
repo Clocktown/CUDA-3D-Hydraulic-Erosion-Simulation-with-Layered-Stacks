@@ -4,7 +4,6 @@
 #include "../utility/span.hpp"
 #include <glad/glad.h>
 #include <utility>
-#include <string>
 #include <type_traits>
 
 namespace onec
