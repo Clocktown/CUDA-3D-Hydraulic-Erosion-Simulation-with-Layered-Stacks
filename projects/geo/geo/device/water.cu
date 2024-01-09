@@ -86,7 +86,7 @@ __global__ void fluxKernel(Simulation simulation)
 				neighbor.solidHeight = neighbor.height[BEDROCK] + neighbor.height[SAND];
 				neighbor.totalHeight = neighbor.solidHeight + neighbor.height[WATER];
 
-				if (totalHeight < neighbor.height[MAX_HEIGHT])
+				if (solidHeight < neighbor.height[MAX_HEIGHT] && neighbor.height[MAX_HEIGHT] - neighbor.totalHeight > glm::epsilon<float>())
 				{
 					const float heightDifference{ totalHeight - neighbor.totalHeight };
 					//const float heightDifference{ totalHeight - glm::max(neighbor.totalHeight, solidHeight) }; // 2013 Interaction with Dynamic Large Bodies in Efficient, Real-Time Water Simulation
@@ -95,8 +95,20 @@ __global__ void fluxKernel(Simulation simulation)
 					flux[i] = (heightDifference > 0.0f) *
 						      glm::max(flux[i] - heightDifference * simulation.gravity * simulation.gridScale * simulation.deltaTime, 0.0f);
 					
+					if (neighbor.height[MAX_HEIGHT] < FLT_MAX)
+					{
+						const float freeSpace{ neighbor.height[MAX_HEIGHT] - neighbor.totalHeight * simulation.gridScale * simulation.gridScale };
+						const float takenSpace{ flux[i] * simulation.deltaTime };
+
+						flux[i] *= glm::min(freeSpace / (takenSpace + glm::epsilon<float>()), 1.0f);
+					}
+
 					totalFlux += flux[i];
-					
+
+					break;
+				}
+				else if (totalHeight < neighbor.height[MAX_HEIGHT])
+				{
 					break;
 				}
 
