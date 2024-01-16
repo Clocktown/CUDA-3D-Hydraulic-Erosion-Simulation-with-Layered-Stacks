@@ -24,7 +24,8 @@ struct Array3D
 	{
 		static_assert(sizeof(U) == sizeof(T), "Size of U must be equal to size of T");
 
-		return reinterpret_cast<U&&>(surf3Dread<T>(surfaceObject, index.x * static_cast<int>(sizeof(T)), index.y, index.z, boundaryMode));
+		const T value{ surf3Dread<T>(surfaceObject, index.x * static_cast<int>(sizeof(T)), index.y, index.z, boundaryMode) };
+		return *reinterpret_cast<const U*>(&value);
 	}
 
 	template<typename U>

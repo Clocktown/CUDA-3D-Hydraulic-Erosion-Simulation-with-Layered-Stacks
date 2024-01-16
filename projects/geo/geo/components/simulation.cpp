@@ -21,11 +21,15 @@ Simulation::Simulation(const std::shared_ptr<Terrain>& terrain) :
 	launch.gridSize.x = static_cast<unsigned int>(glm::ceil(static_cast<float>(gridSize.x) / static_cast<float>(launch.blockSize.x)));
 	launch.gridSize.y = static_cast<unsigned int>(glm::ceil(static_cast<float>(gridSize.y) / static_cast<float>(launch.blockSize.y)));
 
-	flowArray.initialize(gridSize, cudaCreateChannelDesc<char4>(), cudaArrayDefault, nullptr, true);
+	sedimentArray.initialize(gridSize, cudaCreateChannelDesc<float>(), cudaArrayDefault, nullptr, true);
+	pipeArray.initialize(gridSize, cudaCreateChannelDesc<char4>(), cudaArrayDefault, nullptr, true);
 	fluxArray.initialize(gridSize, cudaCreateChannelDesc<float4>(), cudaArrayDefault, nullptr, true);
+	sedimentFluxArray.initialize(gridSize, cudaCreateChannelDesc<float4>(), cudaArrayDefault, nullptr, true);
 	velocityArray.initialize(gridSize, cudaCreateChannelDesc<float2>(), cudaArrayDefault, nullptr, true);
-	data.flowArray.surfaceObject = flowArray.getSurfaceObject();
+	data.sedimentArray.surfaceObject = sedimentArray.getSurfaceObject();
+	data.pipeArray.surfaceObject = pipeArray.getSurfaceObject();
 	data.fluxArray.surfaceObject = fluxArray.getSurfaceObject();
+	data.sedimentFluxArray.surfaceObject = sedimentFluxArray.getSurfaceObject();
 	data.velocityArray.surfaceObject = velocityArray.getSurfaceObject();
 
 	map();

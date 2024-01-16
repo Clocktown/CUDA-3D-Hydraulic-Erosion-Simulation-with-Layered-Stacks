@@ -18,8 +18,10 @@ struct Simulation
 	int cellCount;
 	Array3D<char4> infoArray;
 	Array3D<float4> heightArray;
-	Array3D<char4> flowArray;
+	Array3D<float> sedimentArray;
+	Array3D<char4> pipeArray;
 	Array3D<float4> fluxArray;
+	Array3D<float4> sedimentFluxArray;
 	Array3D<float2> velocityArray;
 
 	float deltaTime{ 0.5f };

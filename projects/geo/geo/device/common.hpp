@@ -1,6 +1,10 @@
 #pragma once
 
+#include <onec/config/cu.hpp>
+#include <onec/cuda/launch.hpp>
+#include <onec/utility/grid.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 
 #define BELOW 0
 #define ABOVE 1
@@ -15,6 +19,13 @@
 #define UP 1
 #define LEFT 2
 #define DOWN 3
+
+namespace geo
+{
+namespace device
+{
+
+using namespace onec;
 
 struct Neighborhood
 {
@@ -33,3 +44,6 @@ struct Neighborhood
 		glm::ivec2 offsets[count]{ { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
 	};
 };
+
+}
+}
