@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="onec\components\aabb.hpp" />
+    <ClInclude Include="onec\components\camera.hpp" />
+    <ClInclude Include="onec\components\light.hpp" />
+    <ClInclude Include="onec\components\mesh_renderer.hpp" />
+    <ClInclude Include="onec\components\name.hpp" />
+    <ClInclude Include="onec\components\trackball.hpp" />
+    <ClInclude Include="onec\components\transform.hpp" />
+    <ClInclude Include="onec\config\config.hpp" />
+    <ClInclude Include="onec\config\cu.hpp" />
+    <ClInclude Include="onec\config\gl.hpp" />
+    <ClInclude Include="onec\config\glfw.hpp" />
+    <ClInclude Include="onec\config\glm.hpp" />
+    <ClInclude Include="onec\core\application.hpp" />
+    <ClInclude Include="onec\core\window.hpp" />
+    <ClInclude Include="onec\core\world.hpp" />
+    <ClInclude Include="onec\onec.hpp" />
+    <ClInclude Include="onec\resources\array.hpp" />
+    <ClInclude Include="onec\resources\buffer.hpp" />
+    <ClInclude Include="onec\resources\framebuffer.hpp" />
+    <ClInclude Include="onec\resources\graphics_buffer.hpp" />
+    <ClInclude Include="onec\resources\material.hpp" />
+    <ClInclude Include="onec\resources\mesh.hpp" />
+    <ClInclude Include="onec\resources\program.hpp" />
+    <ClInclude Include="onec\resources\render_state.hpp" />
+    <ClInclude Include="onec\resources\sampler.hpp" />
+    <ClInclude Include="onec\resources\texture.hpp" />
+    <ClInclude Include="onec\resources\vertex_array.hpp" />
+    <ClInclude Include="onec\singletons\camera.hpp" />
+    <ClInclude Include="onec\singletons\light.hpp" />
+    <ClInclude Include="onec\singletons\mesh_render_pipeline.hpp" />
+    <ClInclude Include="onec\singletons\render_pipeline.hpp" />
+    <ClInclude Include="onec\singletons\viewport.hpp" />
+    <ClInclude Include="onec\systems\camera.hpp" />
+    <ClInclude Include="onec\systems\screenshot.hpp" />
+    <ClInclude Include="onec\systems\trackball.hpp" />
+    <ClInclude Include="onec\systems\transform.hpp" />
+    <ClInclude Include="onec\utility\color.hpp" />
+    <ClInclude Include="onec\utility\grid.hpp" />
+    <ClInclude Include="onec\utility\io.hpp" />
+    <ClInclude Include="onec\utility\launch.hpp" />
+    <ClInclude Include="onec\utility\math.hpp" />
+    <ClInclude Include="onec\utility\random.hpp" />
+    <ClInclude Include="onec\utility\span.hpp" />
+    <ClInclude Include="onec\utility\time.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="onec\config\cu.cpp" />
+    <ClCompile Include="onec\config\gl.cpp" />
+    <ClCompile Include="onec\config\glfw.cpp" />
+    <ClCompile Include="onec\core\application.cpp" />
+    <ClCompile Include="onec\core\window.cpp" />
+    <ClCompile Include="onec\core\world.cpp" />
+    <ClCompile Include="onec\resources\array.cpp" />
+    <ClCompile Include="onec\resources\buffer.cpp" />
+    <ClCompile Include="onec\resources\framebuffer.cpp" />
+    <ClCompile Include="onec\resources\graphics_buffer.cpp" />
+    <ClCompile Include="onec\resources\mesh.cpp" />
+    <ClCompile Include="onec\resources\program.cpp" />
+    <ClCompile Include="onec\resources\render_state.cpp" />
+    <ClCompile Include="onec\resources\sampler.cpp" />
+    <ClCompile Include="onec\resources\texture.cpp" />
+    <ClCompile Include="onec\resources\vertex_array.cpp" />
+    <ClCompile Include="onec\singletons\render_pipeline.cpp" />
+    <ClCompile Include="onec\systems\screenshot.cpp" />
+    <ClCompile Include="onec\utility\io.cpp" />
+    <ClCompile Include="onec\utility\time.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="onec\config\glm.inl" />
+    <None Include="onec\core\world.inl" />
+    <None Include="onec\singletons\mesh_render_pipeline.inl" />
+    <None Include="onec\singletons\render_pipeline.inl" />
+    <None Include="onec\systems\camera.inl" />
+    <None Include="onec\systems\trackball.inl" />
+    <None Include="onec\systems\transform.inl" />
+    <None Include="onec\utility\color.inl" />
+    <None Include="onec\utility\grid.inl" />
+    <None Include="onec\utility\launch.inl" />
+    <None Include="onec\utility\math.inl" />
+    <None Include="onec\utility\random.inl" />
+    <None Include="onec\utility\span.inl" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{BE080DD7-FEAC-47A9-B72A-26C57DFE205D}</ProjectGuid>
+    <RootNamespace>engine</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.3.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions>--std c++20 %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions>--std c++20 %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.3.targets" />
+  </ImportGroup>
+</Project>
