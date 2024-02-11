@@ -8,7 +8,7 @@ namespace device
 
 __global__ void rainKernel(Simulation simulation)
 {
-	glm::ivec3 index{ glm::ivec2{ cu::getLaunchIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ getLaunchIndex() }, 0 };
 
 	if (isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{
@@ -34,7 +34,7 @@ __global__ void rainKernel(Simulation simulation)
 
 __global__ void fluxKernel(Simulation simulation)
 {
-	glm::ivec3 index{ glm::ivec2{ cu::getLaunchIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ getLaunchIndex() }, 0 };
 
 	if (isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{
@@ -129,7 +129,7 @@ __global__ void fluxKernel(Simulation simulation)
 
 		if (fluxStrength > 0.0f)
 		{
-			const float sediment{ simulation.sedimentArray.read<float>(index) };
+			const float sediment{ simulation.flowArray.read<glm::vec4>(index)[SEDIMENT] };
 			const glm::vec4 sedimentFlux{ sediment * flux / fluxStrength };
 
 			simulation.sedimentFluxArray.write(index, sedimentFlux);
@@ -142,7 +142,7 @@ __global__ void fluxKernel(Simulation simulation)
 
 __global__ void waterKernel(Simulation simulation)
 {
-	glm::ivec3 index{ glm::ivec2{ cu::getLaunchIndex() }, 0 };
+	glm::ivec3 index{ glm::ivec2{ getLaunchIndex() }, 0 };
 
 	if (isOutside(glm::ivec2{ index }, glm::ivec2{ simulation.gridSize }))
 	{
@@ -152,6 +152,7 @@ __global__ void waterKernel(Simulation simulation)
 	do
 	{
 		glm::vec4 height{ simulation.heightArray.read<glm::vec4>(index) };
+		const glm::vec4 flow{ simulation.flowArray.read<glm::vec4>(index) };
 		const glm::vec4 outFlux{ simulation.fluxArray.read<glm::vec4>(index) };
 		glm::vec4 inFlux{ 0.0f };
 		glm::vec4 inSedimentFlux{ 0.0f };
@@ -159,7 +160,7 @@ __global__ void waterKernel(Simulation simulation)
 		struct Neighbor
 		{
 			glm::ivec3 index;
-			glm::i8vec4 flow;
+			glm::i8vec4 pipe;
 			glm::vec4 flux;
 			glm::vec4 sedimentFlux;
 		};
@@ -182,9 +183,9 @@ __global__ void waterKernel(Simulation simulation)
 
 			do
 			{
-				neighbor.flow = simulation.pipeArray.read<glm::i8vec4>(neighbor.index);
+				neighbor.pipe = simulation.pipeArray.read<glm::i8vec4>(neighbor.index);
 
-				if (neighbor.flow[direction] == index.z)
+				if (neighbor.pipe[direction] == index.z)
 				{
 					neighbor.flux = simulation.fluxArray.read<glm::vec4>(neighbor.index);
 					neighbor.sedimentFlux += simulation.sedimentFluxArray.read<glm::vec4>(neighbor.index);
@@ -199,8 +200,8 @@ __global__ void waterKernel(Simulation simulation)
 		}
 		
 		const float totalFlux{ inFlux[RIGHT] + inFlux[UP] + inFlux[LEFT] + inFlux[DOWN] - (outFlux[RIGHT] + outFlux[UP] + outFlux[LEFT] + outFlux[DOWN]) };
-		const float totalSediment{ glm::length(outFlux) < 1e-6f ? glm::length(inSedimentFlux) + simulation.sedimentArray.read<float>(index) : glm::length(inSedimentFlux) };
-		
+		const float totalSediment{ glm::length(outFlux) < 1e-6f ? glm::length(inSedimentFlux) + flow[SEDIMENT] : glm::length(inSedimentFlux)};
+
 		const float waterHeight{ glm::min(height[WATER] + totalFlux * simulation.deltaTime * simulation.rGridScale * simulation.rGridScale, height[MAX_HEIGHT] - height[BEDROCK] - height[SAND]) };
 		const float avgWaterHeight{ 0.5f * (waterHeight + height[WATER]) };
 		const glm::vec2 velocity{ avgWaterHeight > 1e-4f ? 0.5f * glm::vec2{ inFlux[LEFT] - outFlux[LEFT] + outFlux[RIGHT] - inFlux[RIGHT],
@@ -209,8 +210,7 @@ __global__ void waterKernel(Simulation simulation)
 		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
 
 		simulation.heightArray.write(index, height);
-		simulation.sedimentArray.write(index, totalSediment);
-		simulation.velocityArray.write(index, velocity);
+		simulation.flowArray.write(index, glm::vec4{ velocity, totalSediment, 0.0f });
 
 		index.z = simulation.infoArray.read<glm::i8vec4>(index)[ABOVE];
 	}

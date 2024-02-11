@@ -25,6 +25,7 @@ void updateSimulation(const float deltaTime, const entt::exclude_t<Excludes...> 
 		simulation.map();
 
 		device::water(simulation.launch, simulation.data);
+		device::verticalErosion(simulation.launch, simulation.data);
 
 		simulation.unmap();
 	}

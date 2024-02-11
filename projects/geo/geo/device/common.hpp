@@ -5,6 +5,7 @@
 #include <onec/utility/grid.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
+#include <float.h>
 
 #define BELOW 0
 #define ABOVE 1
@@ -14,6 +15,11 @@
 #define SAND 1
 #define WATER 2
 #define MAX_HEIGHT 3
+
+#define VELOCITY_X 0
+#define VELOCITY_Y 1
+#define SEDIMENT 2 // Order of sediment and sediment delta is not consistant (MA vs Code)?
+#define SEDIMENT_DELTA 3
 
 #define RIGHT 0
 #define UP 1
@@ -26,6 +32,7 @@ namespace device
 {
 
 using namespace onec;
+using namespace onec::cu;
 
 struct Neighborhood
 {

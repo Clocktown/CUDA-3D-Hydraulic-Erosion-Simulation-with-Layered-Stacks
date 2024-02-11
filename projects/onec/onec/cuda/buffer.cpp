@@ -22,7 +22,7 @@ Buffer::Buffer() :
 
 Buffer::Buffer(const int count)
 {
-	create(Span<const std::byte>{ nullptr, count });
+	create(count);
 }
 
 Buffer::Buffer(const Span<const std::byte>&& source)

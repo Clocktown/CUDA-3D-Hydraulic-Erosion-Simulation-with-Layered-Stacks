@@ -56,6 +56,7 @@
     <None Include="geo\systems\simulation_system.inl" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="geo\device\vertical_erosion.cu" />
     <CudaCompile Include="geo\device\initialization.cu" />
     <CudaCompile Include="geo\device\water.cu" />
   </ItemGroup>
