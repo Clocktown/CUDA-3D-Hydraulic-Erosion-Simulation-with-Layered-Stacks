@@ -6,7 +6,7 @@
 #define BEDROCK 0
 #define SAND 1
 #define WATER 2
-#define CEIL 3
+#define CEILING 3
 
 layout(binding = materialBufferLocation, std140) uniform SimpleMaterialUniforms
 {

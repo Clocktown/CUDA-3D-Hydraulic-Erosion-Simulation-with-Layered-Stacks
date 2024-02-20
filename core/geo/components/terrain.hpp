@@ -5,7 +5,7 @@
 namespace geo
 {
 
-struct Settings
+struct Simulation
 {
 	float deltaTime{ 1.0f / 60.0f };
 	float gravity{ -9.81f };
@@ -21,13 +21,15 @@ struct Terrain
 	static constexpr int maxLayerCount{ 8 };
 
 	explicit Terrain() = default;
-	explicit Terrain(glm::ivec2 gridSize, float gridScale, const Settings& settings = Settings{});
+	explicit Terrain(glm::ivec2 gridSize, float gridScale, const Simulation& settings = Simulation{});
 
 	glm::ivec2 gridSize;
 	float gridScale;
 	onec::GraphicsBuffer layerCountBuffer;
 	onec::GraphicsBuffer heightBuffer;
-	Settings settings;
+	onec::Buffer pipeBuffer;
+	onec::Buffer fluxBuffer;
+	Simulation simulation;
 };
 
 }

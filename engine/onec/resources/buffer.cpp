@@ -63,7 +63,7 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept
 void Buffer::initialize(const std::ptrdiff_t count)
 {
 	destroy();
-	create(Span<const std::byte>{ nullptr, count });
+	create(count);
 }
 
 void Buffer::initialize(const Span<const std::byte>&& source)

@@ -25,16 +25,17 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.gridScale = terrain.gridScale;
 		simulation.rGridScale = 1.0f / simulation.gridScale;
 		simulation.maxLayerCount = terrain.maxLayerCount;
-		simulation.cellCount = simulation.gridSize.x * simulation.gridSize.y;
+		simulation.layerStride = simulation.gridSize.x * simulation.gridSize.y;
 
-		simulation.voxelCount = terrain.maxLayerCount * simulation.cellCount;
-		simulation.deltaTime = terrain.settings.deltaTime;
-		simulation.gravity = terrain.settings.gravity;
-		simulation.rain = terrain.settings.rain;
-		simulation.evaporation = terrain.settings.evaporation;
+		simulation.deltaTime = terrain.simulation.deltaTime;
+		simulation.gravity = terrain.simulation.gravity;
+		simulation.rain = terrain.simulation.rain;
+		simulation.evaporation = terrain.simulation.evaporation;
 
-		simulation.layerCounts = reinterpret_cast<int*>(layerCountBuffer.getData());
+		simulation.layerCounts = reinterpret_cast<char*>(layerCountBuffer.getData());
 		simulation.heights = reinterpret_cast<float4*>(heightBuffer.getData());
+		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
+		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -43,15 +44,16 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		device::setSimulation(simulation);
 
-		if (terrain.settings.init)
+		if (terrain.simulation.init)
 		{
 			device::init(launch);
-			terrain.settings.init = false;
+			terrain.simulation.init = false;
 		}
 
-		if (!terrain.settings.paused)
+		if (!terrain.simulation.paused)
 		{
 		    device::rain(launch);
+			device::pipe(launch);
 		    device::evaporation(launch);
 	    }
 	}

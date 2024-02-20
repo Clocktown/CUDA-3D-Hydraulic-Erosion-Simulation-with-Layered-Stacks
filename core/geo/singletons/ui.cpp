@@ -97,24 +97,25 @@ void UI::updateTerrain()
 			onec::World& world{ onec::getWorld() };
 			const entt::entity entity{ terrain.entity };
 
-			struct Uniforms
-			{
-				glm::ivec2 gridSize;
-				float gridScale;
-			};
-
-			Uniforms uniforms;
+			geo::SimpleMaterialUniforms uniforms;
+			uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
+			uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
+			uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
 			uniforms.gridSize = terrain.gridSize;
 			uniforms.gridScale = terrain.gridScale;
 
+			Terrain& terrain{ *world.getComponent<Terrain>(entity) };
+			terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, terrain.simulation };
+			terrain.simulation.init = true;
+
+			uniforms.maxLayerCount = terrain.maxLayerCount;
+			uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
+			uniforms.heights = terrain.heightBuffer.getBindlessHandle();
+
 			world.setComponent<onec::Position>(entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
 
-			Terrain& terrain{ *world.getComponent<Terrain>(entity) };
-			terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, terrain.settings };
-			terrain.settings.init = true;
-
 			onec::MeshRenderer& meshRenderer{ *world.getComponent<onec::MeshRenderer>(entity) };
-			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&uniforms, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, gridSize)), sizeof(glm::ivec2) + sizeof(float));
+			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
 			meshRenderer.instanceCount = terrain.maxLayerCount * uniforms.gridSize.x * uniforms.gridSize.y;
 		}
 
@@ -132,7 +133,7 @@ void UI::updateSimulation()
 		onec::World& world{ onec::getWorld() };
 		const entt::entity entity{ terrain.entity };
 
-		Settings& settings{ world.getComponent<Terrain>(entity)->settings };
+		Simulation& settings{ world.getComponent<Terrain>(entity)->simulation };
 
 		if (settings.paused)
 		{

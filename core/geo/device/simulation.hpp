@@ -11,7 +11,7 @@
 #define BEDROCK 0
 #define SAND 1
 #define WATER 2
-#define CEIL 3
+#define CEILING 3
 
 #define RIGHT 0
 #define UP 1
@@ -37,16 +37,17 @@ struct Simulation
 	float gridScale;
 	float rGridScale;
 	int maxLayerCount;
-	int cellCount;
-	int voxelCount;
+	int layerStride;
 
 	float deltaTime;
 	float gravity;
 	float rain;
 	float evaporation;
 
-	int* layerCounts;
+	char* layerCounts;
 	float4* heights;
+	char4* pipes;
+	float4* fluxes;
 };
 
 extern __constant__ Simulation simulation;
@@ -56,6 +57,7 @@ void setSimulation(const Simulation& simulation);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);
+void pipe(const Launch& launch);
 void evaporation(const Launch& launch);
 
 }
