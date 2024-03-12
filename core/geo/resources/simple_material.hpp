@@ -18,6 +18,7 @@ struct SimpleMaterialUniforms
 	int maxLayerCount;
 	GLuint64EXT layerCounts;
 	GLuint64EXT heights;
+	GLuint64EXT stability;
 };
 
 }

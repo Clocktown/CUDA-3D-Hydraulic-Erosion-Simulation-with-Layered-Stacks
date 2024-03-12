@@ -37,6 +37,7 @@ struct Terrain
 	float gridScale;
 	onec::GraphicsBuffer layerCountBuffer;
 	onec::GraphicsBuffer heightBuffer;
+	onec::GraphicsBuffer stabilityBuffer;
 	onec::Buffer pipeBuffer;
 	onec::Buffer fluxBuffer;
 	Simulation simulation;

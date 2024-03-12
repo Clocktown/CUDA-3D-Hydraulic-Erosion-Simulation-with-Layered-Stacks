@@ -11,6 +11,7 @@
 
 out VertexToGeometry vertexToGeometry;
 out flat FlatVertexToGeometry flatVertexToGeometry;
+out flat float stabilityValues;
 
 ivec3 getIndex() 
 {
@@ -53,19 +54,21 @@ void main()
     const int layerStride = gridSize.x * gridSize.y;
 
     const vec4 height = heights[flatIndex];
+    stabilityValues = stability[flatIndex];
     const float floor = index.z > 0 ? heights[flatIndex - layerStride][CEILING] : 0.0f;
     const float bedrock = height[BEDROCK] - floor;
     const float sand = bedrock + height[SAND];
     const float water = sand + height[WATER];
    
     vertexToGeometry.position = vec3(gridScale, water, gridScale) * (vec3(index.x, 0.0f, index.y) + (0.5f * position + 0.5f));
-    vertexToGeometry.position.y += height[BEDROCK];
+    vertexToGeometry.position.y += floor;
     vertexToGeometry.position = (localToWorld * vec4(vertexToGeometry.position, 1.0f)).xyz;
     vertexToGeometry.normal = transpose(mat3(worldToLocal)) * normal;
     vertexToGeometry.v = 0.5f * position.y + 0.5f;
 
-    flatVertexToGeometry.maxV[BEDROCK] = bedrock / water;
-    flatVertexToGeometry.maxV[SAND] = sand / water;
+    // Adding small epsilon to avoid issues with 0 water
+    flatVertexToGeometry.maxV[BEDROCK] = bedrock / water + 0.0002;
+    flatVertexToGeometry.maxV[SAND] = sand / water + 0.0001;
     flatVertexToGeometry.maxV[WATER] = 1.0f;
     flatVertexToGeometry.valid = true;
    

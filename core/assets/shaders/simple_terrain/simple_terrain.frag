@@ -13,6 +13,7 @@
 layout(early_fragment_tests) in;
 in GeometryToFragment geometryToFragment;
 in flat FlatGeometryToFragment flatGeometryToFragment;
+in flat float stabilityValue;
 
 layout(location = 0) out vec4 fragmentColor;
 
@@ -27,6 +28,11 @@ PhongBRDF getPhongBRDF()
 
 	PhongBRDF phongBRDF;
 	phongBRDF.diffuseReflectance = colors[cellType];
+	if(cellType == BEDROCK) {
+		if(stabilityValue <= 0) {
+			phongBRDF.diffuseReflectance = vec3(1,0,0);
+		}
+	}
 	phongBRDF.specularReflectance = vec3(0.0f);
 	phongBRDF.shininess = 40.0f;
 	phongBRDF.alpha = 1.0f;

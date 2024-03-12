@@ -57,6 +57,8 @@ struct Simulation
 
 	char4* pipes;
 	float4* fluxes;
+
+	float* stability;
 };
 
 extern __constant__ Simulation simulation;

@@ -17,6 +17,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		Terrain& terrain{ view.get<Terrain>(entity) };
 		onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
 		onec::Buffer heightBuffer{ terrain.heightBuffer };
+		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
 
 		device::Launch launch;
 		device::Simulation simulation;
@@ -34,6 +35,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		simulation.layerCounts = reinterpret_cast<char*>(layerCountBuffer.getData());
 		simulation.heights = reinterpret_cast<float4*>(heightBuffer.getData());
+		simulation.stability = reinterpret_cast<float*>(stabilityBuffer.getData());
 		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 

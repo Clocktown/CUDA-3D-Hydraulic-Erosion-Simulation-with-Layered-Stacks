@@ -16,6 +16,7 @@ layout(binding = materialBufferLocation, std140) uniform SimpleMaterialUniforms
 	int maxLayerCount;
 	int* layerCounts;
 	vec4* heights;
+	float* stability;
 };
 
 #endif

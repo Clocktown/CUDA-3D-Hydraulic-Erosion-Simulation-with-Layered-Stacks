@@ -61,6 +61,7 @@ void start()
 		uniforms.maxLayerCount = terrain.maxLayerCount;
 		uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
 		uniforms.heights = terrain.heightBuffer.getBindlessHandle();
+		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
 
 		const std::filesystem::path assets{ application.getDirectory() / "assets" };
 		const auto mesh{ std::make_shared<onec::Mesh>(assets / "meshes/cube.obj") };
