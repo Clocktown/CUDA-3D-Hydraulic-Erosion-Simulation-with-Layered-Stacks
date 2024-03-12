@@ -51,6 +51,7 @@
     <CudaCompile Include="geo\device\init.cu" />
     <CudaCompile Include="geo\device\rain.cu" />
     <CudaCompile Include="geo\device\simulation.cu" />
+    <CudaCompile Include="geo\device\support.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{843C3D58-7C64-4C3F-82DE-7618B4F2A18D}</ProjectGuid>

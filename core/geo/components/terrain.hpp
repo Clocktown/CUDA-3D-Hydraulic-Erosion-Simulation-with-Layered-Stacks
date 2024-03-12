@@ -12,6 +12,16 @@ struct Simulation
 	float rain{ 0.0f };
 	float evaporation{ 0.0f };
 
+	float bedrockDensity{ 2600.f }; // kg/m³
+	float sandDensity{ 1600.f }; // kg/m³
+	float waterDensity{ 1000.f }; // kg/m³
+	// Water weight will be ignored since water level is constantly changing
+	float bedrockSupport{10000.f}; // kg/m² - how much weight a given surface of bedrock can support
+	float borderSupport{20000.f}; // kg/m²
+	int maxStabilityPropagationSteps{ 100 };
+	int stabilityPropagationStepsPerIteration{ 10 };
+	int currentStabilityStep{ 0 };
+
 	bool init{ true };
 	bool paused{ true };
 };

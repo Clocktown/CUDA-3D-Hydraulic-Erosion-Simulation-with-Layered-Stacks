@@ -37,6 +37,12 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 
+		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
+		simulation.sandDensity = terrain.simulation.sandDensity;
+		simulation.waterDensity = terrain.simulation.waterDensity;
+		simulation.bedrockSupport = terrain.simulation.bedrockSupport;
+		simulation.borderSupport = terrain.simulation.borderSupport;
+
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
 		launch.gridSize.y = (simulation.gridSize.y + launch.blockSize.y - 1) / launch.blockSize.y;
@@ -48,6 +54,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		{
 			device::init(launch);
 			terrain.simulation.init = false;
+			terrain.simulation.currentStabilityStep = 0;
+			device::startSupportCheck(launch);
 		}
 
 		if (!terrain.simulation.paused)
@@ -55,6 +63,15 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		    device::rain(launch);
 			device::pipe(launch);
 		    device::evaporation(launch);
+			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) {
+				device::endSupportCheck(launch);
+				device::startSupportCheck(launch);
+			}
+			for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i) {
+				terrain.simulation.currentStabilityStep++;
+				device::stepSupportCheck(launch);
+			}
+
 	    }
 	}
 }

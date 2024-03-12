@@ -161,6 +161,18 @@ void UI::updateSimulation()
 			settings.evaporation = 0.01f * evaporation;
 		}
 
+		if (ImGui::TreeNode("Support Check")) {
+
+			ImGui::DragFloat("Bedrock density", &settings.bedrockDensity);
+			ImGui::DragFloat("Sand density", &settings.sandDensity);
+			ImGui::DragFloat("Bedrock support", &settings.bedrockSupport);
+			ImGui::DragFloat("Border support", &settings.borderSupport);
+			ImGui::DragInt("Max. stability propagation steps", &settings.maxStabilityPropagationSteps);
+			ImGui::DragInt("Stability propagation steps per iteration", &settings.stabilityPropagationStepsPerIteration);
+
+			ImGui::TreePop();
+		}
+
 		ImGui::TreePop();
 	}
 }
