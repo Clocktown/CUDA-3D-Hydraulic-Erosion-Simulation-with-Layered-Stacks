@@ -32,18 +32,18 @@ namespace geo
 			}
 
 			int flatIndex{ flattenIndex(index, simulation.gridSize) };
-			const char layerCount{ simulation.layerCounts[flatIndex] };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
 
 			float bedrockMin = ((float*)(simulation.heights + flatIndex))[CEILING];
 			flatIndex += simulation.layerStride; // Bottom layer is always stable, so skip
 
-			for (char layer{ 1 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			for (int layer{ 1 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 			{
 				float bedrockMax = ((float*)(simulation.heights + flatIndex))[BEDROCK];
 				float oldStability = simulation.stability[flatIndex];
 				float stability = 0.f;
 
-				struct Neighbor
+				struct
 				{
 					glm::ivec2 index;
 					int flatIndex;

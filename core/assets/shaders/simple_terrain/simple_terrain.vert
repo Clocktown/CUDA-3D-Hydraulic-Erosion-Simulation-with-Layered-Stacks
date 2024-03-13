@@ -67,7 +67,7 @@ void main()
     vertexToGeometry.v = 0.5f * position.y + 0.5f;
 
     // Adding small epsilon to avoid issues with 0 water
-    flatVertexToGeometry.maxV[BEDROCK] = bedrock / water + 0.0002;
+    flatVertexToGeometry.maxV[BEDROCK] = bedrock / water + 0.0001;
     flatVertexToGeometry.maxV[SAND] = sand / water + 0.0001;
     flatVertexToGeometry.maxV[WATER] = 1.0f;
     flatVertexToGeometry.valid = true;

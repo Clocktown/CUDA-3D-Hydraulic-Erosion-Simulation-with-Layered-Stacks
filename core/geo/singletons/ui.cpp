@@ -133,42 +133,53 @@ void UI::updateSimulation()
 		onec::World& world{ onec::getWorld() };
 		const entt::entity entity{ terrain.entity };
 
-		Simulation& settings{ world.getComponent<Terrain>(entity)->simulation };
+		Simulation& simulation{ world.getComponent<Terrain>(entity)->simulation };
 
-		if (settings.paused)
+		if (simulation.paused)
 		{
 			if (ImGui::Button("Start"))
 			{
-				settings.paused = false;
+				simulation.paused = false;
 			}
 		}
 		else
 		{
 			if (ImGui::Button("Pause"))
 			{
-				settings.paused = true;
+				simulation.paused = true;
 			}
 		}
 
-		ImGui::DragFloat("Delta Time [s]", &settings.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Gravity [m/s^2]", &settings.gravity, 0.1f);
-		ImGui::DragFloat("Rain [m/(m^2 * s)]", &settings.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Delta Time [s]", &simulation.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Gravity [m/s^2]", &simulation.gravity, 0.1f);
+		ImGui::DragFloat("Rain [m/(m^2 * s)]", &simulation.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
 
-		float evaporation{ 100.0f * settings.evaporation };
+		float evaporation{ 100.0f * simulation.evaporation };
 
 		if (ImGui::DragFloat("Evaporation [%/s]", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max()))
 		{
-			settings.evaporation = 0.01f * evaporation;
+			simulation.evaporation = 0.01f * evaporation;
+		}
+
+		ImGui::DragFloat("Sediment Capacity Constant", &simulation.sedimentCapacityConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Dissolving Constant", &simulation.dissolvingConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Deposition Constant", &simulation.depositionConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());
+
+		float minTerrainAngle{ glm::degrees(simulation.minTerrainAngle) };
+
+		if (ImGui::DragFloat("Min. Terrain Angle [deg]", &minTerrainAngle, 0.1f, 0.0f, 90.0f))
+		{
+			simulation.minTerrainAngle = glm::radians(minTerrainAngle);
 		}
 
 		if (ImGui::TreeNode("Support Check")) {
 
-			ImGui::DragFloat("Bedrock density", &settings.bedrockDensity);
-			ImGui::DragFloat("Sand density", &settings.sandDensity);
-			ImGui::DragFloat("Bedrock support", &settings.bedrockSupport);
-			ImGui::DragFloat("Border support", &settings.borderSupport);
-			ImGui::DragInt("Max. stability propagation steps", &settings.maxStabilityPropagationSteps);
-			ImGui::DragInt("Stability propagation steps per iteration", &settings.stabilityPropagationStepsPerIteration);
+			ImGui::DragFloat("Bedrock density", &simulation.bedrockDensity);
+			ImGui::DragFloat("Sand density", &simulation.sandDensity);
+			ImGui::DragFloat("Bedrock support", &simulation.bedrockSupport);
+			ImGui::DragFloat("Border support", &simulation.borderSupport);
+			ImGui::DragInt("Max. stability propagation steps", &simulation.maxStabilityPropagationSteps);
+			ImGui::DragInt("Stability propagation steps per iteration", &simulation.stabilityPropagationStepsPerIteration);
 
 			ImGui::TreePop();
 		}

@@ -47,7 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="geo\device\evaporation.cu" />
-    <CudaCompile Include="geo\device\pipe.cu" />
+    <CudaCompile Include="geo\device\transport.cu" />
     <CudaCompile Include="geo\device\init.cu" />
     <CudaCompile Include="geo\device\rain.cu" />
     <CudaCompile Include="geo\device\simulation.cu" />

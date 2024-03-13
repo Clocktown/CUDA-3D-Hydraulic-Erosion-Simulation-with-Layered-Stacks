@@ -15,9 +15,9 @@ __global__ void evaporationKernel()
 	}
 
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
-	const char layerCount{ simulation.layerCounts[flatIndex] };
+	const int layerCount{ simulation.layerCounts[flatIndex] };
 
-	for (char layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 	{
 		simulation.heights[flatIndex].z = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * simulation.heights[flatIndex].z, 0.0f);
 	}

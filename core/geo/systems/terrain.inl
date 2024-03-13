@@ -17,6 +17,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		Terrain& terrain{ view.get<Terrain>(entity) };
 		onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
 		onec::Buffer heightBuffer{ terrain.heightBuffer };
+		onec::Buffer sedimentBuffer{ terrain.sedimentBuffer };
 		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
 
 		device::Launch launch;
@@ -33,17 +34,23 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rain = terrain.simulation.rain;
 		simulation.evaporation = terrain.simulation.evaporation;
 
-		simulation.layerCounts = reinterpret_cast<char*>(layerCountBuffer.getData());
-		simulation.heights = reinterpret_cast<float4*>(heightBuffer.getData());
-		simulation.stability = reinterpret_cast<float*>(stabilityBuffer.getData());
-		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
-		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
+		simulation.sedimentCapacityConstant = terrain.simulation.sedimentCapacityConstant;
+		simulation.dissolvingConstant = terrain.simulation.dissolvingConstant;
+		simulation.depositionConstant = terrain.simulation.depositionConstant;
+		simulation.minTerrainSlope = glm::sin(terrain.simulation.minTerrainAngle);
 
 		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
 		simulation.sandDensity = terrain.simulation.sandDensity;
 		simulation.waterDensity = terrain.simulation.waterDensity;
 		simulation.bedrockSupport = terrain.simulation.bedrockSupport;
 		simulation.borderSupport = terrain.simulation.borderSupport;
+
+		simulation.layerCounts = reinterpret_cast<char*>(layerCountBuffer.getData());
+		simulation.heights = reinterpret_cast<float4*>(heightBuffer.getData());
+		simulation.sediments = reinterpret_cast<float*>(sedimentBuffer.getData());
+		simulation.stability = reinterpret_cast<float*>(stabilityBuffer.getData());
+		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
+		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -55,21 +62,27 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (terrain.simulation.init)
 		{
 			device::init(launch);
-			terrain.simulation.init = false;
+		
 			terrain.simulation.currentStabilityStep = 0;
 			device::startSupportCheck(launch);
+
+			terrain.simulation.init = false;
 		}
 
 		if (!terrain.simulation.paused)
 		{
 		    device::rain(launch);
-			device::pipe(launch);
+			device::transport(launch);
 		    device::evaporation(launch);
-			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) {
+
+			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) 
+			{
 				device::endSupportCheck(launch);
 				device::startSupportCheck(launch);
 			}
-			for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i) {
+
+			for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i) 
+			{
 				terrain.simulation.currentStabilityStep++;
 				device::stepSupportCheck(launch);
 			}

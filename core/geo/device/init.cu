@@ -20,15 +20,18 @@ __global__ void initKernel()
 	{
 		simulation.layerCounts[flatIndex] = 2;
 		simulation.heights[flatIndex] = float4{ (simulation.gridSize.x - index.x) / 16.0f, 0.0f, 0.0f, 30.0f };
+		simulation.sediments[flatIndex] = 0.0f;
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-		simulation.heights[flatIndex + simulation.layerStride] = float4{ 30.0f + index.x / 16.0f, 0.0f, 8.0f, FLT_MAX };
+		simulation.heights[flatIndex + simulation.layerStride] = float4{ 30.0f + index.x / 16.0f, 2.0f, 2.0f, FLT_MAX };
+		simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
 		simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 	}
 	else
 	{
 		simulation.layerCounts[flatIndex] = 1;
 		simulation.heights[flatIndex] = float4{ (simulation.gridSize.x - index.x) / 16.0f, 0.0f, 0.0f, FLT_MAX };
+		simulation.sediments[flatIndex] = 0.0f;
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 	}
 }

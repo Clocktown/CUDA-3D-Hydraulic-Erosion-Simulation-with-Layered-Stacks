@@ -133,6 +133,3 @@ int main()
 
 	application.run();
 }
-
-// Column count
-// Normal flip
