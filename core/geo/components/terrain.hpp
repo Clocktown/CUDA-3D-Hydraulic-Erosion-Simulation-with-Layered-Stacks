@@ -45,6 +45,7 @@ struct Terrain
 	onec::GraphicsBuffer sedimentBuffer;
 	onec::GraphicsBuffer stabilityBuffer;
 	onec::Buffer pipeBuffer;
+	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;
 	Simulation simulation;
 };
