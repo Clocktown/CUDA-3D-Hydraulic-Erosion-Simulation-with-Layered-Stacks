@@ -14,7 +14,15 @@ __global__ void initKernel()
 		return;
 	}
 
-	const int flatIndex{ flattenIndex(index, simulation.gridSize) };
+	int flatIndex{ flattenIndex(index, simulation.gridSize) };
+
+	/*for (int i = 0; i < 8; ++i, flatIndex += simulation.layerStride) {
+		if(i == 0)
+			simulation.layerCounts[flatIndex] = 8;
+		simulation.heights[flatIndex] = float4{ i * 20.f + 10.f, 0.f, 0.f,  i == 7 ? FLT_MAX : (i + 1) * 20.f };
+		simulation.sediments[flatIndex] = 0.0f;
+		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	}*/
 
 	if (index.x > 64)
 	{

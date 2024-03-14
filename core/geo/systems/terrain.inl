@@ -77,8 +77,11 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) 
 			{
-				device::endSupportCheck(launch);
-				device::startSupportCheck(launch);
+				// Uncomment this to test static support check
+				//device::endSupportCheck(launch);
+
+				// TODO: uncomment this. Disabled to test static initial stability
+				//device::startSupportCheck(launch);
 			}
 
 			for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i) 

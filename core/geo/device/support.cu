@@ -18,8 +18,95 @@ namespace geo
 
 			for (char layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 			{
-				simulation.stability[flatIndex] = layer == 0.f ? FLT_MAX :  0.f;
+				//simulation.stability[flatIndex] = layer == 0.f ? FLT_MAX :  0.f;
+				//simulation.stability[flatIndex] = float((layer + 1) % 2);
+				simulation.stability[flatIndex] = float(layer % 4 == 0);
 			}
+		}
+
+		__global__ void endSupportCheckKernel()
+		{
+			const glm::ivec2 index{ getLaunchIndex() };
+
+			if (index.x >= simulation.gridSize.x || index.y >= simulation.gridSize.y)
+			{
+				return;
+			}
+
+			const int flatIndex{ flattenIndex(index, simulation.gridSize) };
+			const char layerCount{ simulation.layerCounts[flatIndex] };
+			int itFlatIndex = flatIndex + (layerCount - 1) * simulation.layerStride;
+
+			char newLayerCount = layerCount;
+
+			float collapsedWater = 0.f;
+			float collapsedSand = 0.f;
+			float collapsedSediment = 0.f;
+			float collapsedBedrock = 0.f;
+			float previousCeiling = 0.f;
+
+			bool previousCollapsed = false;
+
+			for (char layer{ layerCount - 1 }; layer >= 0; --layer, itFlatIndex -= simulation.layerStride)
+			{
+				auto heights = glm::cuda_cast(simulation.heights[itFlatIndex]);
+				float sediment = simulation.sediments[itFlatIndex];
+				if (previousCollapsed) {
+					collapsedBedrock -= heights[CEILING];
+				}
+
+				heights[BEDROCK] += collapsedBedrock;
+				heights[SAND] += collapsedSand;
+				heights[WATER] += collapsedWater;
+				sediment += collapsedSediment;
+				if (previousCollapsed) {
+					heights[CEILING] = previousCeiling;
+				}
+				collapsedBedrock = 0.f;
+				collapsedSand = 0.f;
+				collapsedWater = 0.f;
+				collapsedSediment = 0.f;
+
+				float stability = simulation.stability[itFlatIndex];
+				if (stability <= 0.f) {
+					collapsedWater += heights[WATER];
+					collapsedSand += heights[SAND];
+					collapsedBedrock += heights[BEDROCK];
+					collapsedSediment += sediment;
+					previousCeiling = heights[CEILING];
+					heights = glm::vec4(0);
+					sediment = 0.f;
+					simulation.fluxes[itFlatIndex] = float4(0.f);
+					previousCollapsed = true;
+					newLayerCount--;
+				}
+				else {
+					previousCollapsed = false;
+				}
+
+				simulation.heights[itFlatIndex] = glm::cuda_cast(heights);
+				simulation.sediments[itFlatIndex] = sediment;
+			}
+
+			itFlatIndex = flatIndex + simulation.layerStride; // set index to layer 1
+
+			int tgtIndex = itFlatIndex;
+
+			for (int layer{ 1 }; layer < layerCount; ++layer, itFlatIndex += simulation.layerStride)
+			{
+				float stability = simulation.stability[itFlatIndex];
+				if (stability > 0.f) {
+					if (tgtIndex != itFlatIndex) {
+						simulation.heights[tgtIndex] = simulation.heights[itFlatIndex];
+						simulation.fluxes[tgtIndex] = simulation.fluxes[itFlatIndex];
+						simulation.stability[tgtIndex] = stability;
+						simulation.sediments[tgtIndex] = simulation.sediments[itFlatIndex];
+					}
+					tgtIndex += simulation.layerStride;
+				}
+			}
+
+			simulation.layerCounts[flatIndex] = newLayerCount;
 		}
 
 		__global__ void stepSupportCheckKernel()
@@ -91,11 +178,12 @@ namespace geo
 		}
 
 		void endSupportCheck(const Launch& launch) {
-
+			CU_CHECK_KERNEL(endSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 
 		void stepSupportCheck(const Launch& launch) {
-			CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
+			// TODO: uncomment this. Disabled to test static initial stability, also not yet fully implemented
+			//CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 	}
 }
