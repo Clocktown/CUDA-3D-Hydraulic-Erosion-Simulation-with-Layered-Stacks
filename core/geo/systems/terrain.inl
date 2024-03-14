@@ -50,6 +50,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.sediments = reinterpret_cast<float*>(sedimentBuffer.getData());
 		simulation.stability = reinterpret_cast<float*>(stabilityBuffer.getData());
 		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
+		simulation.slopes = reinterpret_cast<float*>(terrain.slopeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };

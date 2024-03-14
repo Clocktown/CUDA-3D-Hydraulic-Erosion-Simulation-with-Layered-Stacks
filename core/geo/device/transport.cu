@@ -14,6 +14,8 @@ __global__ void pipeKernel()
 		return;
 	}
 
+	const float gridScale2{ 2.0f * simulation.gridScale };
+
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
 
@@ -24,6 +26,7 @@ __global__ void pipeKernel()
 		const float water{ sand + height[WATER] };
 
 		glm::vec<4, char> pipe{ -1 };
+		glm::vec4 heights{ sand };
 		glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
 
 		struct
@@ -61,6 +64,7 @@ __global__ void pipeKernel()
 					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; // dynamic?
 
 					pipe[i] = static_cast<char>(neighbor.layer);
+					heights[i] = neighbor.sand;
 					flux[i] = (deltaHeight > 0.0f) *
 						      glm::max(flux[i] - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
 
@@ -81,12 +85,19 @@ __global__ void pipeKernel()
 			}
 		}
 
+		const glm::vec3 tangents[2]{ glm::normalize(glm::vec3{ gridScale2, heights[RIGHT] - heights[LEFT], 0.0f }),
+									 glm::normalize(glm::vec3{ 0.0f, heights[UP] - heights[DOWN], gridScale2 }) };
+
+		const glm::vec3 normal{ glm::cross(tangents[0], tangents[1]) };
+		const float slope{ glm::sqrt(1.0f - normal.y * normal.y) }; // sin(alpha)
+
 		const float totalFlux{ flux.x + flux.y + flux.z + flux.w };
 
 		flux *= glm::min(height[WATER] * simulation.gridScale * simulation.gridScale /
 					     (totalFlux * simulation.deltaTime + glm::epsilon<float>()), 1.0f);
 
 		simulation.pipes[flatIndex] = glm::cuda_cast(pipe);
+		simulation.slopes[flatIndex] = slope;
 		simulation.fluxes[flatIndex] = glm::cuda_cast(flux);
 	}
 }
@@ -159,7 +170,7 @@ __global__ void transportKernel()
 		sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
 
 		const glm::vec2 velocity{ glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) / (avgWater * simulation.gridScale + glm::epsilon<float>()) };
-		const float terrainSlope{ simulation.minTerrainSlope };
+		const float terrainSlope{ glm::max(simulation.slopes[flatIndex], simulation.minTerrainSlope) };
 		const float sedimentCapacity{ simulation.sedimentCapacityConstant * terrainSlope * glm::length(velocity) };
 
 		if (sedimentCapacity > sediment)

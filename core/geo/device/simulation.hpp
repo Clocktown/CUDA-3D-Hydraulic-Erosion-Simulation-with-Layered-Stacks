@@ -62,6 +62,7 @@ struct Simulation
 	float* sediments;
 
 	char4* pipes;
+	float* slopes; // sin(alpha)
 	float4* fluxes;
 
 	float* stability;
