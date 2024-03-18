@@ -111,6 +111,7 @@ void UI::updateTerrain()
 			uniforms.maxLayerCount = terrain.maxLayerCount;
 			uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
 			uniforms.heights = terrain.heightBuffer.getBindlessHandle();
+			uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
 
 			world.setComponent<onec::Position>(entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
 

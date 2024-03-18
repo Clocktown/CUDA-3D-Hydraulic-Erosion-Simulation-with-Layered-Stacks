@@ -29,7 +29,7 @@ PhongBRDF getPhongBRDF()
 	PhongBRDF phongBRDF;
 	phongBRDF.diffuseReflectance = colors[cellType];
 	if(cellType == BEDROCK) {
-		if(stabilityValue <= 0) {
+		if(stabilityValue <= 0.f) {
 			phongBRDF.diffuseReflectance = vec3(1,0,0);
 		}
 	}
