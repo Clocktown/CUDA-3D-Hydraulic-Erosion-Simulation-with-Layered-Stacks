@@ -17,6 +17,8 @@ struct Simulation
 	float depositionConstant{ 0.01f };
 	float minTerrainAngle{ glm::radians(5.0f) }; // [rad]
 
+	float talusAngle{ glm::radians(30.0f) }; // [rad]
+
 	float bedrockDensity{ 2600.f }; // [kg/m³]
 	float sandDensity{ 1600.f }; // [kg/m³]
 	float waterDensity{ 1000.f }; // [kg/m³]
@@ -47,6 +49,7 @@ struct Terrain
 	onec::Buffer pipeBuffer;
 	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;
+	onec::Buffer slippageBuffer;
 	Simulation simulation;
 };
 

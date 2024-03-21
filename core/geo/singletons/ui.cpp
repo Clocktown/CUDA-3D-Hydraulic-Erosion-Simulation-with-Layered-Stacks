@@ -173,6 +173,13 @@ void UI::updateSimulation()
 			simulation.minTerrainAngle = glm::radians(minTerrainAngle);
 		}
 
+		float talusAngle{ glm::degrees(simulation.talusAngle) };
+
+		if (ImGui::DragFloat("Talus Angle [deg]", &talusAngle, 0.1f, 0.0f, 90.0f))
+		{
+			simulation.talusAngle = glm::radians(talusAngle);
+		}
+
 		if (ImGui::TreeNode("Support Check")) {
 
 			ImGui::DragFloat("Bedrock density", &simulation.bedrockDensity);

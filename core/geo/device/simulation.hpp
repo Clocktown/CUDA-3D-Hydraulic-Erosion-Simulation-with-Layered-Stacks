@@ -49,6 +49,7 @@ struct Simulation
 	float dissolvingConstant;
 	float depositionConstant;
 	float minTerrainSlope; // sin(alpha)
+	float talusSlope; // tan(alpha)
 
 	float bedrockDensity; // [kg/m³]
 	float sandDensity; // [kg/m³]
@@ -64,6 +65,7 @@ struct Simulation
 	char4* pipes;
 	float* slopes; // sin(alpha)
 	float4* fluxes;
+	float4* slippages;
 
 	float* stability;
 };

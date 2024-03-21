@@ -38,6 +38,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.dissolvingConstant = terrain.simulation.dissolvingConstant;
 		simulation.depositionConstant = terrain.simulation.depositionConstant;
 		simulation.minTerrainSlope = glm::sin(terrain.simulation.minTerrainAngle);
+		simulation.talusSlope = glm::tan(terrain.simulation.talusAngle);
 
 		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
 		simulation.sandDensity = terrain.simulation.sandDensity;
@@ -52,6 +53,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
 		simulation.slopes = reinterpret_cast<float*>(terrain.slopeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
+		simulation.slippages = reinterpret_cast<float4*>(terrain.slippageBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;

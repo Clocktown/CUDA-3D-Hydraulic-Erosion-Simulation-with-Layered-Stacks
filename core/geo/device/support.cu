@@ -14,9 +14,9 @@ namespace geo
 			}
 
 			int flatIndex{ flattenIndex(index, simulation.gridSize) };
-			const char layerCount{ simulation.layerCounts[flatIndex] };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
 
-			for (char layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 			{
 				simulation.stability[flatIndex] = layer == 0.f ? FLT_MAX :  0.f;
 				//simulation.stability[flatIndex] = float((layer + 1) % 2);
@@ -34,10 +34,10 @@ namespace geo
 			}
 
 			const int flatIndex{ flattenIndex(index, simulation.gridSize) };
-			const char layerCount{ simulation.layerCounts[flatIndex] };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
 			int itFlatIndex = flatIndex + (layerCount - 1) * simulation.layerStride;
 
-			char newLayerCount = layerCount;
+			int newLayerCount = layerCount;
 
 			float collapsedWater = 0.f;
 			float collapsedSand = 0.f;
@@ -47,7 +47,7 @@ namespace geo
 
 			bool previousCollapsed = false;
 
-			for (char layer{ layerCount - 1 }; layer >= 0; --layer, itFlatIndex -= simulation.layerStride)
+			for (int layer{ layerCount - 1 }; layer >= 0; --layer, itFlatIndex -= simulation.layerStride)
 			{
 				auto heights = glm::cuda_cast(simulation.heights[itFlatIndex]);
 				float sediment = simulation.sediments[itFlatIndex];

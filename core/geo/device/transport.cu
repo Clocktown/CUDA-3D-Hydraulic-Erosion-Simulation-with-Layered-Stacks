@@ -28,6 +28,7 @@ __global__ void pipeKernel()
 		glm::vec<4, char> pipe{ -1 };
 		glm::vec4 heights{ sand };
 		glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
+		glm::vec4 slippage{ 0.0f };
 
 		struct
 		{
@@ -76,6 +77,8 @@ __global__ void pipeKernel()
 						flux[i] *= glm::min(freeSpace / (takenSpace + glm::epsilon<float>()), 1.0f);
 					}
 
+					slippage[i] = glm::max(simulation.deltaTime * (sand - neighbor.sand - simulation.talusSlope * simulation.gridScale), 0.0f);
+
 					break;
 				}
 				else if (water < neighbor.height[CEILING])
@@ -91,14 +94,15 @@ __global__ void pipeKernel()
 		const glm::vec3 normal{ glm::cross(tangents[0], tangents[1]) };
 		const float slope{ glm::sqrt(1.0f - normal.y * normal.y) }; // sin(alpha)
 
-		const float totalFlux{ flux.x + flux.y + flux.z + flux.w };
-
 		flux *= glm::min(height[WATER] * simulation.gridScale * simulation.gridScale /
-					     (totalFlux * simulation.deltaTime + glm::epsilon<float>()), 1.0f);
+						 ((flux.x + flux.y + flux.z + flux.w) * simulation.deltaTime + glm::epsilon<float>()), 1.0f);
+
+		slippage *= glm::min(height[SAND] / (slippage.x + slippage.y + slippage.z + slippage.w + glm::epsilon<float>()), 1.0f);
 
 		simulation.pipes[flatIndex] = glm::cuda_cast(pipe);
 		simulation.slopes[flatIndex] = slope;
 		simulation.fluxes[flatIndex] = glm::cuda_cast(flux);
+		simulation.slippages[flatIndex] = glm::cuda_cast(slippage);
 	}
 }
 
@@ -122,6 +126,7 @@ __global__ void transportKernel()
 		float sediment{ simulation.sediments[flatIndex] };
 		glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
 		glm::vec4 sedimentFlux{ sediment * flux };
+		glm::vec4 slippage{ glm::cuda_cast(simulation.slippages[flatIndex]) };
 
 		struct
 		{
@@ -132,6 +137,7 @@ __global__ void transportKernel()
 			int layer;
 			float sediment;
 			float flux;
+			float slippage;
 		} neighbor;
 
 		for (int i{ 0 }; i < 4; ++i)
@@ -156,9 +162,11 @@ __global__ void transportKernel()
 				{
 					neighbor.sediment = simulation.sediments[neighbor.flatIndex];
 					neighbor.flux = reinterpret_cast<float*>(simulation.fluxes)[neighbor.flatIndex4 + direction];
+					neighbor.slippage = reinterpret_cast<float*>(simulation.slippages)[neighbor.flatIndex4 + direction];
 
 					flux[i] -= neighbor.flux;
 					sedimentFlux[i] -= neighbor.sediment * neighbor.flux;
+					slippage[i] -= neighbor.slippage;
 				}
 			}
 		}
@@ -185,6 +193,8 @@ __global__ void transportKernel()
 			sediment -= deltaSediment;
 			height[SAND] += deltaSediment;
 		}
+
+		height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
 
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;
