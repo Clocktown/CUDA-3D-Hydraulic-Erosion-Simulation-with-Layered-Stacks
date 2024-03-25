@@ -162,6 +162,13 @@ void UI::updateSimulation()
 			simulation.evaporation = 0.01f * evaporation;
 		}
 
+		float petrification{ 100.0f * simulation.petrification };
+
+		if (ImGui::DragFloat("Petrification [%/s]", &petrification, 0.01f, 0.0f, std::numeric_limits<float>::max()))
+		{
+			simulation.petrification = 0.01f * petrification;
+		}
+
 		ImGui::DragFloat("Sediment Capacity Constant", &simulation.sedimentCapacityConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Dissolving Constant", &simulation.dissolvingConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Deposition Constant", &simulation.depositionConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());

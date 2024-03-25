@@ -33,6 +33,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.gravity = terrain.simulation.gravity;
 		simulation.rain = terrain.simulation.rain;
 		simulation.evaporation = terrain.simulation.evaporation;
+		simulation.petrification = terrain.simulation.petrification;
 
 		simulation.sedimentCapacityConstant = terrain.simulation.sedimentCapacityConstant;
 		simulation.dissolvingConstant = terrain.simulation.dissolvingConstant;
@@ -76,8 +77,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		{
 		    device::rain(launch);
 			device::transport(launch);
-		    device::evaporation(launch);
-
+		   
 			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) 
 			{
 				// Uncomment this to test static support check

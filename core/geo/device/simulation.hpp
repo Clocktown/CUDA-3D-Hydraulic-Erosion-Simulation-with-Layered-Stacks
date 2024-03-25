@@ -43,7 +43,8 @@ struct Simulation
 	float deltaTime; // [s]
 	float gravity; // [m/s²]
 	float rain; // [m/(m²s)]
-	float evaporation; // [%/s]
+	float evaporation; // [1/s]
+	float petrification; // [1/s]                                                                                                                                                                                           
 
 	float sedimentCapacityConstant;
 	float dissolvingConstant;
@@ -78,7 +79,6 @@ void setSimulation(const Simulation& simulation);
 void init(const Launch& launch);
 void rain(const Launch& launch);
 void transport(const Launch& launch);
-void evaporation(const Launch& launch);
 
 void stepSupportCheck(const Launch& launch);
 void startSupportCheck(const Launch& launch);
