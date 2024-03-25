@@ -180,11 +180,18 @@ void UI::updateSimulation()
 			simulation.minTerrainAngle = glm::radians(minTerrainAngle);
 		}
 
-		float talusAngle{ glm::degrees(simulation.talusAngle) };
+		float dryTalusAngle{ glm::degrees(simulation.dryTalusAngle) };
 
-		if (ImGui::DragFloat("Talus Angle [deg]", &talusAngle, 0.1f, 0.0f, 90.0f))
+		if (ImGui::DragFloat("Dry Talus Angle [deg]", &dryTalusAngle, 0.1f, 0.0f, 90.0f))
 		{
-			simulation.talusAngle = glm::radians(talusAngle);
+			simulation.dryTalusAngle = glm::radians(dryTalusAngle);
+		}
+
+		float wetTalusAngle{ glm::degrees(simulation.wetTalusAngle) };
+
+		if (ImGui::DragFloat("Wet Talus Angle [deg]", &wetTalusAngle, 0.1f, 0.0f, 90.0f))
+		{
+			simulation.wetTalusAngle = glm::radians(wetTalusAngle);
 		}
 
 		if (ImGui::TreeNode("Support Check")) {

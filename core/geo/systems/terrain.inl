@@ -39,7 +39,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.dissolvingConstant = terrain.simulation.dissolvingConstant;
 		simulation.depositionConstant = terrain.simulation.depositionConstant;
 		simulation.minTerrainSlope = glm::sin(terrain.simulation.minTerrainAngle);
-		simulation.talusSlope = glm::tan(terrain.simulation.talusAngle);
+		simulation.dryTalusSlope = glm::tan(terrain.simulation.dryTalusAngle);
+		simulation.wetTalusSlope = glm::tan(terrain.simulation.wetTalusAngle);
 
 		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
 		simulation.sandDensity = terrain.simulation.sandDensity;

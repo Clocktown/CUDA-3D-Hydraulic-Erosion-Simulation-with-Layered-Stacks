@@ -77,7 +77,10 @@ __global__ void pipeKernel()
 						flux[i] *= glm::min(freeSpace / (takenSpace + glm::epsilon<float>()), 1.0f);
 					}
 
-					slippage[i] = glm::max(simulation.deltaTime * (sand - neighbor.sand - simulation.talusSlope * simulation.gridScale), 0.0f);
+					const float avgWater{ 0.5f * (height[WATER] + neighbor.height[WATER]) };
+					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater, 1.0f)) };
+
+					slippage[i] = glm::max(simulation.deltaTime * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f);
 
 					break;
 				}

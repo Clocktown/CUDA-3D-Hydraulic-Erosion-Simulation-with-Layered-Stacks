@@ -18,7 +18,8 @@ struct Simulation
 	float depositionConstant{ 0.01f };
 	float minTerrainAngle{ glm::radians(5.0f) }; // [rad]
 
-	float talusAngle{ glm::radians(30.0f) }; // [rad]
+	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
+	float wetTalusAngle{ glm::radians(15.0f) }; // [rad]
 
 	float bedrockDensity{ 2600.f }; // [kg/m³]
 	float sandDensity{ 1600.f }; // [kg/m³]
