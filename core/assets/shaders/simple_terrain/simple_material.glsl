@@ -7,6 +7,7 @@
 #define SAND 1
 #define WATER 2
 #define CEILING 3
+#define FLOOR 3
 
 layout(binding = materialBufferLocation, std140) uniform SimpleMaterialUniforms
 {
