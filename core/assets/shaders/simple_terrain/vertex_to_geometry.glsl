@@ -5,12 +5,13 @@ struct VertexToGeometry
 {
 	vec3 position;
 	vec3 normal;
+	vec3 maxV;
 	float v;
 };
 
 struct FlatVertexToGeometry
 {
-	vec3 maxV;
+	float stability;
 	bool valid;
 };
 

@@ -11,7 +11,11 @@
 
 out VertexToGeometry vertexToGeometry;
 out flat FlatVertexToGeometry flatVertexToGeometry;
-out flat float stabilityValues;
+
+const ivec2 offsets[2][2] = {
+    {ivec2(1,1), ivec2(1,-1)}, 
+    {ivec2(-1,1), ivec2(-1,-1)}
+};
 
 ivec3 getIndex() 
 {
@@ -39,6 +43,34 @@ int getLayerCount(const int flatIndex)
     return (packedValue >> (8 * packedPosition)) & 0xff;
 }
 
+vec4 getInterpolatedHeight(const in vec2 off, const in ivec3 index, const in int layerStride, const in vec4 height, const in float floor, const in vec4 prev) {
+    // Greatly simplified, does not search for correct neighbor yet and simply uses the one on the same layer + only x-direction + no normals
+    ivec3 idx = index + ivec3(off.x, 0, 0);
+    if(idx.x >= gridSize.x || idx.x < 0) {
+        return prev;
+    }
+    int flatIdx = idx.x + idx.y * gridSize.x;
+    if(idx.z >= getLayerCount(flatIdx)) {
+        return prev;
+    }
+    flatIdx += index.z * layerStride;
+
+    const vec4 nheight = heights[flatIdx];
+    float nfloor = index.z > 0 ? heights[flatIdx - layerStride][CEILING] : 0.0f;
+    nfloor = 0.5f * (floor + nfloor);
+    float bedrock = 0.5f * (nheight[BEDROCK] + height[BEDROCK]) - nfloor;
+    float sand = bedrock + 0.5f * (nheight[SAND] + height[SAND]);
+    float water = sand + 0.5f * (nheight[WATER] + height[WATER]);
+
+    vec4 ret = vec4(0);
+    ret[CEILING] = nfloor;
+    ret[BEDROCK] = bedrock;
+    ret[SAND] = sand;
+    ret[WATER] = water;
+
+    return ret;
+}
+
 void main() 
 {
     const ivec3 index = unflattenIndex(gl_InstanceID, ivec3(gridSize, maxLayerCount));
@@ -54,22 +86,37 @@ void main()
     const int layerStride = gridSize.x * gridSize.y;
 
     const vec4 height = heights[flatIndex];
-    stabilityValues = stability[flatIndex];
-    const float floor = index.z > 0 ? heights[flatIndex - layerStride][CEILING] : 0.0f;
-    const float bedrock = height[BEDROCK] - floor;
-    const float sand = bedrock + height[SAND];
-    const float water = sand + height[WATER];
+    flatVertexToGeometry.stability = stability[flatIndex];
+    float floor = index.z > 0 ? heights[flatIndex - layerStride][CEILING] : 0.0f;
+    float bedrock = height[BEDROCK] - floor;
+    float sand = bedrock + height[SAND];
+    float water = sand + height[WATER];
+
+    if(useInterpolation) {
+        vec4 prev = vec4(0);
+        prev[CEILING] = floor;
+        prev[BEDROCK] = bedrock;
+        prev[SAND] = sand;
+        prev[WATER] = water;
+
+        vec2 off = offsets[int(position.x < 0.5f)][int(position.z < 0.5f)];
+        vec4 interpolatedHeight = getInterpolatedHeight(off, index, layerStride, height, floor, prev);
+        floor = interpolatedHeight[CEILING];
+        bedrock = interpolatedHeight[BEDROCK];
+        sand = interpolatedHeight[SAND];
+        water = interpolatedHeight[WATER];
+    }
    
     vertexToGeometry.position = vec3(gridScale, water, gridScale) * (vec3(index.x, 0.0f, index.y) + (0.5f * position + 0.5f));
     vertexToGeometry.position.y += floor;
     vertexToGeometry.position = (localToWorld * vec4(vertexToGeometry.position, 1.0f)).xyz;
     vertexToGeometry.normal = transpose(mat3(worldToLocal)) * normal;
-    vertexToGeometry.v = 0.5f * position.y + 0.5f;
+    vertexToGeometry.v = water * (0.5f * position.y + 0.5f);
 
     // Adding small epsilon to avoid issues with 0 water
-    flatVertexToGeometry.maxV[BEDROCK] = bedrock / water + 0.0001;
-    flatVertexToGeometry.maxV[SAND] = sand / water + 0.0001;
-    flatVertexToGeometry.maxV[WATER] = 1.0f;
+    vertexToGeometry.maxV[BEDROCK] = bedrock;
+    vertexToGeometry.maxV[SAND] = sand;
+    vertexToGeometry.maxV[WATER] = water;
     flatVertexToGeometry.valid = true;
    
     gl_Position = worldToClip * vec4(vertexToGeometry.position, 1.0f);

@@ -14,6 +14,7 @@ layout(binding = materialBufferLocation, std140) uniform SimpleMaterialUniforms
     ivec2 gridSize;
     float gridScale;
 	int maxLayerCount;
+	bool useInterpolation;
 	int* layerCounts;
 	vec4* heights;
 	float* stability;

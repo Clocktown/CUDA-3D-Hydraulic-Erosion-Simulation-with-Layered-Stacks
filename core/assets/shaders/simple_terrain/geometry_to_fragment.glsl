@@ -5,12 +5,13 @@ struct GeometryToFragment
 {
 	vec3 position;
 	vec3 normal;
+	vec3 maxV;
 	float v;
 };
 
 struct FlatGeometryToFragment
 {
-	vec3 maxV;
+	float stability;
 };
 
 #endif

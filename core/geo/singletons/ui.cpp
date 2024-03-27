@@ -101,6 +101,7 @@ void UI::updateTerrain()
 			uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
 			uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
 			uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
+			uniforms.useInterpolation = rendering.useInterpolation;
 			uniforms.gridSize = terrain.gridSize;
 			uniforms.gridScale = terrain.gridScale;
 
@@ -245,6 +246,12 @@ void UI::updateRendering()
 		{
 			const glm::vec3 waterColor{ onec::sRGBToLinear(rendering.waterColor) };
 			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&waterColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, waterColor)), sizeof(glm::vec3));
+		}
+
+		bool useInterpolation = bool(rendering.useInterpolation);
+		if (ImGui::Checkbox("Use Interpolation", &useInterpolation)) {
+			rendering.useInterpolation = int(useInterpolation);
+			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&rendering.useInterpolation, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, useInterpolation)), sizeof(int));
 		}
 
 		ImGui::TreePop();

@@ -16,6 +16,8 @@ struct SimpleMaterialUniforms
 	glm::ivec2 gridSize;
 	float gridScale;
 	int maxLayerCount;
+	int useInterpolation;
+	int pad4;
 	GLuint64EXT layerCounts;
 	GLuint64EXT heights;
 	GLuint64EXT stability;

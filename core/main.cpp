@@ -56,6 +56,7 @@ void start()
 		uniforms.bedrockColor = onec::sRGBToLinear(ui.rendering.bedrockColor);
 		uniforms.sandColor = onec::sRGBToLinear(ui.rendering.sandColor);
 		uniforms.waterColor = onec::sRGBToLinear(ui.rendering.waterColor);
+		uniforms.useInterpolation = ui.rendering.useInterpolation;
 		uniforms.gridSize = gridSize;
 		uniforms.gridScale = gridScale;
 		uniforms.maxLayerCount = terrain.maxLayerCount;
