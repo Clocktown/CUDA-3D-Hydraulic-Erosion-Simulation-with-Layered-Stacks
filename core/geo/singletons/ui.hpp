@@ -25,7 +25,7 @@ struct UI
 	{
 		glm::vec3 bedrockColor{ 0.5f, 0.5f, 0.5f };
 		glm::vec3 sandColor{ 0.9f, 0.8f, 0.6f };
-		glm::vec3 waterColor{ 0.0f, 0.3f, 0.75f };
+		glm::vec3 waterColor{ 0.2f, 0.4f, 0.7f };
 		int useInterpolation{ true };
 	} rendering;
 

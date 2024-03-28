@@ -18,22 +18,48 @@ layout(location = 0) out vec4 fragmentColor;
 
 PhongBRDF getPhongBRDF()
 {
-    int cellType = BEDROCK;
-
-	while (geometryToFragment.v > geometryToFragment.maxV[cellType] && cellType++ < WATER) 
-	{
-
-	}
-
 	PhongBRDF phongBRDF;
-	phongBRDF.diffuseReflectance = colors[cellType];
-	if(cellType == BEDROCK) {
-		if(flatGeometryToFragment.stability <= 0.f) {
-			phongBRDF.diffuseReflectance = vec3(1,0,0);
-		}
-	}
-	phongBRDF.specularReflectance = vec3(0.0f);
-	phongBRDF.shininess = 40.0f;
+	// Todo: a) use view-direction and normal to refract view
+	//		 b) calculate Intersection with plane defined by layer below water
+	//		 c) use distance to that intersection point for color interpolation instead
+	//		 d) same idea can be used for sand but without refracting to improve look
+	phongBRDF.diffuseReflectance = mix(
+		colors[BEDROCK], colors[SAND], 
+		smoothstep(
+			geometryToFragment.maxV[BEDROCK], 
+			geometryToFragment.maxV[BEDROCK] + 0.2f, 
+			geometryToFragment.v
+		)
+	);
+	phongBRDF.diffuseReflectance = mix(
+		phongBRDF.diffuseReflectance, phongBRDF.diffuseReflectance * colors[WATER], 
+		smoothstep(
+			geometryToFragment.maxV[SAND], 
+			geometryToFragment.maxV[SAND] + 1.f, 
+			geometryToFragment.v
+		)
+	);
+	phongBRDF.diffuseReflectance = mix(
+		phongBRDF.diffuseReflectance, colors[WATER]	* 0.25, 
+		smoothstep(
+			geometryToFragment.maxV[SAND] + 1.f, 
+			geometryToFragment.maxV[SAND] + 2.f, 
+			geometryToFragment.v
+		)
+	);
+
+	phongBRDF.specularReflectance = mix(vec3(0.f), vec3(1.f), 
+		smoothstep(
+				geometryToFragment.maxV[SAND], 
+				geometryToFragment.maxV[SAND] + 0.05f, 
+				geometryToFragment.v
+			));
+	phongBRDF.shininess = mix(40.f, 10000.f, 
+		smoothstep(
+				geometryToFragment.maxV[SAND], 
+				geometryToFragment.maxV[SAND] + 0.05f, 
+				geometryToFragment.v
+			));
 	phongBRDF.alpha = 1.0f;
 	phongBRDF.position = geometryToFragment.position;
 	phongBRDF.normal = normalize(geometryToFragment.normal);

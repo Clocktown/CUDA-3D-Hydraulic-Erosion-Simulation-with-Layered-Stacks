@@ -121,7 +121,7 @@ void render()
 
 int main()
 {
-	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1280, 720 }, 0) };
+	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1280, 720 }, 16) };
 	application.setTargetFrameRate(3000);
 
 	onec::Window& window{ onec::getWindow() };

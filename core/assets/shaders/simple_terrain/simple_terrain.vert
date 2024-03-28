@@ -109,6 +109,10 @@ vec3 calculateNormal(int numCells, bvec4 isValid, vec4 top, ivec2 off) {
     return n;
 }
 
+bool doesOverlap(vec2 a, vec2 b) {
+    return (min(a.y, b.y) - max(a.x, b.x)) > 0.f;
+}
+
 vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int layerStride, const in vec4 absoluteHeight, inout vec3 newNormal) {
     // Greatly simplified, does not search for correct neighbor yet (just uses what is on the same layer)
     if(!useInterpolation) {
@@ -125,22 +129,38 @@ vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int la
 
     for(int i = 0; i < 3; ++i) {
         ivec3 idx = index + offs[i];
+        idx.z = 0;
         if(idx.x >= gridSize.x || idx.x < 0 || idx.y < 0 || idx.y >= gridSize.y) {
             continue;
         }
         int flatIdx = idx.x + idx.y * gridSize.x;
-        if(idx.z >= getLayerCount(flatIdx)) {
-            continue;
-        }
-        flatIdx += index.z * layerStride;
+        int layerCount = getLayerCount(flatIdx);
 
-        vec4 h = getAbsoluteHeight(flatIdx, layerStride, idx.z);
-        cumulativeHeight += h;
-        top[i+1] = h[WATER];
-        bot[i+1] = h[FLOOR];
-        isValid[i+1] = true;
-        
-        numCells++;
+        bool foundFloor = false;
+        vec4 neighborHeight = absoluteHeight;
+
+        for(int j = 0; j < layerCount; ++j, flatIdx += layerStride, ++idx.z) {
+            vec4 h = getAbsoluteHeight(flatIdx, layerStride, idx.z);
+            if(doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
+                isValid[i+1] = true;
+                if(!foundFloor) {
+                    neighborHeight[FLOOR] = h[FLOOR];
+                }
+                neighborHeight[SAND] = h[SAND];
+                neighborHeight[BEDROCK] = h[BEDROCK];
+                neighborHeight[WATER] = h[WATER];
+            }
+            if(doesOverlap(vec2(absoluteHeight[SAND], absoluteHeight[WATER]), vec2(h[SAND], h[WATER]))) {
+                isValid[i+1] = true;
+                neighborHeight[WATER] = h[WATER];
+            }
+        }
+        if(isValid[i+1]) {
+            top[i+1] = neighborHeight[WATER];
+            bot[i+1] = neighborHeight[FLOOR];
+            cumulativeHeight += neighborHeight;
+            numCells++;
+        }
     }
 
     if(newNormal.y >= 0.5f && numCells > 1) {
