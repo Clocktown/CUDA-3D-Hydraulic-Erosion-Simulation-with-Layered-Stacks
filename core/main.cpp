@@ -7,8 +7,9 @@ void start()
 	onec::World& world{ onec::getWorld() };
 
 	world.addSingleton<onec::Viewport>();
-	world.addSingleton<onec::AmbientLight>();
-	world.addSingleton<onec::RenderPipeline>().clearColor = glm::vec4{ 0.7f, 0.9f, 1.0f, 1.0f };
+	glm::vec3 backgroundColor = glm::vec3(0.3f, 0.65f, 0.98f);
+	world.addSingleton<onec::AmbientLight>(backgroundColor, 37000.f);
+	world.addSingleton<onec::RenderPipeline>();
 	world.addSingleton<onec::MeshRenderPipeline>();
 
 	geo::UI& ui{ world.addSingleton<geo::UI>() };
@@ -101,13 +102,20 @@ void update()
 	geo::UI& ui{ *world.getSingleton<geo::UI>() };
 	ui.update();
 
+	auto& ambientLight = *world.getSingleton<onec::AmbientLight>();
+	auto& renderPipeline = *world.getSingleton<onec::RenderPipeline>();
+
+	glm::vec3 clearColor = ambientLight.color * ambientLight.strength * (world.getComponent<onec::Exposure>(ui.camera.entity)->exposure);
+	clearColor = clearColor / (clearColor + 1.0f);
+	clearColor = pow(clearColor, glm::vec3(1.0f / 2.2f));
+	renderPipeline.clearColor = glm::vec4{ clearColor, 1.0f };
+
 	geo::updateTerrains();
 	onec::updateTrackballs();
 	onec::updateModelMatrices(entt::exclude<onec::Static>);
 	onec::updateViewMatrices(entt::exclude<onec::Static>);
 	onec::updateProjectionMatrices();
 
-	onec::RenderPipeline& renderPipeline{ *world.getSingleton<onec::RenderPipeline>() };
 	renderPipeline.update();
 	renderPipeline.render();
 }

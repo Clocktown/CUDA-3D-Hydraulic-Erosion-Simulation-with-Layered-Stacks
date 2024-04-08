@@ -12,6 +12,7 @@ struct PhongBRDF
 	float alpha;
 	vec3 position;
 	vec3 normal;
+	float F;
 };
 
 vec3 evaluatePhongBRDF(const PhongBRDF phongBRDF, const vec3 lightDirection, const vec3 viewDirection)
@@ -27,7 +28,7 @@ vec3 evaluatePhongBRDF(const PhongBRDF phongBRDF, const vec3 lightDirection, con
 
 vec3 getAmbientLightLuminance(const AmbientLight ambientLight, const PhongBRDF phongBRDF)
 {
-	return rPi * phongBRDF.diffuseReflectance * ambientLight.illuminance;
+	return (rPi * phongBRDF.diffuseReflectance) * ambientLight.illuminance;
 }
 
 vec3 getPointLightLuminance(const PointLight pointLight, const PhongBRDF phongBRDF, const vec3 direction)
