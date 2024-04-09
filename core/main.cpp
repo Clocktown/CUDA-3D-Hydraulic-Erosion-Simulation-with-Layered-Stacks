@@ -1,6 +1,9 @@
 #include "geo/geo.hpp"
 #include <onec/onec.hpp>
 
+#include <fstream>
+#include <filesystem>
+
 void start()
 {
 	onec::Application& application{ onec::getApplication() };
@@ -129,7 +132,20 @@ void render()
 
 int main()
 {
-	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1280, 720 }, 16) };
+	if (!std::filesystem::exists("cfg.txt")) {
+		std::ofstream file("cfg.txt");
+		file << 16;
+	}
+	int multisamples = 0;
+	{
+		std::ifstream file("cfg.txt");
+		file >> multisamples;
+		if (!file.good()) {
+			multisamples = 0;
+		}
+	}
+
+	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1280, 720 }, multisamples) };
 	application.setTargetFrameRate(3000);
 
 	onec::Window& window{ onec::getWindow() };
