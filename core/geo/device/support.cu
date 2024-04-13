@@ -101,6 +101,7 @@ namespace geo
 						simulation.fluxes[tgtIndex] = simulation.fluxes[itFlatIndex];
 						simulation.stability[tgtIndex] = stability;
 						simulation.sediments[tgtIndex] = simulation.sediments[itFlatIndex];
+						simulation.damages[tgtIndex] = simulation.damages[itFlatIndex];
 					}
 					tgtIndex += simulation.layerStride;
 				}

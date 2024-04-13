@@ -47,8 +47,9 @@ struct Simulation
 	float petrification; // [1/s]                                                                                                                                                                                           
 
 	float sedimentCapacityConstant;
-	float dissolvingConstant;
-	float depositionConstant;
+	float bedrockDissolvingConstant;
+	float sandDissolvingConstant;
+	float sedimentDepositionConstant;
 	float minTerrainSlope; // sin(alpha)
 	float dryTalusSlope; // tan(alpha)
 	float wetTalusSlope; // tan(alpha)
@@ -67,9 +68,16 @@ struct Simulation
 	char4* pipes;
 	float* slopes; // sin(alpha)
 	float4* fluxes;
-	float4* slippages;
 
+	union
+	{
+		float4* slippages;
+		float* splitHeights; 
+	};
+	
+	float* speeds;
 	float* stability;
+	float* damages;
 };
 
 extern __constant__ Simulation simulation;
@@ -80,6 +88,7 @@ void setSimulation(const Simulation& simulation);
 void init(const Launch& launch);
 void rain(const Launch& launch);
 void transport(const Launch& launch);
+void horizontalErosion(const Launch& launch);
 
 void stepSupportCheck(const Launch& launch);
 void startSupportCheck(const Launch& launch);

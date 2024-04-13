@@ -68,6 +68,21 @@ CU_INLINE CU_HOST_DEVICE CU_IF_HOST(constexpr) glm::ivec3 wrapIndex(const glm::i
 	return glm::ivec3{ mod(index.x, size.x, shift), mod(index.y, size.y, shift), mod(index.z, size.z, shift) };
 }
 
+CU_INLINE CU_HOST_DEVICE constexpr bool isInside(int index, int size)
+{
+	return !isOutside(index, size);
+}
+
+CU_INLINE CU_HOST_DEVICE constexpr bool isInside(glm::ivec2 index, glm::ivec2 size)
+{
+	return !isOutside(index, size);
+}
+
+CU_INLINE CU_HOST_DEVICE constexpr bool isInside(glm::ivec3 index, glm::ivec3 size)
+{
+	return !isOutside(index, size);
+}
+
 CU_INLINE CU_HOST_DEVICE constexpr bool isOutside(const int index, const int size)
 {
 	ONEC_ASSERT(size >= 0, "Size must be greater than or equal to 0");

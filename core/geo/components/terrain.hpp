@@ -14,8 +14,9 @@ struct Simulation
 	float petrification{ 0.0005f }; // [1/s]
 
 	float sedimentCapacityConstant{ 0.001f };
-	float dissolvingConstant{ 0.01f };
-	float depositionConstant{ 0.01f };
+	float bedrockDissolvingConstant{ 0.5f };
+	float sandDissolvingConstant{ 60.0f };
+	float sedimentDepositionConstant{ 60.0f };
 	float minTerrainAngle{ glm::radians(5.0f) }; // [rad]
 
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
@@ -52,6 +53,8 @@ struct Terrain
 	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;
 	onec::Buffer slippageBuffer;
+	onec::Buffer speedBuffer;
+	onec::Buffer damageBuffer;
 	Simulation simulation;
 };
 

@@ -174,38 +174,24 @@ __global__ void transportKernel()
 			}
 		}
 
-		float avgWater = height[WATER];
+		float avgWater{ height[WATER] };
 		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, height[CEILING] - height[BEDROCK] - height[SAND]);
+		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
 		avgWater = 0.5f * (avgWater + height[WATER]);
-		
-		sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
-
 		const glm::vec2 velocity{ glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) / (avgWater * simulation.gridScale + glm::epsilon<float>()) };
-		const float terrainSlope{ glm::max(simulation.slopes[flatIndex], simulation.minTerrainSlope) };
-		const float sedimentCapacity{ simulation.sedimentCapacityConstant * terrainSlope * glm::length(velocity) };
-
-		if (sedimentCapacity > sediment)
-		{
-			const float deltaSand{ glm::min(simulation.dissolvingConstant * (sedimentCapacity - sediment), height[SAND]) };
-			height[SAND] -= deltaSand;
-			sediment += deltaSand;
-		}
-		else
-		{
-			const float deltaSediment{ glm::min(simulation.depositionConstant * (sediment - sedimentCapacity),  height[CEILING] - height[BEDROCK] - height[WATER]) };
-			sediment -= deltaSediment;
-			height[SAND] += deltaSediment;
-		}
+		const float speed{ glm::length(velocity) };
 
 		height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
 
 		const float petrificationAmount{ glm::min(simulation.petrification * simulation.deltaTime * height[SAND], height[SAND]) };
 		height[BEDROCK] += petrificationAmount;
 		height[SAND] -= petrificationAmount;
-		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
+
+		sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
 
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;
+		simulation.speeds[flatIndex] = speed;
 	}
 }
 

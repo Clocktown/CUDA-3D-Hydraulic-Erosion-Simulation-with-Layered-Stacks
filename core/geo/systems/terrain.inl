@@ -36,8 +36,9 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.petrification = terrain.simulation.petrification;
 
 		simulation.sedimentCapacityConstant = terrain.simulation.sedimentCapacityConstant;
-		simulation.dissolvingConstant = terrain.simulation.dissolvingConstant;
-		simulation.depositionConstant = terrain.simulation.depositionConstant;
+		simulation.bedrockDissolvingConstant = terrain.simulation.bedrockDissolvingConstant;
+		simulation.sandDissolvingConstant = terrain.simulation.sandDissolvingConstant;
+		simulation.sedimentDepositionConstant = terrain.simulation.sedimentDepositionConstant;
 		simulation.minTerrainSlope = glm::sin(terrain.simulation.minTerrainAngle);
 		simulation.dryTalusSlope = glm::tan(terrain.simulation.dryTalusAngle);
 		simulation.wetTalusSlope = glm::tan(terrain.simulation.wetTalusAngle);
@@ -56,6 +57,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.slopes = reinterpret_cast<float*>(terrain.slopeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 		simulation.slippages = reinterpret_cast<float4*>(terrain.slippageBuffer.getData());
+		simulation.speeds = reinterpret_cast<float*>(terrain.speedBuffer.getData());
+		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -78,7 +81,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		{
 		    device::rain(launch);
 			device::transport(launch);
-		   
+			device::horizontalErosion(launch);
+
 			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) 
 			{
 				// Uncomment this to test static support check
