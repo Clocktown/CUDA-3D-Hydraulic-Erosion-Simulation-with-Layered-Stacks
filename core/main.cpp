@@ -110,7 +110,7 @@ void update()
 
 	glm::vec3 clearColor = ambientLight.color * ambientLight.strength * (world.getComponent<onec::Exposure>(ui.camera.entity)->exposure);
 	clearColor = clearColor / (clearColor + 1.0f);
-	clearColor = pow(clearColor, glm::vec3(1.0f / 2.2f));
+	clearColor = onec::linearToSRGB(clearColor);
 	renderPipeline.clearColor = glm::vec4{ clearColor, 1.0f };
 
 	geo::updateTerrains();
