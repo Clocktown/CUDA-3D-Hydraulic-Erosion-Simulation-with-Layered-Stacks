@@ -15,6 +15,7 @@ struct MeshRenderPipelineUniforms
 	glm::mat4 worldToLocal;
 };
 
+template <class T = StandardVertexProperties>
 struct MeshRenderPipeline
 {
 	static constexpr GLuint uniformBufferLocation{ 1 };
@@ -23,10 +24,7 @@ struct MeshRenderPipeline
 	template<typename... Includes, typename... Excludes>
 	void render(entt::exclude_t<Excludes...> excludes = entt::exclude_t{});
 
-	VertexArray vertexArray{ { VertexAttribute{ 0, 3, GL_FLOAT },
-							   VertexAttribute{ 1, 3, GL_FLOAT, static_cast<int>(offsetof(VertexProperties, normal)) },
-							   VertexAttribute{ 1, 3, GL_FLOAT, static_cast<int>(offsetof(VertexProperties, tangent)) },
-							   VertexAttribute{ 1, 2, GL_FLOAT, static_cast<int>(offsetof(VertexProperties, uv)) } } };
+	VertexArray vertexArray{ T::makeVAO() };
 	GraphicsBuffer uniformBuffer{ sizeof(MeshRenderPipelineUniforms) };
 };
 

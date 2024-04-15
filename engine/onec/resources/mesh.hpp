@@ -18,11 +18,25 @@ struct SubMesh
 	int baseVertex{ 0 };
 };
 
-struct VertexProperties
+struct StandardVertexProperties
 {
 	glm::vec3 normal;
 	glm::vec3 tangent;
 	glm::vec2 uv;
+	static constexpr bool hasProps() { return true; }
+	static VertexArray makeVAO() {
+		return VertexArray{ { VertexAttribute{ 0, 3, GL_FLOAT },
+							   VertexAttribute{ 1, 3, GL_FLOAT, static_cast<int>(offsetof(StandardVertexProperties, normal)) },
+							   VertexAttribute{ 1, 3, GL_FLOAT, static_cast<int>(offsetof(StandardVertexProperties, tangent)) },
+							   VertexAttribute{ 1, 2, GL_FLOAT, static_cast<int>(offsetof(StandardVertexProperties, uv)) } } };
+	}
+};
+
+struct EmptyVertexProperties {
+	static constexpr bool hasProps() { return false; }
+	static VertexArray makeVAO() {
+		return VertexArray{ { VertexAttribute{ 0, 3, GL_FLOAT } } };
+	}
 };
 
 struct Mesh

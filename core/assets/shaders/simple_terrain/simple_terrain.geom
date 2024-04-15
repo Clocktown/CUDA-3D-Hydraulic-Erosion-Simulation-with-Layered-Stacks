@@ -18,19 +18,38 @@ void main()
     if (flatVertexToGeometry[0].valid) 
     {
         flatGeometryToFragment.stability = flatVertexToGeometry[0].stability;
-        
-        for (int i = 0; i < 3; ++i)
-        {
-            geometryToFragment.position = vertexToGeometry[i].position;
-            geometryToFragment.normal = vertexToGeometry[i].normal;
-            geometryToFragment.v = vertexToGeometry[i].v;
-            geometryToFragment.maxV = vertexToGeometry[i].maxV;
+        vec3 n = cross(vertexToGeometry[0].position - vertexToGeometry[1].position, 
+                       vertexToGeometry[0].position - vertexToGeometry[2].position);
+        const bool flatNormal = n.y == 0.f;
+        int interpIdx = int(n.x == 0.f);
+        if(
+            (
+                flatNormal && !(
+                    flatVertexToGeometry[0].interpolated[interpIdx] && 
+                    flatVertexToGeometry[1].interpolated[interpIdx] && 
+                    flatVertexToGeometry[2].interpolated[interpIdx]
+                )
+             )
+            || !flatNormal
+         ) {
+            if(flatNormal) {
+                n = normalize(n);
+            }
 
-            gl_Position = gl_in[i].gl_Position;
+            for (int i = 0; i < 3; ++i)
+            {
+            
+                geometryToFragment.position = vertexToGeometry[i].position;
+                geometryToFragment.normal = flatNormal ? n : vertexToGeometry[i].normal;
+                geometryToFragment.v = vertexToGeometry[i].v;
+                geometryToFragment.maxV = vertexToGeometry[i].maxV;
 
-            EmitVertex();
+                gl_Position = gl_in[i].gl_Position;
+
+                EmitVertex();
+            }
+
+            EndPrimitive();
         }
-
-        EndPrimitive();
     }
 }

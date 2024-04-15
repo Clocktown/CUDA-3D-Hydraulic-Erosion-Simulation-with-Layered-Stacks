@@ -13,7 +13,7 @@ void start()
 	glm::vec3 backgroundColor = glm::vec3(0.3f, 0.65f, 0.98f);
 	world.addSingleton<onec::AmbientLight>(backgroundColor, 37000.f);
 	world.addSingleton<onec::RenderPipeline>();
-	world.addSingleton<onec::MeshRenderPipeline>();
+	world.addSingleton<onec::MeshRenderPipeline<onec::EmptyVertexProperties>>();
 
 	geo::UI& ui{ world.addSingleton<geo::UI>() };
 	const glm::ivec2 gridSize{ ui.terrain.gridSize };
@@ -69,7 +69,7 @@ void start()
 		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
 
 		const std::filesystem::path assets{ application.getDirectory() / "assets" };
-		const auto mesh{ std::make_shared<onec::Mesh>(assets / "meshes/cube.obj") };
+		const auto mesh{ geo::Terrain::makeCubeMesh() };
 		const auto material{ std::make_shared<onec::Material>() };
 		const std::array<std::filesystem::path, 3> shaders{ assets / "shaders/simple_terrain/simple_terrain.vert",
 															assets / "shaders/simple_terrain/simple_terrain.geom",
@@ -82,7 +82,7 @@ void start()
 		onec::MeshRenderer& meshRenderer{ world.addComponent<onec::MeshRenderer>(entity) };
 		meshRenderer.mesh = mesh;
 		meshRenderer.materials.emplace_back(material);
-		meshRenderer.instanceCount = terrain.maxLayerCount * gridSize.x * gridSize.y;
+		meshRenderer.instanceCount = (terrain.maxLayerCount * gridSize.x * gridSize.y) / geo::Terrain::numCubes;
 
 		ui.terrain.entity = entity;
 	}
@@ -126,7 +126,7 @@ void update()
 void render()
 {
 	onec::World& world{ onec::getWorld() };
-	onec::MeshRenderPipeline& meshRenderPipeline{ *world.getSingleton<onec::MeshRenderPipeline>() };
+	onec::MeshRenderPipeline<onec::EmptyVertexProperties>& meshRenderPipeline{ *world.getSingleton<onec::MeshRenderPipeline<onec::EmptyVertexProperties>>() };
 	meshRenderPipeline.render();
 }
 

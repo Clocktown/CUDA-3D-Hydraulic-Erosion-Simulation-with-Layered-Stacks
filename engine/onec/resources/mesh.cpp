@@ -40,7 +40,7 @@ Mesh::Mesh(const std::filesystem::path& file, const unsigned int flags, const bo
 	std::vector<SubMesh> subMeshes;
 	std::vector<unsigned int> indices;
 	std::vector<glm::vec3> positions;
-	std::vector<VertexProperties> vertexProperties;
+	std::vector<StandardVertexProperties> vertexProperties;
 	subMeshes.reserve(scene->mNumMeshes);
 	indices.reserve(indexCount);
 	positions.reserve(vertexCount);

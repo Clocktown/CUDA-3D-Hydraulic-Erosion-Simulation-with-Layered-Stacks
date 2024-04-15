@@ -15,9 +15,9 @@
 
 namespace onec
 {
-
+template<class T>
 template<typename ...Includes, typename ...Excludes>
-inline void MeshRenderPipeline::render(const entt::exclude_t<Excludes...> excludes)
+inline void MeshRenderPipeline<T>::render(const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
 
@@ -46,7 +46,9 @@ inline void MeshRenderPipeline::render(const entt::exclude_t<Excludes...> exclud
 
 			GL_CHECK_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, activeMesh->indexBuffer.getHandle()));
 			GL_CHECK_ERROR(glBindVertexBuffer(0, activeMesh->positionBuffer.getHandle(), 0, sizeof(glm::vec3)));
-			GL_CHECK_ERROR(glBindVertexBuffer(1, activeMesh->vertexPropertyBuffer.getHandle(), 0, sizeof(VertexProperties)));
+			if (T::hasProps()) {
+				GL_CHECK_ERROR(glBindVertexBuffer(1, activeMesh->vertexPropertyBuffer.getHandle(), 0, sizeof(T)));
+			}
 		}
 
 		MeshRenderPipelineUniforms uniforms;

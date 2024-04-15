@@ -17,23 +17,6 @@ const ivec2 offsets[2][2] = {
     {ivec2(-1,1), ivec2(-1,-1)}
 };
 
-ivec3 getIndex() 
-{
-    ivec3 index;
-    int flatIndex = gl_InstanceID;
-    const int layerStride = gridSize.x * gridSize.y;
-
-    index.z = flatIndex / layerStride;
-    flatIndex -= index.z * layerStride;
-
-    index.y = flatIndex / gridSize.x;
-    flatIndex -= index.y * gridSize.x;
-
-    index.x = flatIndex;
-
-    return index;
-}
-
 int getLayerCount(const int flatIndex) 
 {
     const int packedIndex = flatIndex / 4;
@@ -127,6 +110,8 @@ vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int la
     vec4 cumulativeHeight = absoluteHeight;
     int numCells = 1;
 
+    bool hasWater = (absoluteHeight[WATER] - absoluteHeight[SAND]) > 0.f;
+
     for(int i = 0; i < 3; ++i) {
         ivec3 idx = index + offs[i];
         idx.z = 0;
@@ -141,7 +126,8 @@ vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int la
 
         for(int j = 0; j < layerCount; ++j, flatIdx += layerStride, ++idx.z) {
             vec4 h = getAbsoluteHeight(flatIdx, layerStride, idx.z);
-            if(doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
+            bool nHasWater = (h[WATER] - h[SAND]) > 0.f;
+            if((hasWater == nHasWater) && doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
                 isValid[i+1] = true;
                 if(!foundFloor) {
                     neighborHeight[FLOOR] = h[FLOOR];
@@ -163,18 +149,22 @@ vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int la
         }
     }
 
-    if(newNormal.y >= 0.5f && numCells > 1) {
+    if(position.y >= 0.5f && numCells > 1) {
        newNormal = calculateNormal(numCells, isValid, top, off);
-    } else if(newNormal.y <= -0.5f && numCells > 1) {
+    } else if(position.y <= -0.5f && numCells > 1) {
        newNormal = -calculateNormal(numCells, isValid, bot, off);
     }
+
+    flatVertexToGeometry.interpolated[0] = isValid[1];
+    flatVertexToGeometry.interpolated[1] = isValid[2];
 
     return makeRelative(cumulativeHeight / numCells);
 }
 
 void main() 
 {
-    const ivec3 index = unflattenIndex(gl_InstanceID, ivec3(gridSize, maxLayerCount));
+    const int realInstanceID = 1 * gl_InstanceID + (gl_VertexID / 8);
+    const ivec3 index = unflattenIndex(realInstanceID, ivec3(gridSize, maxLayerCount));
     int flatIndex = index.x + index.y * gridSize.x;
    
     if (index.z >= getLayerCount(flatIndex)) 
@@ -183,7 +173,10 @@ void main()
         return;
     }
 
-    flatIndex = gl_InstanceID;
+    flatVertexToGeometry.interpolated[0] = false;
+    flatVertexToGeometry.interpolated[1] = false;
+
+    flatIndex = realInstanceID;
     const int layerStride = gridSize.x * gridSize.y;
 
     flatVertexToGeometry.stability = stability[flatIndex];
@@ -191,7 +184,7 @@ void main()
     vec4 absoluteHeights = getAbsoluteHeight(flatIndex, layerStride, index.z);
 
     ivec2 off = offsets[int(position.x < 0.5f)][int(position.z < 0.5f)];
-    vec3 newNormal = normal;
+    vec3 newNormal = vec3(0, position.y, 0);
     const vec4 relativeHeight = getRelativeHeight(off, index, layerStride, absoluteHeights, newNormal);
    
     vertexToGeometry.position = vec3(gridScale, relativeHeight[WATER], gridScale) * (vec3(index.x, 0.0f, index.y) + (0.5f * position + 0.5f));

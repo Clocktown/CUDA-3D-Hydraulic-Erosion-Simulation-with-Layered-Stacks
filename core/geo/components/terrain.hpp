@@ -38,6 +38,8 @@ struct Simulation
 
 struct Terrain
 {
+	static constexpr int numCubes{ 1 };
+	static std::shared_ptr<onec::Mesh> makeCubeMesh();
 	static constexpr int maxLayerCount{ 8 };
 
 	explicit Terrain() = default;

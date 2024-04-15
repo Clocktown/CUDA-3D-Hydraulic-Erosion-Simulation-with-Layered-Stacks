@@ -13,6 +13,7 @@ struct FlatVertexToGeometry
 {
 	float stability;
 	bool valid;
+	bool interpolated[2];
 };
 
 #endif
