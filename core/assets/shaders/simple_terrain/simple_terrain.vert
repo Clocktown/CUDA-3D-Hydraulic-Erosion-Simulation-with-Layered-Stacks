@@ -163,8 +163,8 @@ vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int la
 
 void main() 
 {
-    const int realInstanceID = 1 * gl_InstanceID + (gl_VertexID / 8);
-    const ivec3 index = unflattenIndex(realInstanceID, ivec3(gridSize, maxLayerCount));
+    //const int realInstanceID = numCubes * gl_InstanceID + (gl_VertexID / 8);
+    const ivec3 index = unflattenIndex(gl_InstanceID, ivec3(gridSize, maxLayerCount));
     int flatIndex = index.x + index.y * gridSize.x;
    
     if (index.z >= getLayerCount(flatIndex)) 
@@ -176,7 +176,7 @@ void main()
     flatVertexToGeometry.interpolated[0] = false;
     flatVertexToGeometry.interpolated[1] = false;
 
-    flatIndex = realInstanceID;
+    flatIndex = gl_InstanceID;
     const int layerStride = gridSize.x * gridSize.y;
 
     flatVertexToGeometry.stability = stability[flatIndex];
