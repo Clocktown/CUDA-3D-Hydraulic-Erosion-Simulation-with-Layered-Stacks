@@ -118,7 +118,7 @@ void UI::updateTerrain()
 
 			onec::MeshRenderer& meshRenderer{ *world.getComponent<onec::MeshRenderer>(entity) };
 			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
-			meshRenderer.instanceCount = (terrain.maxLayerCount * uniforms.gridSize.x * uniforms.gridSize.y) / geo::Terrain::numCubes;
+			meshRenderer.instanceCount = uniforms.gridSize.x * uniforms.gridSize.y;
 		}
 
 		ImGui::DragInt2("Grid Size", &terrain.gridSize.x, 0.5f, 16, 4096);

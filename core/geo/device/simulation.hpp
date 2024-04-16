@@ -31,6 +31,14 @@ struct Launch
 	dim3 blockSize;
 };
 
+struct DrawElementsIndirectCommand {
+	unsigned int  count;
+	unsigned int  instanceCount;
+	unsigned int  firstIndex;
+	unsigned int  baseVertex;
+	unsigned int  baseInstance;
+};
+
 struct Simulation
 {
 	glm::ivec2 gridSize;
@@ -65,6 +73,8 @@ struct Simulation
 	float4* heights;
 	float* sediments;
 
+	DrawElementsIndirectCommand* drawCalls;
+
 	char4* pipes;
 	float* slopes; // sin(alpha)
 	float4* fluxes;
@@ -93,6 +103,8 @@ void horizontalErosion(const Launch& launch);
 void stepSupportCheck(const Launch& launch);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
+
+void generateDrawCalls(const Launch& launch);
 
 }
 }

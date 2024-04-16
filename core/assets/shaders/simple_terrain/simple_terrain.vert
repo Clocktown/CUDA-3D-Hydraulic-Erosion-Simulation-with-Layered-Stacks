@@ -163,20 +163,14 @@ vec4 getRelativeHeight(const in ivec2 off, const in ivec3 index, const in int la
 
 void main() 
 {
-    //const int realInstanceID = numCubes * gl_InstanceID + (gl_VertexID / 8);
-    const ivec3 index = unflattenIndex(gl_InstanceID, ivec3(gridSize, maxLayerCount));
+    const ivec2 index2 = unflattenIndex(gl_DrawID, ivec2(gridSize));
+    const ivec3 index = ivec3(index2, gl_InstanceID);
     int flatIndex = index.x + index.y * gridSize.x;
-   
-    if (index.z >= getLayerCount(flatIndex)) 
-    {
-        flatVertexToGeometry.valid = false;
-        return;
-    }
 
     flatVertexToGeometry.interpolated[0] = false;
     flatVertexToGeometry.interpolated[1] = false;
 
-    flatIndex = gl_InstanceID;
+    flatIndex = flattenIndex(index, ivec3(gridSize, maxLayerCount));
     const int layerStride = gridSize.x * gridSize.y;
 
     flatVertexToGeometry.stability = stability[flatIndex];
@@ -197,7 +191,6 @@ void main()
     vertexToGeometry.maxV[BEDROCK] = relativeHeight[BEDROCK];
     vertexToGeometry.maxV[SAND] = relativeHeight[SAND];
     vertexToGeometry.maxV[WATER] = relativeHeight[WATER];
-    flatVertexToGeometry.valid = true;
    
     gl_Position = worldToClip * vec4(vertexToGeometry.position, 1.0f);
 }

@@ -15,10 +15,12 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 	for (const entt::entity entity : view)
 	{
 		Terrain& terrain{ view.get<Terrain>(entity) };
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, terrain.drawCallBuffer.getHandle());
 		onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
 		onec::Buffer heightBuffer{ terrain.heightBuffer };
 		onec::Buffer sedimentBuffer{ terrain.sedimentBuffer };
 		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
+		onec::Buffer drawCallBuffer{ terrain.drawCallBuffer };
 
 		device::Launch launch;
 		device::Simulation simulation;
@@ -59,6 +61,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.slippages = reinterpret_cast<float4*>(terrain.slippageBuffer.getData());
 		simulation.speeds = reinterpret_cast<float*>(terrain.speedBuffer.getData());
 		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
+		simulation.drawCalls = reinterpret_cast<device::DrawElementsIndirectCommand*>(drawCallBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -75,6 +78,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			device::startSupportCheck(launch);
 
 			terrain.simulation.init = false;
+
+			device::generateDrawCalls(launch);
 		}
 
 		if (!terrain.simulation.paused)
@@ -98,6 +103,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 				terrain.simulation.currentStabilityStep++;
 				device::stepSupportCheck(launch);
 			}
+
+			device::generateDrawCalls(launch);
 
 	    }
 	}

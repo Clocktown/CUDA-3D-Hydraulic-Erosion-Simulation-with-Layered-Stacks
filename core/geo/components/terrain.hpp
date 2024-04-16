@@ -51,6 +51,7 @@ struct Terrain
 	onec::GraphicsBuffer heightBuffer;
 	onec::GraphicsBuffer sedimentBuffer;
 	onec::GraphicsBuffer stabilityBuffer;
+	onec::GraphicsBuffer drawCallBuffer;
 	onec::Buffer pipeBuffer;
 	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;

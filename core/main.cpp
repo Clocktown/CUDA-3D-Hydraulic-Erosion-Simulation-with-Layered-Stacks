@@ -82,7 +82,7 @@ void start()
 		onec::MeshRenderer& meshRenderer{ world.addComponent<onec::MeshRenderer>(entity) };
 		meshRenderer.mesh = mesh;
 		meshRenderer.materials.emplace_back(material);
-		meshRenderer.instanceCount = (terrain.maxLayerCount * gridSize.x * gridSize.y) / geo::Terrain::numCubes;
+		meshRenderer.instanceCount = gridSize.x * gridSize.y;
 
 		ui.terrain.entity = entity;
 	}

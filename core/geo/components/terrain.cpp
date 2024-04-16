@@ -19,6 +19,7 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const Simulat
 	heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)), true);
 	sedimentBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)), true);
 	stabilityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)), true);
+	drawCallBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(5 * sizeof(unsigned int)), true);
 	pipeBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(char4)));
 	slopeBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
 	fluxBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));

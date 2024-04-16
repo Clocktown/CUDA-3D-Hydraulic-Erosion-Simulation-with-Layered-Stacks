@@ -65,8 +65,7 @@ inline void MeshRenderPipeline<T>::render(const entt::exclude_t<Excludes...> exc
 		std::size_t subMeshIndex{ 0 };
 		std::size_t materialIndex{ 0 };
 
-		for (std::size_t i{ 0 }; i < drawCount; ++i)
-		{
+		if constexpr (!T::hasProps()) {
 			ONEC_ASSERT(materials[materialIndex] != nullptr, "Material cannot be equal to nullptr");
 
 			Material* const material{ materials[materialIndex].get() };
@@ -95,12 +94,46 @@ inline void MeshRenderPipeline<T>::render(const entt::exclude_t<Excludes...> exc
 					activeRenderState->use();
 				}
 			}
+			glMultiDrawElementsIndirect(GL_TRIANGLES, activeMesh->indexType, nullptr, meshRenderer.instanceCount, 0);
+		}
+		else {
+			for (std::size_t i{ 0 }; i < drawCount; ++i)
+			{
+				ONEC_ASSERT(materials[materialIndex] != nullptr, "Material cannot be equal to nullptr");
 
-			const std::size_t indexByteOffset{ static_cast<std::size_t>(subMeshes[subMeshIndex].baseIndex) * sizeof(unsigned int) };
-			GL_CHECK_ERROR(glDrawElementsInstancedBaseVertexBaseInstance(GL_TRIANGLES, subMeshes[subMeshIndex].indexCount, activeMesh->indexType, reinterpret_cast<const void*>(indexByteOffset), meshRenderer.instanceCount, subMeshes[subMeshIndex].baseVertex, meshRenderer.baseInstance));
+				Material* const material{ materials[materialIndex].get() };
 
-			subMeshIndex = glm::min(subMeshIndex + 1, maxSubMeshIndex);
-			materialIndex = glm::min(materialIndex + 1, maxMaterialIndex);
+				if (material != activeMaterial)
+				{
+					ONEC_ASSERT(material->program != nullptr, "Material must have a program");
+					ONEC_ASSERT(material->renderState != nullptr, "Material must have a render state");
+
+					activeMaterial = material;
+
+					GL_CHECK_ERROR(glBindBufferBase(GL_UNIFORM_BUFFER, materialBufferLocation, activeMaterial->uniformBuffer.getHandle()));
+
+					Program* const program{ material->program.get() };
+					RenderState* const renderState{ material->renderState.get() };
+
+					if (program != activeProgram)
+					{
+						activeProgram = program;
+						GL_CHECK_ERROR(glUseProgram(activeProgram->getHandle()));
+					}
+
+					if (renderState != activeRenderState)
+					{
+						activeRenderState = renderState;
+						activeRenderState->use();
+					}
+				}
+
+				const std::size_t indexByteOffset{ static_cast<std::size_t>(subMeshes[subMeshIndex].baseIndex) * sizeof(unsigned int) };
+				GL_CHECK_ERROR(glDrawElementsInstancedBaseVertexBaseInstance(GL_TRIANGLES, subMeshes[subMeshIndex].indexCount, activeMesh->indexType, reinterpret_cast<const void*>(indexByteOffset), meshRenderer.instanceCount, subMeshes[subMeshIndex].baseVertex, meshRenderer.baseInstance));
+
+				subMeshIndex = glm::min(subMeshIndex + 1, maxSubMeshIndex);
+				materialIndex = glm::min(materialIndex + 1, maxMaterialIndex);
+			}
 		}
 	}
 }

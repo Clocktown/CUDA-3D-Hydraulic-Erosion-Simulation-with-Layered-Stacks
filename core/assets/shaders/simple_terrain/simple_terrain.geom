@@ -15,8 +15,6 @@ out flat FlatGeometryToFragment flatGeometryToFragment;
 
 void main()
 {
-    if (flatVertexToGeometry[0].valid) 
-    {
         flatGeometryToFragment.stability = flatVertexToGeometry[0].stability;
         vec3 n = cross(vertexToGeometry[0].position - vertexToGeometry[1].position, 
                        vertexToGeometry[0].position - vertexToGeometry[2].position);
@@ -51,5 +49,4 @@ void main()
 
             EndPrimitive();
         }
-    }
 }

@@ -46,6 +46,7 @@
     <None Include="geo\systems\terrain.inl" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="geo\device\gen_drawcall.cu" />
     <CudaCompile Include="geo\device\horizonal_erosion.cu" />
     <CudaCompile Include="geo\device\transport.cu" />
     <CudaCompile Include="geo\device\init.cu" />
