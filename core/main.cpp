@@ -1,6 +1,8 @@
 #include "geo/geo.hpp"
 #include <onec/onec.hpp>
 
+#include "geo/singletons/point_render_pipeline.hpp"
+
 #include <fstream>
 #include <filesystem>
 
@@ -13,7 +15,7 @@ void start()
 	glm::vec3 backgroundColor = glm::vec3(0.3f, 0.65f, 0.98f);
 	world.addSingleton<onec::AmbientLight>(backgroundColor, 37000.f);
 	world.addSingleton<onec::RenderPipeline>();
-	world.addSingleton<onec::MeshRenderPipeline<onec::EmptyVertexProperties>>();
+	world.addSingleton<geo::PointRenderPipeline>();
 
 	geo::UI& ui{ world.addSingleton<geo::UI>() };
 	const glm::ivec2 gridSize{ ui.terrain.gridSize };
@@ -69,20 +71,19 @@ void start()
 		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
 
 		const std::filesystem::path assets{ application.getDirectory() / "assets" };
-		const auto mesh{ geo::Terrain::makeCubeMesh() };
 		const auto material{ std::make_shared<onec::Material>() };
-		const std::array<std::filesystem::path, 3> shaders{ assets / "shaders/simple_terrain/simple_terrain.vert",
-															assets / "shaders/simple_terrain/simple_terrain.geom",
-															assets / "shaders/simple_terrain/simple_terrain.frag" };
+		const std::array<std::filesystem::path, 3> shaders{ assets / "shaders/point_terrain/simple_terrain.vert",
+															assets / "shaders/point_terrain/simple_terrain.geom",
+															assets / "shaders/point_terrain/simple_terrain.frag" };
 
 		material->program = std::make_shared<onec::Program>(shaders);
 		material->renderState = std::make_shared<onec::RenderState>();
 		material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
 
-		onec::MeshRenderer& meshRenderer{ world.addComponent<onec::MeshRenderer>(entity) };
-		meshRenderer.mesh = mesh;
-		meshRenderer.materials.emplace_back(material);
-		meshRenderer.instanceCount = (terrain.maxLayerCount * gridSize.x * gridSize.y) / geo::Terrain::numCubes;
+		geo::PointRenderer& pointRenderer{ world.addComponent<geo::PointRenderer>(entity) };
+		pointRenderer.material = material;
+		pointRenderer.first = 0;
+		pointRenderer.count = (terrain.maxLayerCount * gridSize.x * gridSize.y) / geo::Terrain::numCubes;
 
 		ui.terrain.entity = entity;
 	}
@@ -126,8 +127,8 @@ void update()
 void render()
 {
 	onec::World& world{ onec::getWorld() };
-	onec::MeshRenderPipeline<onec::EmptyVertexProperties>& meshRenderPipeline{ *world.getSingleton<onec::MeshRenderPipeline<onec::EmptyVertexProperties>>() };
-	meshRenderPipeline.render();
+	geo::PointRenderPipeline& pointRenderPipeline{ *world.getSingleton<geo::PointRenderPipeline>() };
+	pointRenderPipeline.render();
 }
 
 int main()

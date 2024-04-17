@@ -21,16 +21,26 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="geo\components\point_renderer.hpp" />
     <ClInclude Include="geo\device\simulation.hpp" />
     <ClInclude Include="geo\geo.hpp" />
     <ClInclude Include="geo\components\terrain.hpp" />
     <ClInclude Include="geo\resources\simple_material.hpp" />
+    <ClInclude Include="geo\singletons\point_render_pipeline.hpp" />
     <ClInclude Include="geo\singletons\ui.hpp" />
     <ClInclude Include="geo\systems\terrain.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\shaders\mesh_render_pipeline\mesh_render_pipeline.glsl" />
     <None Include="assets\shaders\mesh_render_pipeline\vertex_attributes.glsl" />
+    <None Include="assets\shaders\point_render_pipeline\point_render_pipeline.glsl" />
+    <None Include="assets\shaders\point_terrain\geometry_to_fragment.glsl" />
+    <None Include="assets\shaders\point_terrain\grid.glsl" />
+    <None Include="assets\shaders\point_terrain\simple_material.glsl" />
+    <None Include="assets\shaders\point_terrain\simple_terrain.frag" />
+    <None Include="assets\shaders\point_terrain\simple_terrain.geom" />
+    <None Include="assets\shaders\point_terrain\simple_terrain.vert" />
+    <None Include="assets\shaders\point_terrain\vertex_to_geometry.glsl" />
     <None Include="assets\shaders\render_pipeline\color.glsl" />
     <None Include="assets\shaders\render_pipeline\light.glsl" />
     <None Include="assets\shaders\render_pipeline\maths.glsl" />
@@ -43,6 +53,7 @@
     <None Include="assets\shaders\simple_terrain\simple_terrain.geom" />
     <None Include="assets\shaders\simple_terrain\simple_terrain.vert" />
     <None Include="assets\shaders\simple_terrain\vertex_to_geometry.glsl" />
+    <None Include="geo\singletons\point_render_pipeline.inl" />
     <None Include="geo\systems\terrain.inl" />
   </ItemGroup>
   <ItemGroup>

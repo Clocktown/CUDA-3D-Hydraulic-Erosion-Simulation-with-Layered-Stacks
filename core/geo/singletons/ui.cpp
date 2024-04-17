@@ -3,6 +3,7 @@
 #include "../components/terrain.hpp"
 #include "../resources/simple_material.hpp"
 #include <onec/onec.hpp>
+#include "../components/point_renderer.hpp"
 
 namespace geo
 {
@@ -116,9 +117,9 @@ void UI::updateTerrain()
 
 			world.setComponent<onec::Position>(entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
 
-			onec::MeshRenderer& meshRenderer{ *world.getComponent<onec::MeshRenderer>(entity) };
-			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
-			meshRenderer.instanceCount = (terrain.maxLayerCount * uniforms.gridSize.x * uniforms.gridSize.y) / geo::Terrain::numCubes;
+			PointRenderer& pointRenderer{ *world.getComponent<PointRenderer>(entity) };
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
+			pointRenderer.count = (terrain.maxLayerCount * uniforms.gridSize.x * uniforms.gridSize.y) / geo::Terrain::numCubes;
 		}
 
 		ImGui::DragInt2("Grid Size", &terrain.gridSize.x, 0.5f, 16, 4096);
@@ -221,7 +222,7 @@ void UI::updateRendering()
 
 		Terrain& terrain{ *world.getComponent<Terrain>(entity) };
 		float& scale{ world.getComponent<onec::Scale>(entity)->scale };
-		onec::MeshRenderer& meshRenderer{ *world.getComponent<onec::MeshRenderer>(entity) };
+		PointRenderer& pointRenderer{ *world.getComponent<PointRenderer>(entity) };
 		
 		if (ImGui::DragFloat("Visual Scale", &scale, 0.1f, 0.001f, std::numeric_limits<float>::max()))
 		{
@@ -234,25 +235,25 @@ void UI::updateRendering()
 		if (ImGui::ColorEdit3("Bedrock Color", &rendering.bedrockColor.x))
 		{
 			const glm::vec3 bedrockColor{ onec::sRGBToLinear(rendering.bedrockColor) };
-			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&bedrockColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, bedrockColor)), sizeof(glm::vec3));
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&bedrockColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, bedrockColor)), sizeof(glm::vec3));
 		}
 
 		if (ImGui::ColorEdit3("Sand Color", &rendering.sandColor.x))
 		{
 			const glm::vec3 sandColor{ onec::sRGBToLinear(rendering.sandColor) };
-			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&sandColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, sandColor)), sizeof(glm::vec3));
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&sandColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, sandColor)), sizeof(glm::vec3));
 		}
 
 		if (ImGui::ColorEdit3("Water Color", &rendering.waterColor.x))
 		{
 			const glm::vec3 waterColor{ onec::sRGBToLinear(rendering.waterColor) };
-			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&waterColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, waterColor)), sizeof(glm::vec3));
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&waterColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, waterColor)), sizeof(glm::vec3));
 		}
 
 		bool useInterpolation = bool(rendering.useInterpolation);
 		if (ImGui::Checkbox("Use Interpolation", &useInterpolation)) {
 			rendering.useInterpolation = int(useInterpolation);
-			meshRenderer.materials[0]->uniformBuffer.upload(onec::asBytes(&rendering.useInterpolation, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, useInterpolation)), sizeof(int));
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.useInterpolation, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, useInterpolation)), sizeof(int));
 		}
 
 		ImGui::TreePop();
