@@ -72,7 +72,7 @@ struct Simulation
 	union
 	{
 		float4* slippages;
-		float* splitHeights; 
+		float2* splits; 
 	};
 	
 	float* speeds;
