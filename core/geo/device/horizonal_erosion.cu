@@ -29,7 +29,7 @@ __global__ void horizontalErosionKernel()
 
 		glm::vec4 erosions{ 0.0f };
 		float maxErosion{ 0.0f };
-		float splitHeight{ 0.0f };
+		glm::vec2 maxSplit{ floor, height[BEDROCK] };
 
 		struct
 		{
@@ -61,20 +61,19 @@ __global__ void horizontalErosionKernel()
 				neighbor.sand = neighbor.height[BEDROCK] + neighbor.height[SAND];
 				neighbor.water = neighbor.sand + neighbor.height[WATER];
 
-				const float overlapCeiling{ glm::min(height[BEDROCK], neighbor.water) };
-				const float overlapFloor{ glm::max(floor, neighbor.sand) };
-				const float overlapArea{ (overlapCeiling - overlapFloor) * simulation.gridScale };
+				const glm::vec2 split{ glm::max(floor, neighbor.sand), glm::min(height[BEDROCK], neighbor.water) };
+				const float area{ (split.y - split.x) * simulation.gridScale };
 
-				if (overlapArea > 0.0f)
+				if (area > 0.0f)
 				{
 					const float speed{ simulation.speeds[neighbor.flatIndices[i]] };
 
-					erosions[i] = overlapArea * simulation.bedrockDissolvingConstant * speed * integrationScale;
+					erosions[i] = area * simulation.bedrockDissolvingConstant * speed * integrationScale;
 					
 					if (erosions[i] > maxErosion)
 					{
 						maxErosion = erosions[i];
-						splitHeight = overlapCeiling;
+						maxSplit = split;
 					}
 
 					break;
@@ -83,7 +82,7 @@ __global__ void horizontalErosionKernel()
 		}
 
 		const float totalErosion{ erosions.x + erosions.y + erosions.z + erosions.w };
-		erosions *= glm::min((splitHeight - floor - damage) / (totalErosion + glm::epsilon<float>()), 1.0f);
+		erosions *= glm::min((maxSplit.y - maxSplit.x - damage) / (totalErosion + glm::epsilon<float>()), 1.0f);
 
 		for (int i{ 0 }; i < 4; ++i)
 		{
@@ -95,7 +94,7 @@ __global__ void horizontalErosionKernel()
 
 		damage += totalErosion;
 
-		simulation.splitHeights[flatIndex] = splitHeight;
+		simulation.splits[flatIndex] = glm::cuda_cast(maxSplit);
 		simulation.damages[flatIndex] = damage;
 
 		floor = height[CEILING];
@@ -152,20 +151,16 @@ __global__ void damageKernel()
 	const int flatBase{ flattenIndex(index, simulation.gridSize) };
 	int flatIndex{ flatBase };
 	int layerCount{ simulation.layerCounts[flatIndex] };
-	float floor{ 0.0f };
 
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 	{
-		glm::vec4 height{ glm::cuda_cast(simulation.heights[flatIndex]) };
+		const glm::vec2 split{ glm::cuda_cast(simulation.splits[flatIndex]) };
 		const float damage{ simulation.damages[flatIndex] };
 
-		if (damage / (height[BEDROCK] + glm::epsilon<float>()) <= 0.75f || layerCount == simulation.maxLayerCount)
+		if (damage < 2.0f || damage < 0.75f * (split.y - split.x) || layerCount == simulation.maxLayerCount)
 		{
-			floor = height[CEILING];
 			continue;
 		}
-
-		const float splitHeight{ simulation.splitHeights[flatIndex] };
 
 		int above{ flatBase + layerCount++ * simulation.layerStride };
 		int below{ above - simulation.layerStride };
@@ -176,22 +171,21 @@ __global__ void damageKernel()
 			simulation.fluxes[above] = simulation.fluxes[below];
 			simulation.stability[above] = simulation.stability[below];
 			simulation.sediments[above] = simulation.sediments[below];
-			simulation.damages[above] = simulation.damages[below];
+			simulation.damages[above] = 0.0f;
 		}
 
-		simulation.heights[above] = glm::cuda_cast(height);
+		simulation.heights[above] = simulation.heights[below];
 		simulation.fluxes[above] = simulation.fluxes[below];
 		simulation.stability[above] = simulation.stability[below];
 		simulation.sediments[above] = simulation.sediments[below];
 		simulation.damages[above] = 0.0f;
 
-		simulation.heights[below] = float4{ glm::max(splitHeight - damage, 0.0f), 0.0f, 0.0f, splitHeight };
+		simulation.heights[below] = float4{ glm::max(split.y - damage, split.x), 0.0f, 0.0f, split.y };
 		simulation.fluxes[below] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		simulation.stability[below] = FLT_MAX;
 		simulation.sediments[below] = 0.0f;
 		simulation.damages[below] = 0.0f;
 
-		floor = height[CEILING];
 		++layer;
 	}
 
