@@ -6,7 +6,7 @@ struct VertexToGeometry
 	vec3 normal[8];
 	vec4 h[4];
 	bool valid;
-	bool interpolated[8];
+	bool valid_face[4];
 };
 
 #endif
