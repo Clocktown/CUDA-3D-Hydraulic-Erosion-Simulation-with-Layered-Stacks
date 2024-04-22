@@ -101,7 +101,7 @@ void fillVertexInfo(const in ivec3 index, const in int layerStride, const in vec
     top[0] = absoluteHeight[WATER];
     bot[0] = absoluteHeight[FLOOR];
 
-    bool hasWater = (absoluteHeight[WATER] - absoluteHeight[SAND]) > 0.f;
+    //bool hasWater = (absoluteHeight[WATER] - absoluteHeight[SAND]) > 0.f;
 
     for(int n = 0; n < 8; ++n) {
         ivec3 idx = index + ivec3(offs[n], 0);
@@ -120,8 +120,8 @@ void fillVertexInfo(const in ivec3 index, const in int layerStride, const in vec
 
             for(int j = 0; j < layerCount; ++j, flatIdx += layerStride, ++idx.z) {
                 const vec4 h = getAbsoluteHeight(flatIdx, layerStride, idx.z);
-                const bool nHasWater = (h[WATER] - h[SAND]) > 0.f;
-                if((hasWater == nHasWater) && doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
+                //const bool nHasWater = (h[WATER] - h[SAND]) > 0.f;
+                if(/*(hasWater == nHasWater) && */doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
                     if(!foundFloor) {
                         neighborHeight[FLOOR] = h[FLOOR];
                         foundFloor = true;

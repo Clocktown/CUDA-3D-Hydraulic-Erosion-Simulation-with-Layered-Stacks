@@ -79,6 +79,10 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			//device::startSupportCheck(launch);
 
 			terrain.simulation.init = false;
+
+			terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
+			PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
+			pointRenderer.count = terrain.numValidColumns;
 		}
 
 		if (!terrain.simulation.paused)
@@ -102,11 +106,11 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 				terrain.simulation.currentStabilityStep++;
 				//device::stepSupportCheck(launch);
 			}
-
+			terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
+			PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
+			pointRenderer.count = terrain.numValidColumns;
 	    }
-		terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
-		PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
-		pointRenderer.count = terrain.numValidColumns;
+		
 	}
 }
 

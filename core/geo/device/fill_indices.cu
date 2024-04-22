@@ -34,7 +34,6 @@ int fillIndices(const Launch& launch, int* atomicCounter, int* indices)
 	cudaMemcpy(atomicCounter, &count, sizeof(int), cudaMemcpyHostToDevice);
 	CU_CHECK_KERNEL(fillIndicesKernel<<<launch.gridSize, launch.blockSize>>>());
 	cudaMemcpy(&count, atomicCounter, sizeof(int), cudaMemcpyDeviceToHost);
-	//thrust::sort(thrust::device, indices, indices + count);
 	return count;
 }
 
