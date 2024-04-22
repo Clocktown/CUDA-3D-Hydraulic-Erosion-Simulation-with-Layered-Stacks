@@ -176,20 +176,10 @@ void fillVertexInfo(const in ivec3 index, const in int layerStride, const in vec
 
 void main() 
 {
-    const ivec3 index = unflattenIndex(gl_VertexID, ivec3(gridSize, maxLayerCount));
+    const ivec3 index = unflattenIndex(indices[gl_VertexID], ivec3(gridSize, maxLayerCount));
     int flatIndex = index.x + index.y * gridSize.x;
-   
-    if (index.z >= getLayerCount(flatIndex)) 
-    {
-        vertexToGeometry.valid = false;
-        return;
-    }
 
-    vertexToGeometry.valid = true;
-
-
-
-    flatIndex = gl_VertexID;
+    flatIndex = indices[gl_VertexID];
     const int layerStride = gridSize.x * gridSize.y;
 
     vec4 absoluteHeights = getAbsoluteHeight(flatIndex, layerStride, index.z);

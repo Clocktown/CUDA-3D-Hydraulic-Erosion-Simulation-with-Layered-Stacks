@@ -38,19 +38,20 @@ struct Simulation
 
 struct Terrain
 {
-	static constexpr int numCubes{ 1 };
-	static std::shared_ptr<onec::Mesh> makeCubeMesh();
 	static constexpr int maxLayerCount{ 8 };
 
 	explicit Terrain() = default;
 	explicit Terrain(glm::ivec2 gridSize, float gridScale, const Simulation& settings = Simulation{});
 
+	int numValidColumns;
 	glm::ivec2 gridSize;
 	float gridScale;
 	onec::GraphicsBuffer layerCountBuffer;
 	onec::GraphicsBuffer heightBuffer;
 	onec::GraphicsBuffer sedimentBuffer;
 	onec::GraphicsBuffer stabilityBuffer;
+	onec::GraphicsBuffer indicesBuffer;
+	onec::Buffer atomicCounter;
 	onec::Buffer pipeBuffer;
 	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;

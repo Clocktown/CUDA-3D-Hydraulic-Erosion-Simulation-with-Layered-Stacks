@@ -5,7 +5,6 @@ struct VertexToGeometry
 {
 	vec3 normal[8];
 	vec4 h[4];
-	bool valid;
 	bool valid_face[4];
 };
 

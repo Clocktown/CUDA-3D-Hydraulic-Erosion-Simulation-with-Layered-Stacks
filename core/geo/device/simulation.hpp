@@ -64,7 +64,9 @@ struct Simulation
 	char* layerCounts;
 	float4* heights;
 	float* sediments;
+	int* indices;
 
+	int* atomicCounter;
 	char4* pipes;
 	float* slopes; // sin(alpha)
 	float4* fluxes;
@@ -84,6 +86,8 @@ extern __constant__ Simulation simulation;
 extern __constant__ int2 offsets[4];
 
 void setSimulation(const Simulation& simulation);
+
+int fillIndices(const Launch& launch, int* atomicCounter, int* indices);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);

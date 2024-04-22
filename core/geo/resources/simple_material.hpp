@@ -18,9 +18,11 @@ struct SimpleMaterialUniforms
 	int maxLayerCount;
 	int useInterpolation;
 	int pad4;
+	// TODO: Sediment buffer
 	GLuint64EXT layerCounts;
 	GLuint64EXT heights;
 	GLuint64EXT stability;
+	GLuint64EXT indices;
 };
 
 }

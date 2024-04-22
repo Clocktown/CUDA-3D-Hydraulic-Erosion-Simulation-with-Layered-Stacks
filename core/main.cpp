@@ -69,6 +69,7 @@ void start()
 		uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
 		uniforms.heights = terrain.heightBuffer.getBindlessHandle();
 		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
+		uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
 
 		const std::filesystem::path assets{ application.getDirectory() / "assets" };
 		const auto material{ std::make_shared<onec::Material>() };
@@ -83,7 +84,7 @@ void start()
 		geo::PointRenderer& pointRenderer{ world.addComponent<geo::PointRenderer>(entity) };
 		pointRenderer.material = material;
 		pointRenderer.first = 0;
-		pointRenderer.count = (terrain.maxLayerCount * gridSize.x * gridSize.y) / geo::Terrain::numCubes;
+		pointRenderer.count = terrain.numValidColumns;
 
 		ui.terrain.entity = entity;
 	}

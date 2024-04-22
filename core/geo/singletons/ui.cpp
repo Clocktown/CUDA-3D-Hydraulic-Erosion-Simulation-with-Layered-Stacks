@@ -114,12 +114,13 @@ void UI::updateTerrain()
 			uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
 			uniforms.heights = terrain.heightBuffer.getBindlessHandle();
 			uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
+			uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
 
 			world.setComponent<onec::Position>(entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
 
 			PointRenderer& pointRenderer{ *world.getComponent<PointRenderer>(entity) };
 			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
-			pointRenderer.count = (terrain.maxLayerCount * uniforms.gridSize.x * uniforms.gridSize.y) / geo::Terrain::numCubes;
+			pointRenderer.count = terrain.numValidColumns;
 		}
 
 		ImGui::DragInt2("Grid Size", &terrain.gridSize.x, 0.5f, 16, 4096);

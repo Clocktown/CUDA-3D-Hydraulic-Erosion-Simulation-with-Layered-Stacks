@@ -1,6 +1,7 @@
 #include "terrain.hpp"
 #include "../components/terrain.hpp"
 #include "../device/simulation.hpp"
+#include "../components/point_renderer.hpp"
 
 namespace geo
 {
@@ -10,7 +11,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 {
 	onec::World& world{ onec::getWorld() };
 
-	const auto view{ world.getView<Terrain, Includes...>(excludes) };
+	const auto view{ world.getView<Terrain, PointRenderer, Includes...>(excludes) };
 	
 	for (const entt::entity entity : view)
 	{
@@ -19,6 +20,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		onec::Buffer heightBuffer{ terrain.heightBuffer };
 		onec::Buffer sedimentBuffer{ terrain.sedimentBuffer };
 		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
+		onec::Buffer indicesBuffer{ terrain.indicesBuffer };
 
 		device::Launch launch;
 		device::Simulation simulation;
@@ -53,6 +55,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.heights = reinterpret_cast<float4*>(heightBuffer.getData());
 		simulation.sediments = reinterpret_cast<float*>(sedimentBuffer.getData());
 		simulation.stability = reinterpret_cast<float*>(stabilityBuffer.getData());
+		simulation.indices = reinterpret_cast<int*>(indicesBuffer.getData());
+		simulation.atomicCounter = reinterpret_cast<int*>(terrain.atomicCounter.getData());
 		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
 		simulation.slopes = reinterpret_cast<float*>(terrain.slopeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
@@ -100,6 +104,9 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			}
 
 	    }
+		terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
+		PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
+		pointRenderer.count = terrain.numValidColumns;
 	}
 }
 
