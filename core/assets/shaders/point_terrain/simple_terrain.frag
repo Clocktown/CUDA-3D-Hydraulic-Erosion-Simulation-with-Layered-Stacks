@@ -15,20 +15,19 @@ in GeometryToFragment geometryToFragment;
 
 layout(location = 0) out vec4 fragmentColor;  
 
-vec2 getWaterDxy(vec3 n, vec3 p) {
-	vec2 d = vec2(0.f);
-	float strength = 50.f;
-	float amplitude = 0.5f;
+vec3 waterNormalMap(vec3 n, vec3 p) {
+	vec3 y = cross(n, vec3(1,0,0));
+	vec3 x = cross(y, n);
 
-	for(int i = 0; i < 4; ++i) {
-		vec2 scale = min(1.f / (strength * abs(n.xz)), vec2(1.f));
-		scale = mix(scale, vec2(1.f), float(i) / 3.f);
-		d.x += (length(n.xz) * amplitude + 0.025 * amplitude) * snoise(vec3(p.xz * scale.yx, time));
-		d.y += (length(n.xz) * amplitude + 0.025 * amplitude) * snoise(vec3(p.zx * scale.xy, time));
+	vec2 d = vec2(0.1f, 0.f);
 
-		amplitude *= 0.75f;
-	}
-	return d;
+	float dx = -(pow(worley(vec3(p.xz + d.xy, time), 1.f, false).x, 4.f) - pow(worley(vec3(p.xz - d.xy, time), 1.f, false).x, 4.f)) / (2 * d.x);
+	float dy = -(pow(worley(vec3(p.xz + d.yx, time), 1.f, false).x, 4.f) - pow(worley(vec3(p.xz - d.yx, time), 1.f, false).x, 4.f)) / (2 * d.x);
+
+	vec3 gx = 0.03 * dx * n + x;
+	vec3 gy = 0.03 * dy * n + y;
+
+	return cross(gx, gy);
 }
 
 PhongBRDF getPhongBRDF()
@@ -37,12 +36,9 @@ PhongBRDF getPhongBRDF()
 	phongBRDF.normal = normalize(geometryToFragment.normal);
 	phongBRDF.position = geometryToFragment.position;
 
-	//vec2 scale = min(1.f / (10.f * abs(phongBRDF.normal.xz)), vec2(1.f));
-	//float dx = snoise(vec3(phongBRDF.position.xz * scale.yx, time));
-	//float dy = snoise(vec3(phongBRDF.position.zx * scale.xy, time));
 	vec3 waterNormal = phongBRDF.normal;
 	if(geometryToFragment.maxV[WATER] > geometryToFragment.maxV[SAND] && waterNormal.y > 0.0f) {
-		waterNormal.xz += getWaterDxy(waterNormal, phongBRDF.position.xyz);
+		waterNormal = waterNormalMap(waterNormal, phongBRDF.position.xyz);
 	}
 	waterNormal = normalize(waterNormal);
 
@@ -64,7 +60,7 @@ PhongBRDF getPhongBRDF()
 		)
 	);
 	vec2 causticPos = geometryToFragment.position.xz + refractedDistance * refractedView.xz;
-	causticPos *= exp(0.05 * (geometryToFragment.maxV[SAND] - geometryToFragment.maxV[WATER]));
+	//causticPos *= exp(0.05 * (geometryToFragment.maxV[SAND] - geometryToFragment.maxV[WATER]));
 	vec2 worleyVal = worley(vec3(causticPos, time), 1.f, false);
 	phongBRDF.diffuseReflectance += mix(
 		0.f, 
