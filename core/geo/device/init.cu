@@ -24,44 +24,44 @@ __global__ void initKernel()
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 	}*/
 
-	//if (index.x > 64)
-	//{
-	//	simulation.layerCounts[flatIndex] = 2;
-	//	simulation.heights[flatIndex] = float4{ (simulation.gridSize.x - index.x) / 16.0f, 0.0f, 0.0f, 30.0f };
-	//	simulation.sediments[flatIndex] = 0.0f;
-	//	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	//	simulation.damages[flatIndex] = 0.0f;
-
-	//	simulation.heights[flatIndex + simulation.layerStride] = float4{ 30.0f + index.x / 16.0f, 2.0f, 2.0f, FLT_MAX };
-	//	simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
-	//	simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	//	simulation.damages[flatIndex + simulation.layerStride] = 0.0f;
-	//}
-	//else
-	//{
-	//	simulation.layerCounts[flatIndex] = 1;
-	//	simulation.heights[flatIndex] = float4{ (simulation.gridSize.x - index.x) / 16.0f, 0.0f, 0.0f, FLT_MAX };
-	//	simulation.sediments[flatIndex] = 0.0f;
-	//	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	//	simulation.damages[flatIndex] = 0.0f;
-	//}
-
-	if (isInside(index - simulation.gridSize / 2 + 25, glm::ivec2{ 10 }))
+	if (index.x > 64)
 	{
-		simulation.layerCounts[flatIndex] = 1;
-		simulation.heights[flatIndex] = float4{ 55.0f, 0.0f, 0.0f, FLT_MAX };
+		simulation.layerCounts[flatIndex] = 2;
+		simulation.heights[flatIndex] = float4{ (simulation.gridSize.x - index.x) / 16.0f, 0.0f, 0.0f, 30.0f };
 		simulation.sediments[flatIndex] = 0.0f;
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		simulation.damages[flatIndex] = 0.0f;
+
+		simulation.heights[flatIndex + simulation.layerStride] = float4{ 30.0f + index.x / 16.0f, 0.0f, 2.0f, FLT_MAX };
+		simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
+		simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+		simulation.damages[flatIndex + simulation.layerStride] = 0.0f;
 	}
 	else
 	{
 		simulation.layerCounts[flatIndex] = 1;
-		simulation.heights[flatIndex] = float4{ 5.0f, 0.0f, glm::max((simulation.gridSize.x / 2 - index.x) / 4.0f, 0.0f), FLT_MAX };
+		simulation.heights[flatIndex] = float4{ (simulation.gridSize.x - index.x) / 16.0f, 0.0f, 0.0f, FLT_MAX };
 		simulation.sediments[flatIndex] = 0.0f;
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		simulation.damages[flatIndex] = 0.0f;
 	}
+
+	//if (isInside(index - simulation.gridSize / 2 + 25, glm::ivec2{ 10 }))
+	//{
+	//	simulation.layerCounts[flatIndex] = 1;
+	//	simulation.heights[flatIndex] = float4{ 55.0f, 0.0f, 0.0f, FLT_MAX };
+	//	simulation.sediments[flatIndex] = 0.0f;
+	//	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	//	simulation.damages[flatIndex] = 0.0f;
+	//}
+	//else
+	//{
+	//	simulation.layerCounts[flatIndex] = 1;
+	//	simulation.heights[flatIndex] = float4{ 5.0f, 0.0f, glm::max((simulation.gridSize.x / 2 - index.x) / 4.0f, 0.0f), FLT_MAX };
+	//	simulation.sediments[flatIndex] = 0.0f;
+	//	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	//	simulation.damages[flatIndex] = 0.0f;
+	//}
 }
 
 void init(const Launch& launch)

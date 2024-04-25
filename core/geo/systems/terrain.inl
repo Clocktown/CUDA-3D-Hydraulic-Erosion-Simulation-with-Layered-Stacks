@@ -45,6 +45,11 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.dryTalusSlope = glm::tan(terrain.simulation.dryTalusAngle);
 		simulation.wetTalusSlope = glm::tan(terrain.simulation.wetTalusAngle);
 
+		simulation.minErosionArea = terrain.simulation.minErosionArea;
+		simulation.erosionStrength = terrain.simulation.erosionStrength;
+		simulation.minSplitDamage = terrain.simulation.minSplitDamage;
+		simulation.splitThreshold = terrain.simulation.splitThreshold;
+
 		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
 		simulation.sandDensity = terrain.simulation.sandDensity;
 		simulation.waterDensity = terrain.simulation.waterDensity;
@@ -76,7 +81,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			device::init(launch);
 		
 			terrain.simulation.currentStabilityStep = 0;
-			//device::startSupportCheck(launch);
+			device::startSupportCheck(launch);
 
 			terrain.simulation.init = false;
 
@@ -94,17 +99,17 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) 
 			{
 				// Uncomment this to test static support check
-				//device::endSupportCheck(launch);
+				device::endSupportCheck(launch);
 
 				// TODO: uncomment this. Disabled to test static initial stability
-				//device::startSupportCheck(launch);
+				device::startSupportCheck(launch);
 				terrain.simulation.currentStabilityStep = 0;
 			}
 
 			for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i) 
 			{
 				terrain.simulation.currentStabilityStep++;
-				//device::stepSupportCheck(launch);
+				device::stepSupportCheck(launch);
 			}
 			terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
 			PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };

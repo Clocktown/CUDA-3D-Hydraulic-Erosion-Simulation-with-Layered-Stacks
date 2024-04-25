@@ -14,13 +14,18 @@ struct Simulation
 	float petrification{ 0.0005f }; // [1/s]
 
 	float sedimentCapacityConstant{ 0.001f };
-	float bedrockDissolvingConstant{ 0.5f };
+	float bedrockDissolvingConstant{ 1.0f };
 	float sandDissolvingConstant{ 60.0f };
 	float sedimentDepositionConstant{ 60.0f };
 	float minTerrainAngle{ glm::radians(5.0f) }; // [rad]
 
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
 	float wetTalusAngle{ glm::radians(15.0f) }; // [rad]
+
+	float minErosionArea{ 0.5f };
+	float erosionStrength{ 0.1f };
+	float minSplitDamage{ 2.0f };
+	float splitThreshold{ 0.75f };
 
 	float bedrockDensity{ 2600.f }; // [kg/m³]
 	float sandDensity{ 1600.f }; // [kg/m³]

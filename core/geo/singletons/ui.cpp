@@ -173,7 +173,7 @@ void UI::updateSimulation()
 		}
 
 		ImGui::DragFloat("Sediment Capacity Constant", &simulation.sedimentCapacityConstant, 0.01f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Bedrock Dissolving Constant", &simulation.bedrockDissolvingConstant, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Bedrock Dissolving Constant", &simulation.bedrockDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Sand Dissolving Constant", &simulation.sandDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Sediment Deposition Constant", &simulation.sedimentDepositionConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
 
@@ -197,6 +197,11 @@ void UI::updateSimulation()
 		{
 			simulation.wetTalusAngle = glm::radians(wetTalusAngle);
 		}
+
+		ImGui::DragFloat("Min. Erosion Area", &simulation.minErosionArea, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Erosion Strength", &simulation.erosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
 
 		if (ImGui::TreeNode("Support Check")) {
 

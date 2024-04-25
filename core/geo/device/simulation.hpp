@@ -54,6 +54,11 @@ struct Simulation
 	float dryTalusSlope; // tan(alpha)
 	float wetTalusSlope; // tan(alpha)
 
+	float minErosionArea;
+	float erosionStrength;
+	float minSplitDamage;
+	float splitThreshold;
+
 	float bedrockDensity; // [kg/m³]
 	float sandDensity; // [kg/m³]
 	float waterDensity; // [kg/m³]

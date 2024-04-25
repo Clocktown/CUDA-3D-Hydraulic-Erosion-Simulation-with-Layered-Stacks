@@ -64,11 +64,11 @@ __global__ void horizontalErosionKernel()
 				const glm::vec2 split{ glm::max(floor, neighbor.sand), glm::min(height[BEDROCK], neighbor.water) };
 				const float area{ (split.y - split.x) * simulation.gridScale };
 
-				if (area > 0.0f)
+				if (area > simulation.minErosionArea)
 				{
 					const float speed{ simulation.speeds[neighbor.flatIndices[i]] };
 
-					erosions[i] = area * simulation.bedrockDissolvingConstant * speed * integrationScale;
+					erosions[i] = area * simulation.erosionStrength * speed * integrationScale;
 					
 					if (erosions[i] > maxErosion)
 					{
@@ -112,6 +112,7 @@ __global__ void sedimentKernel()
 
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
+	float floor{ 0.0f };
 
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 	{
@@ -126,6 +127,12 @@ __global__ void sedimentKernel()
 			const float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
 			height[SAND] -= deltaSand;
 			sediment += deltaSand;
+
+			constexpr float sandThreshold{ 0.01f };
+
+			const float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] / sandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[BEDROCK] - floor) };
+			height[BEDROCK] -= deltaBedrock;
+			sediment += deltaBedrock;
 		}
 		else
 		{
@@ -136,6 +143,8 @@ __global__ void sedimentKernel()
 
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;
+
+		floor = height[CEILING];
 	}
 }
 
@@ -157,7 +166,7 @@ __global__ void damageKernel()
 		const glm::vec2 split{ glm::cuda_cast(simulation.splits[flatIndex]) };
 		const float damage{ simulation.damages[flatIndex] };
 
-		if (damage < 2.0f || damage < 0.75f * (split.y - split.x) || layerCount == simulation.maxLayerCount)
+		if (damage < simulation.minSplitDamage || damage < simulation.splitThreshold * (split.y - split.x) || layerCount == simulation.maxLayerCount)
 		{
 			continue;
 		}
@@ -176,7 +185,7 @@ __global__ void damageKernel()
 
 		simulation.heights[above] = simulation.heights[below];
 		simulation.fluxes[above] = simulation.fluxes[below];
-		simulation.stability[above] = simulation.stability[below];
+		simulation.stability[above] = FLT_MAX;
 		simulation.sediments[above] = simulation.sediments[below];
 		simulation.damages[above] = 0.0f;
 
@@ -195,7 +204,7 @@ __global__ void damageKernel()
 void horizontalErosion(const Launch& launch)
 {
 	CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
-	//CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
+	CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
 	CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
 }
 
