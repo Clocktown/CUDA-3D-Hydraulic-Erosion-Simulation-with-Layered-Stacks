@@ -24,8 +24,8 @@ vec3 waterNormalMap(vec3 n, vec3 p) {
 	float dx = -(pow(worley(vec3(p.xz + d.xy, time), 1.f, false).x, 4.f) - pow(worley(vec3(p.xz - d.xy, time), 1.f, false).x, 4.f)) / (2 * d.x);
 	float dy = -(pow(worley(vec3(p.xz + d.yx, time), 1.f, false).x, 4.f) - pow(worley(vec3(p.xz - d.yx, time), 1.f, false).x, 4.f)) / (2 * d.x);
 
-	vec3 gx = 0.03 * dx * n + x;
-	vec3 gy = 0.03 * dy * n + y;
+	vec3 gx = 0.1 * dx * n + x;
+	vec3 gy = 0.1 * dy * n + y;
 
 	return cross(gx, gy);
 }
