@@ -54,8 +54,8 @@ struct Simulation
 	float dryTalusSlope; // tan(alpha)
 	float wetTalusSlope; // tan(alpha)
 
-	float minErosionArea;
-	float erosionStrength;
+	float minHorizontalErosion;
+	float horizontalErosionStrength;
 	float minSplitDamage;
 	float splitThreshold;
 
@@ -82,7 +82,7 @@ struct Simulation
 		float2* splits; 
 	};
 	
-	float* speeds;
+	float2* velocities;
 	float* stability;
 	float* damages;
 };

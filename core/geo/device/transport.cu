@@ -179,7 +179,6 @@ __global__ void transportKernel()
 		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
 		avgWater = 0.5f * (avgWater + height[WATER]);
 		const glm::vec2 velocity{ glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) / (avgWater * simulation.gridScale + glm::epsilon<float>()) };
-		const float speed{ glm::length(velocity) };
 
 		height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
 
@@ -191,7 +190,7 @@ __global__ void transportKernel()
 
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;
-		simulation.speeds[flatIndex] = speed;
+		simulation.velocities[flatIndex] = glm::cuda_cast(velocity);
 	}
 }
 
