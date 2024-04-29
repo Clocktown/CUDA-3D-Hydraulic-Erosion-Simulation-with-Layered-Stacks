@@ -45,8 +45,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.dryTalusSlope = glm::tan(terrain.simulation.dryTalusAngle);
 		simulation.wetTalusSlope = glm::tan(terrain.simulation.wetTalusAngle);
 
-		simulation.minErosionArea = terrain.simulation.minErosionArea;
-		simulation.erosionStrength = terrain.simulation.erosionStrength;
+		simulation.minHorizontalErosion = terrain.simulation.minHorizontalErosion;
+		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;
 		simulation.minSplitDamage = terrain.simulation.minSplitDamage;
 		simulation.splitThreshold = terrain.simulation.splitThreshold;
 
@@ -66,7 +66,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.slopes = reinterpret_cast<float*>(terrain.slopeBuffer.getData());
 		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
 		simulation.slippages = reinterpret_cast<float4*>(terrain.slippageBuffer.getData());
-		simulation.speeds = reinterpret_cast<float*>(terrain.speedBuffer.getData());
+		simulation.velocities = reinterpret_cast<float2*>(terrain.velocityBuffer.getData());
 		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };

@@ -25,7 +25,7 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const Simulat
 	slopeBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
 	fluxBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
 	slippageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
-	speedBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
+	velocityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
 	damageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
 	atomicCounter.initialize(static_cast<std::ptrdiff_t>(sizeof(int)));
 }

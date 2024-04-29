@@ -62,13 +62,16 @@ __global__ void horizontalErosionKernel()
 				neighbor.water = neighbor.sand + neighbor.height[WATER];
 
 				const glm::vec2 split{ glm::max(floor, neighbor.sand), glm::min(height[BEDROCK], neighbor.water) };
-				const float area{ (split.y - split.x) * simulation.gridScale };
 
-				if (area > simulation.minErosionArea)
+				if (split.y - split.x > simulation.minHorizontalErosion)
 				{
-					const float speed{ simulation.speeds[neighbor.flatIndices[i]] };
-
-					erosions[i] = area * simulation.erosionStrength * speed * integrationScale;
+					const float area{ (split.y - split.x) * simulation.gridScale };
+					const glm::vec2 velocity{ glm::cuda_cast(simulation.velocities[neighbor.flatIndices[i]]) };
+					const float speed{ glm::length(velocity) };
+					const glm::vec2 normal{ glm::cuda_cast(offsets[i]) };
+					const float attenuation{ 1.0f - glm::max(glm::dot(normal, velocity / (speed + glm::epsilon<float>())), 0.0f) };
+					
+					erosions[i] = simulation.horizontalErosionStrength * attenuation * speed * area * integrationScale;
 					
 					if (erosions[i] > maxErosion)
 					{
@@ -119,7 +122,7 @@ __global__ void sedimentKernel()
 		glm::vec4 height{ glm::cuda_cast(simulation.heights[flatIndex]) };
 		float sediment{ simulation.sediments[flatIndex] };
 		const float slope{ glm::max(simulation.slopes[flatIndex], simulation.minTerrainSlope) };
-		const float speed{ simulation.speeds[flatIndex] };
+		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
 		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed };
 		
 		if (sedimentCapacity > sediment)
@@ -204,7 +207,7 @@ __global__ void damageKernel()
 void horizontalErosion(const Launch& launch)
 {
 	CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
-	CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
+	//CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
 	CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
 }
 

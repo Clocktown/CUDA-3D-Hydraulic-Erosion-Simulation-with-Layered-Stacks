@@ -198,8 +198,8 @@ void UI::updateSimulation()
 			simulation.wetTalusAngle = glm::radians(wetTalusAngle);
 		}
 
-		ImGui::DragFloat("Min. Erosion Area", &simulation.minErosionArea, 0.001f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Erosion Strength", &simulation.erosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Min. Horizontal Erosion", &simulation.minHorizontalErosion, 0.001f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
 

@@ -22,8 +22,8 @@ struct Simulation
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
 	float wetTalusAngle{ glm::radians(15.0f) }; // [rad]
 
-	float minErosionArea{ 0.5f };
-	float erosionStrength{ 0.1f };
+	float minHorizontalErosion{ 0.5f };
+	float horizontalErosionStrength{ 0.1f };
 	float minSplitDamage{ 2.0f };
 	float splitThreshold{ 0.75f };
 
@@ -61,7 +61,7 @@ struct Terrain
 	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;
 	onec::Buffer slippageBuffer;
-	onec::Buffer speedBuffer;
+	onec::Buffer velocityBuffer;
 	onec::Buffer damageBuffer;
 	Simulation simulation;
 };
