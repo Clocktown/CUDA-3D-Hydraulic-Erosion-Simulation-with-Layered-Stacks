@@ -223,6 +223,15 @@ void UI::updateRendering()
 {
 	if (ImGui::TreeNode("Rendering"))
 	{
+		if (ImGui::Button("Reload Shaders")) {
+			const std::filesystem::path assets{ onec::getApplication().getDirectory() / "assets" };
+			const std::array<std::filesystem::path, 3> shaders{ assets / "shaders/point_terrain/simple_terrain.vert",
+																assets / "shaders/point_terrain/simple_terrain.geom",
+																assets / "shaders/point_terrain/simple_terrain.frag" };
+
+			PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(terrain.entity)};
+			pointRenderer.material->program = std::make_shared<onec::Program>(shaders);
+		}
 		onec::World& world{ onec::getWorld() };
 		const entt::entity entity{ terrain.entity };
 

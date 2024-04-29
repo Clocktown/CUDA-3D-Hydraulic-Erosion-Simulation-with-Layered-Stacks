@@ -55,7 +55,7 @@ PhongBRDF getPhongBRDF()
 		colors[BEDROCK], colors[SAND], 
 		smoothstep(
 			geometryToFragment.maxV[BEDROCK], 
-			geometryToFragment.maxV[BEDROCK] + 0.2f, 
+			geometryToFragment.maxV[BEDROCK] + 0.1f, 
 			min(geometryToFragment.maxV[SAND], geometryToFragment.v)
 		)
 	);
