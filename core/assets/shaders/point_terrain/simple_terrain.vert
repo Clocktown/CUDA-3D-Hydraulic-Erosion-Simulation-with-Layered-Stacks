@@ -83,6 +83,91 @@ bool doesOverlap(vec2 a, vec2 b) {
     return (min(a.y, b.y) - max(a.x, b.x)) > 0.f;
 }
 
+vec4 getNeighborHeight(const in int n, const in ivec3 index, const in ivec2[8] offs, const in vec4 absoluteHeight, inout bool[8] valid, inout float[9] top, inout float[9] bot, const in int layerStride, const in bool has_above, const in bool has_below, const in vec4 above, const in vec4 below, inout vec4[8] nBelowAbove) {
+    ivec3 idx = index + ivec3(offs[n], 0);
+    idx.z = 0;
+    vec4 neighborHeight = absoluteHeight;
+    nBelowAbove[n] = vec4(0);
+    valid[n] = false;
+    
+
+    if(idx.x >= gridSize.x || idx.x < 0 || idx.y < 0 || idx.y >= gridSize.y) {
+        //top[n+1] = absoluteHeight[WATER];
+        //bot[n+1] = absoluteHeight[FLOOR];
+    } else {
+        int flatIdx = idx.x + idx.y * gridSize.x;
+        const int layerCount = getLayerCount(flatIdx);
+
+        vec4 nBelow = getAbsoluteHeight(flatIdx, layerStride, idx.z);
+        vec4 nAbove = nBelow;
+        bool nHasBelow = false;
+        bool nHasAbove = layerCount > 1;
+
+        int jBot = 0;
+        int jTop = 0;
+
+        for(int j = 0; j < layerCount; ++j, flatIdx += layerStride, ++idx.z) {
+            if(j == layerCount - 1) nHasAbove = false;
+            const vec4 h = nAbove;
+            if(nHasAbove) {
+                nAbove = getAbsoluteHeight(flatIdx + layerStride, layerStride, idx.z + 1);
+            }
+            if(h[FLOOR] >= absoluteHeight[BEDROCK]) {
+                if(!valid[n]) {
+                    // We have no neighbor here to interpolate. Remember the Column just Above and just Below our center column in this neighbor cell for later sanity check
+                    if(nHasBelow) nBelowAbove[n].xy = vec2(nBelow[FLOOR], nBelow[BEDROCK]);
+                    nBelowAbove[n].zw = vec2(h[FLOOR], h[BEDROCK]);
+                }
+                break;
+            }
+            if(doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
+                if(!valid[n]) {
+                        // Interpolate Floor with lowest
+                        neighborHeight[FLOOR] = h[FLOOR];
+                        jBot = j;
+                        // Remember what we interpolated with
+                        nBelowAbove[n].xy = vec2(h[FLOOR], h[BEDROCK]);
+                }
+                // Interpolate Top with highest
+                neighborHeight[SAND] = h[SAND];
+                neighborHeight[BEDROCK] = h[BEDROCK];
+                neighborHeight[WATER] = h[WATER];
+                valid[n] = true;
+                jTop = j;
+                // Remember what we interpolated with
+                nBelowAbove[n].zw = vec2(h[FLOOR], h[BEDROCK]);
+            }
+
+            nBelow = h;
+            nHasBelow = true;
+        }
+        if(!bool(n % 2) && valid[n] && (jTop == jBot)) {
+             // jTop == jBot Condition may be able to be removed depending on how we interpolate
+             vertexToGeometry.valid_face[n / 2] = false; // Face can potentially be discarded, needs to be checked later
+        }
+    }
+    return neighborHeight;
+}
+
+void incrementVertexValues(const in int n, const in vec4 neighborHeight, inout vec4 numNeigh) {
+    if(n <= 2) {
+        numNeigh[0]++;
+        vertexToGeometry.h[0] += neighborHeight;
+    }
+    if(n >= 2 && n <= 4) {
+        numNeigh[2]++;
+        vertexToGeometry.h[2] += neighborHeight;
+    }
+    if(n >= 4 && n <= 6) {
+        numNeigh[3]++;
+        vertexToGeometry.h[3] += neighborHeight;
+    }
+    if((n >= 6 && n <= 7) || n == 0) {
+        numNeigh[1]++;
+        vertexToGeometry.h[1] += neighborHeight;
+    }
+}
+
 void fillVertexInfo(const in ivec3 index, const in int layerStride, const in vec4 absoluteHeight, const in int flatIndex, const in int layerCount) {
     const ivec2 offs[8] = {
                             ivec2(-1,0),
@@ -97,85 +182,51 @@ void fillVertexInfo(const in ivec3 index, const in int layerStride, const in vec
     float top[9];
     float bot[9];
     bool valid[8];
-    bool valid_face[8];
     vec4 numNeigh = vec4(1);
     top[0] = absoluteHeight[WATER];
     bot[0] = absoluteHeight[FLOOR];
 
+    // Following 4 variables are currently unused - maybe remove later but could be used for "nicer" interpolation
     bool has_above = index.z < (layerCount - 1);
     vec4 above = has_above ? getAbsoluteHeight(flatIndex + layerStride, layerStride, index.z + 1) : vec4(0);
     bool has_below = index.z > 0;
     vec4 below = has_below ? getAbsoluteHeight(flatIndex - layerStride, layerStride, index.z - 1) : vec4(0);
 
+    vec4 nBelowAbove[8]; // Stores [FLOOR, BEDROCK] Intervalls for neighbor columns that are interpolated with (bottom/top face respectively). If there is no interpolation, stores interval of the column just below and above the center column
+
     for(int n = 0; n < 8; ++n) {
-        ivec3 idx = index + ivec3(offs[n], 0);
-        idx.z = 0;
-        vec4 neighborHeight = absoluteHeight;
-        valid[n] = false;
-
-        if(idx.x >= gridSize.x || idx.x < 0 || idx.y < 0 || idx.y >= gridSize.y) {
-            top[n+1] = absoluteHeight[WATER];
-            bot[n+1] = absoluteHeight[FLOOR];
-        } else {
-            int flatIdx = idx.x + idx.y * gridSize.x;
-            const int layerCount = getLayerCount(flatIdx);
-
-            bool foundFloor = false;
-
-            for(int j = 0; j < layerCount; ++j, flatIdx += layerStride, ++idx.z) {
-                const vec4 h = getAbsoluteHeight(flatIdx, layerStride, idx.z);
-                if(doesOverlap(vec2(absoluteHeight[FLOOR], absoluteHeight[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
-                    if(!foundFloor) {
-                        neighborHeight[FLOOR] = h[FLOOR];
-                        /*if(has_below && doesOverlap(vec2(below[FLOOR], below[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
-                            neighborHeight[FLOOR] = below[WATER];
-                        }*/
-                        foundFloor = true;
-                    }
-                    neighborHeight[SAND] = h[SAND];
-                    neighborHeight[BEDROCK] = h[BEDROCK];
-                    neighborHeight[WATER] = h[WATER];
-                    if(!bool(n % 2)) {
-                        vertexToGeometry.valid_face[n / 2] = false;
-                    }
-                    valid[n] = true;
-
-                    /*if(has_above && doesOverlap(vec2(above[FLOOR], above[BEDROCK]), vec2(h[FLOOR], h[BEDROCK]))) {
-                        neighborHeight[SAND] = above[FLOOR];
-                        neighborHeight[BEDROCK] = above[FLOOR];
-                        neighborHeight[WATER] = above[FLOOR];
-                    }*/
-                }
-                /*if(doesOverlap(vec2(absoluteHeight[SAND], absoluteHeight[WATER]), vec2(h[SAND], h[WATER]))) {
-                    neighborHeight[WATER] = h[WATER];
-                    valid[n] = true;
-                }
-                if(doesOverlap(vec2(absoluteHeight[BEDROCK], absoluteHeight[SAND]), vec2(h[BEDROCK], h[SAND]))) {
-                    neighborHeight[SAND] = h[SAND];
-                    valid[n] = true;
-                }*/
-            }
-        }
+        vec4 neighborHeight = getNeighborHeight(n, index, offs, absoluteHeight, valid, top, bot, layerStride, has_above, has_below, above, below, nBelowAbove);
         top[n + 1] = neighborHeight[WATER];
         bot[n + 1] = neighborHeight[FLOOR];
-        if(!valid[n]) continue;
-        if(n <= 2) {
-            numNeigh[0]++;
-            vertexToGeometry.h[0] += neighborHeight;
-        }
-        if(n >= 2 && n <= 4) {
-            numNeigh[2]++;
-            vertexToGeometry.h[2] += neighborHeight;
-        }
-        if(n >= 4 && n <= 6) {
-            numNeigh[3]++;
-            vertexToGeometry.h[3] += neighborHeight;
-        }
-        if((n >= 6 && n <= 7) || n == 0) {
-            numNeigh[1]++;
-            vertexToGeometry.h[1] += neighborHeight;
+        if(valid[n]) incrementVertexValues(n, neighborHeight, numNeigh);
+    }
+
+    for(int i = 0; i < 4; ++i) {
+        if(!vertexToGeometry.valid_face[i]) {
+            // nBelow = nAbove for this neighbor
+            int n = 2 * i; // Translate to correct index in 8-Neighborhood
+            for(int j = n - 2; j <= n + 2; ++j) { // Iterate relevant neighborhood and check if interpolation rules are kept
+                int nj = (8 + j) % 8; // Fix index
+                bool o1 = doesOverlap(nBelowAbove[n].xy, nBelowAbove[nj].xy);
+                bool o2 = doesOverlap(nBelowAbove[n].zw, nBelowAbove[nj].zw);
+
+                if(valid[nj]) {
+                    // Center Column did interpolate with 1 or two columns in this cell, so both have to overlap this neighbor
+                    if(!(o1 && o2)) {
+                        vertexToGeometry.valid_face[i] = true;
+                        break;
+                    }
+                } else {
+                    // Center Column did not interpolate with a column in this cell. We either overlap with nothing as well, or overlap with a higher AND lower column with respect to the center column
+                    if((o1 && !o2) || (!o1 && o2)) {
+                        vertexToGeometry.valid_face[i] = true;
+                        break;
+                    }
+                }
+            }
         }
     }
+
     const ivec4 indexMap = ivec4(0, 3, 1, 2);
     for(int i = 0; i < 4; ++i) {
         vertexToGeometry.h[i] /= numNeigh[i];
