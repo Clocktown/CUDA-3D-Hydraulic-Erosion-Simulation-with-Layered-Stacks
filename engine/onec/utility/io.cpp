@@ -23,22 +23,15 @@ namespace onec
 
 std::string readFile(const std::filesystem::path& file)
 {
-	std::ifstream stream{ file, std::ios::in };
+	std::ifstream stream{ file, std::ios::in | std::ios::binary };
 
-	ONEC_ASSERT(stream.is_open(), "Failed to open file (" + file.string() + ")");
+	ONEC_ASSERT(stream.is_open(), "Failed to open " + file.string());
 
-	std::string data;
-	std::string line;
+	const std::string destination{ std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>{} };
 
-	while (std::getline(stream, line))
-	{
-		ONEC_ASSERT(!stream.fail() && !stream.bad(), "Failed to read file (" + file.string() + ")");
+	ONEC_ASSERT(!stream.fail() && !stream.bad(), "Failed to read " + file.string());
 
-		std::getline(stream, line);
-		data += line + "\n";
-	}
-
-	return data;
+	return destination;
 }
 
 std::string& readShader(const std::regex& regex, const std::filesystem::path& file, std::unordered_map<std::filesystem::path, std::string>& includes)
@@ -334,6 +327,17 @@ std::unique_ptr<std::byte, decltype(&free)> readImage(const std::filesystem::pat
 
 		return std::unique_ptr<std::byte, decltype(&free)>{ reinterpret_cast<std::byte*>(data), &free };
 	}
+}
+
+void writeFile(const std::filesystem::path& file, std::string_view source) noexcept
+{
+	std::ofstream stream{ file, std::ios::out | std::ios::binary };
+
+	ONEC_ASSERT(stream.is_open(), "Failed to open " + file.string());
+
+	stream << source;
+
+	ONEC_ASSERT(!stream.fail() && !stream.bad(), "Failed to write " + file.string());
 }
 
 void writeImage(const std::filesystem::path& file, const Span<const std::byte>&& source, const glm::ivec2 size, const int channelCount)

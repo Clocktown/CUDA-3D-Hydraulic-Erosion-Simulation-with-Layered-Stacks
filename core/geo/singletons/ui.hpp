@@ -31,11 +31,14 @@ struct UI
 
 	bool visable{ true };
 private:
+	void updateFile();
 	void updateApplication();
 	void updateCamera();
 	void updateTerrain();
 	void updateSimulation();
 	void updateRendering();
+	void saveToFile(const std::filesystem::path& file);
+	void loadFromFile(const std::filesystem::path& file);
 };
 
 }

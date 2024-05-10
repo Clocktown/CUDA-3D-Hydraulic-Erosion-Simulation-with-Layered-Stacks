@@ -1,9 +1,14 @@
 #include "ui.hpp"
 #include "imgui.h"
 #include "../components/terrain.hpp"
-#include "../resources/simple_material.hpp"
-#include <onec/onec.hpp>
 #include "../components/point_renderer.hpp"
+#include "../resources/simple_material.hpp"
+#include "../device/simulation.hpp"
+#include <onec/onec.hpp>
+#include <tinyfiledialogs/tinyfiledialogs.h>
+#include <tinyexr.h>
+#include <nlohmann/json.hpp>
+#include <fstream>
 
 namespace geo
 {
@@ -29,6 +34,7 @@ void UI::update()
 
 	ImGui::Begin("UI", &this->visable);
 
+	updateFile();
 	updateApplication();
 	updateCamera();
 	updateTerrain();
@@ -36,6 +42,37 @@ void UI::update()
 	updateRendering();
 
 	ImGui::End();
+}
+
+void UI::updateFile()
+{
+
+	if (ImGui::TreeNode("File"))
+	{
+		if (ImGui::Button("Open"))
+		{
+			char const* filterPatterns[1] = { "*.json" };
+			auto input = tinyfd_openFileDialog("Save JSON", "./scene.json", 1, filterPatterns, "JSON (.json)", 0);
+
+			if (input != nullptr)
+			{
+				loadFromFile(input);
+			}
+		}
+
+		if (ImGui::Button("Save"))
+		{
+			char const* filterPatterns[1] = { "*.json" };
+			auto output = tinyfd_saveFileDialog("Save JSON", "./scene.json", 1, filterPatterns, "JSON (.json)");
+
+			if (output != nullptr)
+			{
+				saveToFile(output);
+			}
+		}
+
+		ImGui::TreePop();
+	}
 }
 
 void UI::updateApplication()
@@ -245,7 +282,7 @@ void UI::updateRendering()
 		}
 
 		ImGui::DragFloat("Ambient Light [lux]", &world.getSingleton<onec::AmbientLight>()->strength, 1.0f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::ColorEdit3("Background Color", &world.getSingleton<onec::RenderPipeline>()->clearColor.x);
+		ImGui::ColorEdit3("Background Color", &world.getSingleton<onec::AmbientLight>()->color.x);
 
 		if (ImGui::ColorEdit3("Bedrock Color", &rendering.bedrockColor.x))
 		{
@@ -273,6 +310,161 @@ void UI::updateRendering()
 
 		ImGui::TreePop();
 	}
+}
+
+void UI::saveToFile(const std::filesystem::path& file)
+{
+	const onec::Application& application{ onec::getApplication() };
+	onec::Window& window{ onec::getWindow() };
+	onec::World& world{ onec::getWorld() };
+
+	onec::PerspectiveCamera& camera{ *world.getComponent<onec::PerspectiveCamera>(this->camera.entity) };
+	Terrain& terrain{ *world.getComponent<Terrain>(this->terrain.entity) };
+	Simulation& simulation{ terrain.simulation };
+
+	nlohmann::json json;
+	
+	json["Application/TargetFrameRate"] = application.getTargetFrameRate();
+	json["Application/VerticalSynchronization"] = window.getSwapInterval() != 0;
+
+	const glm::vec3 cameraPosition{ world.getComponent<onec::Position>(this->camera.entity)->position };
+	const glm::quat cameraRotation{ world.getComponent<onec::Rotation>(this->camera.entity)->rotation };
+	json["Camera/Position"] = { cameraPosition.x, cameraPosition.y, cameraPosition.z };
+	json["Camera/Rotation"] = { cameraRotation.x, cameraRotation.y, cameraRotation.z, cameraRotation.w };
+	json["Camera/FieldOfView"] = camera.fieldOfView;
+	json["Camera/NearPlane"] = camera.nearPlane;
+	json["Camera/FarPlane"] = camera.farPlane;
+	json["Camera/Exposure"] = world.getComponent<onec::Exposure>(this->camera.entity)->exposure;
+
+	json["Terrain/GridSize"] = { terrain.gridSize.x, terrain.gridSize.y };
+	json["Terrain/GridScale"] = terrain.gridScale;
+
+	json["Simulation/DeltaTime"] = simulation.deltaTime;
+	json["Simulation/Gravity"] = simulation.gravity;
+	json["Simulation/Rain"] = simulation.rain;
+	json["Simulation/Evaporation"] = simulation.evaporation;
+	json["Simulation/Petrification"] = simulation.petrification;
+	json["Simulation/SedimentCapacityConstant"] = simulation.sedimentCapacityConstant;
+	json["Simulation/BedrockDissolvingConstant"] = simulation.bedrockDissolvingConstant;
+	json["Simulation/SandDissolvingConstant"] = simulation.sandDissolvingConstant;
+	json["Simulation/SedimentDepositionConstant"] = simulation.sedimentDepositionConstant;
+	json["Simulation/MinTerrainAngle"] = simulation.minTerrainAngle;
+	json["Simulation/DryTalusAngle"] = simulation.dryTalusAngle;
+	json["Simulation/WetTalusAngle"] = simulation.wetTalusAngle;
+	json["Simulation/MinHorizontalErosion"] = simulation.minHorizontalErosion;
+	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
+	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
+	json["Simulation/SplitThreshold"] = simulation.splitThreshold;
+
+	const auto backgroundColor{ world.getSingleton<onec::AmbientLight>()->color };
+	json["Rendering/VisualScale"] = world.getComponent<onec::Scale>(this->terrain.entity)->scale;
+	json["Rendering/AmbientLight"] = world.getSingleton<onec::AmbientLight>()->strength;
+	json["Rendering/BackgroundColor"] = { backgroundColor.r, backgroundColor.g, backgroundColor.b };
+	json["Rendering/BedrockColor"] = { rendering.bedrockColor.r, rendering.bedrockColor.g, rendering.bedrockColor.b };
+	json["Rendering/SandColor"] = { rendering.sandColor.r, rendering.sandColor.g, rendering.sandColor.b };
+	json["Rendering/WaterColor"] = { rendering.waterColor.r, rendering.waterColor.g, rendering.waterColor.b };
+	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
+
+	std::ptrdiff_t byteCount{ 0 };
+	byteCount += terrain.layerCountBuffer.getCount();
+	byteCount += terrain.heightBuffer.getCount();
+	byteCount += terrain.fluxBuffer.getCount();
+	byteCount += terrain.stabilityBuffer.getCount();
+	byteCount += terrain.sedimentBuffer.getCount();
+	byteCount += terrain.damageBuffer.getCount();
+
+	std::vector<std::byte> destination(byteCount);
+	std::ptrdiff_t i{ 0 };
+
+	terrain.layerCountBuffer.download({ destination.data() + i, terrain.layerCountBuffer.getCount() }); i += terrain.layerCountBuffer.getCount();
+	terrain.heightBuffer.download({ destination.data() + i, terrain.heightBuffer.getCount() }); i += terrain.heightBuffer.getCount();
+	terrain.fluxBuffer.download({ destination.data() + i, terrain.fluxBuffer.getCount() }); i += terrain.fluxBuffer.getCount();
+	terrain.stabilityBuffer.download({ destination.data() + i, terrain.stabilityBuffer.getCount() }); i += terrain.stabilityBuffer.getCount();
+	terrain.sedimentBuffer.download({ destination.data() + i, terrain.sedimentBuffer.getCount() }); i += terrain.sedimentBuffer.getCount();
+	terrain.damageBuffer.download({ destination.data() + i, terrain.damageBuffer.getCount() }); i += terrain.damageBuffer.getCount();
+
+	onec::writeFile(file, json.dump());
+	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(destination.data()), static_cast<std::size_t>(byteCount) });
+}
+
+void UI::loadFromFile(const std::filesystem::path& file)
+{
+	onec::Application& application{ onec::getApplication() };
+	onec::Window& window{ onec::getWindow() };
+	onec::World& world{ onec::getWorld() };
+
+	onec::PerspectiveCamera& camera{ *world.getComponent<onec::PerspectiveCamera>(this->camera.entity) };
+	Terrain& terrain{ *world.getComponent<Terrain>(this->terrain.entity) };
+
+	nlohmann::json json{ nlohmann::json::parse(std::ifstream{ file }) };
+
+	application.setTargetFrameRate(json["Application/TargetFrameRate"]);
+	window.setSwapInterval(json["Application/VerticalSynchronization"]);
+
+	world.getComponent<onec::Position>(this->camera.entity)->position = glm::vec3{ json["Camera/Position"][0], json["Camera/Position"][1], json["Camera/Position"][2] };
+	world.getComponent<onec::Rotation>(this->camera.entity)->rotation = glm::quat{ json["Camera/Rotation"][3], json["Camera/Rotation"][0], json["Camera/Rotation"][1], json["Camera/Rotation"][2] };
+	camera.fieldOfView = json["Camera/FieldOfView"];
+	camera.nearPlane = json["Camera/NearPlane"];
+	camera.farPlane = json["Camera/FarPlane"];
+	world.getComponent<onec::Exposure>(this->camera.entity)->exposure = json["Camera/Exposure"];
+	
+	this->terrain.gridSize = glm::ivec2{ json["Terrain/GridSize"][0], json["Terrain/GridSize"][1] };
+	this->terrain.gridScale = json["Terrain/GridScale"];
+
+	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale };
+	const std::string source{ onec::readFile(file.stem().concat(".dat")) };
+	const std::byte* const data{ reinterpret_cast<const std::byte*>(source.data()) };
+
+	std::ptrdiff_t i{ 0 };
+	terrain.layerCountBuffer.upload({ data + i, terrain.layerCountBuffer.getCount() }); i += terrain.layerCountBuffer.getCount();
+	terrain.heightBuffer.upload({ data + i, terrain.heightBuffer.getCount() }); i += terrain.heightBuffer.getCount();
+	terrain.fluxBuffer.upload({ data + i, terrain.fluxBuffer.getCount() }); i += terrain.fluxBuffer.getCount();
+	terrain.stabilityBuffer.upload({ data + i, terrain.stabilityBuffer.getCount() }); i += terrain.stabilityBuffer.getCount();
+	terrain.sedimentBuffer.upload({ data + i, terrain.sedimentBuffer.getCount() }); i += terrain.sedimentBuffer.getCount();
+	terrain.damageBuffer.upload({ data + i, terrain.damageBuffer.getCount() }); i += terrain.damageBuffer.getCount();
+
+	Simulation& simulation{ terrain.simulation };
+	simulation.deltaTime = json["Simulation/DeltaTime"];
+	simulation.gravity = json["Simulation/Gravity"];
+	simulation.rain = json["Simulation/Rain"];
+	simulation.evaporation = json["Simulation/Evaporation"];
+	simulation.petrification = json["Simulation/Petrification"];
+	simulation.sedimentCapacityConstant = json["Simulation/SedimentCapacityConstant"];
+	simulation.bedrockDissolvingConstant = json["Simulation/BedrockDissolvingConstant"];
+	simulation.sandDissolvingConstant = json["Simulation/SandDissolvingConstant"];
+	simulation.sedimentDepositionConstant = json["Simulation/SedimentDepositionConstant"];
+	simulation.minTerrainAngle = json["Simulation/MinTerrainAngle"];
+	simulation.dryTalusAngle = json["Simulation/DryTalusAngle"];
+	simulation.wetTalusAngle = json["Simulation/WetTalusAngle"];
+	simulation.minHorizontalErosion = json["Simulation/MinHorizontalErosion"];
+	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
+	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
+	simulation.splitThreshold = json["Simulation/SplitThreshold"];
+	simulation.init = false;
+	simulation.paused = true;
+
+	world.getComponent<onec::Scale>(this->terrain.entity)->scale = json["Rendering/VisualScale"];
+	world.getSingleton<onec::AmbientLight>()->color = glm::vec3{ json["Rendering/BackgroundColor"][0], json["Rendering/BackgroundColor"][1], json["Rendering/BackgroundColor"][2] };
+	world.getSingleton<onec::AmbientLight>()->strength = json["Rendering/AmbientLight"];
+	rendering.bedrockColor = glm::vec3{ json["Rendering/BedrockColor"][0], json["Rendering/BedrockColor"][1], json["Rendering/BedrockColor"][2] };
+	rendering.sandColor = glm::vec3{ json["Rendering/SandColor"][0], json["Rendering/SandColor"][1], json["Rendering/SandColor"][2] };
+	rendering.waterColor = glm::vec3{ json["Rendering/WaterColor"][0], json["Rendering/WaterColor"][1], json["Rendering/WaterColor"][2] };
+	rendering.useInterpolation = json["Rendering/UseInterpolation"];
+
+    PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(this->terrain.entity) };
+	geo::SimpleMaterialUniforms uniforms;
+	uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
+	uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
+	uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
+	uniforms.useInterpolation = rendering.useInterpolation;
+	uniforms.gridSize = terrain.gridSize;
+	uniforms.gridScale = terrain.gridScale;
+	uniforms.maxLayerCount = terrain.maxLayerCount;
+	uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
+	uniforms.heights = terrain.heightBuffer.getBindlessHandle();
+	uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
+	uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
+	pointRenderer.material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
 }
 
 }
