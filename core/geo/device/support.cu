@@ -192,16 +192,16 @@ namespace geo
 		}
 
 		void startSupportCheck(const Launch& launch) {
-			CU_CHECK_KERNEL(startSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
+			//CU_CHECK_KERNEL(startSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 
 		void endSupportCheck(const Launch& launch) {
-			CU_CHECK_KERNEL(endSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
+			//CU_CHECK_KERNEL(endSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 
 		void stepSupportCheck(const Launch& launch) {
 			// TODO: uncomment this. Disabled to test static initial stability, also not yet fully implemented
-			CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
+			//CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 
 			// weird checkerboard update version for race conditions
 			//CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > (0));

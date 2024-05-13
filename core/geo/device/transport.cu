@@ -61,13 +61,12 @@ __global__ void pipeKernel()
 
 				if (sand < neighbor.height[CEILING])
 				{
-					const float deltaHeight{ water - neighbor.water };
+					const float deltaHeight{ water - glm::max(neighbor.water, sand)  };
 					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; // dynamic?
 
 					pipe[i] = static_cast<char>(neighbor.layer);
 					heights[i] = neighbor.sand;
-					flux[i] = (deltaHeight > 0.0f) *
-						      glm::max(flux[i] - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
+					flux[i] = glm::max(((1.f - 0.001f * simulation.deltaTime) * flux[i]) - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
 
 					if (neighbor.height[CEILING] < FLT_MAX)
 					{
@@ -80,7 +79,7 @@ __global__ void pipeKernel()
 					const float avgWater{ 0.5f * (height[WATER] + neighbor.height[WATER]) };
 					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater, 1.0f)) };
 
-					slippage[i] = glm::max(simulation.deltaTime * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f);
+					slippage[i] = glm::max(0.125f * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f);
 
 					break;
 				}
@@ -175,18 +174,23 @@ __global__ void transportKernel()
 		}
 
 		float avgWater{ height[WATER] };
+		// TODO: Can this generate/delete water, sand...? => Can delete water but not generate
 		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, height[CEILING] - height[BEDROCK] - height[SAND]);
 		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
-		avgWater = 0.5f * (avgWater + height[WATER]);
-		const glm::vec2 velocity{ glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) / (avgWater * simulation.gridScale + glm::epsilon<float>()) };
+		// avgWater = 0.5f * (avgWater + height[WATER]);
+		const glm::vec2 velocity{ 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
 
-		height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
+		const float mag = glm::length(velocity);
+		if (layer == 1 && index.x == 128 && index.y == 128) {
+			printf("%f\n", mag);
+		}
+		//height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
 
 		const float petrificationAmount{ glm::min(simulation.petrification * simulation.deltaTime * height[SAND], height[SAND]) };
-		height[BEDROCK] += petrificationAmount;
-		height[SAND] -= petrificationAmount;
+		//height[BEDROCK] += petrificationAmount;
+		//height[SAND] -= petrificationAmount;
 
-		sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
+		//sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
 
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;

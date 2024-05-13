@@ -123,23 +123,26 @@ __global__ void sedimentKernel()
 		float sediment{ simulation.sediments[flatIndex] };
 		const float slope{ glm::max(simulation.slopes[flatIndex], simulation.minTerrainSlope) };
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
-		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed };
+		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed};
 		
 		if (sedimentCapacity > sediment)
 		{
-			const float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
+			float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
+			deltaSand = glm::min(deltaSand, (sedimentCapacity - sediment));
 			height[SAND] -= deltaSand;
 			sediment += deltaSand;
 
 			constexpr float sandThreshold{ 0.01f };
 
-			const float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] / sandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[BEDROCK] - floor) };
+			float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] / sandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[BEDROCK] - floor) };
+			deltaBedrock = glm::min(deltaBedrock, (sedimentCapacity - sediment));
 			height[BEDROCK] -= deltaBedrock;
 			sediment += deltaBedrock;
 		}
 		else
 		{
-			const float deltaSediment{ glm::min(simulation.sedimentDepositionConstant * (sediment - sedimentCapacity) * simulation.deltaTime,  height[CEILING] - height[BEDROCK] - height[WATER]) };
+			float deltaSediment{ glm::min(simulation.sedimentDepositionConstant * (sediment - sedimentCapacity) * simulation.deltaTime,  height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]) };
+			deltaSediment = glm::min(deltaSediment, (sediment - sedimentCapacity));
 			sediment -= deltaSediment;
 			height[SAND] += deltaSediment;
 		}
@@ -206,9 +209,9 @@ __global__ void damageKernel()
 
 void horizontalErosion(const Launch& launch)
 {
-	CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
+	//CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
 	//CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
-	CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
+	//CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
 }
 
 }
