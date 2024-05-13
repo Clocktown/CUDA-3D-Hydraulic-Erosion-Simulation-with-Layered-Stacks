@@ -142,12 +142,12 @@ void UI::updateTerrain()
 			uniforms.useInterpolation = rendering.useInterpolation;
 			uniforms.gridSize = terrain.gridSize;
 			uniforms.gridScale = terrain.gridScale;
+			uniforms.maxLayerCount = terrain.maxLayerCount;
 
 			Terrain& terrain{ *world.getComponent<Terrain>(entity) };
-			terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, terrain.simulation };
+			terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, static_cast<char>(uniforms.maxLayerCount), terrain.simulation };
 			terrain.simulation.init = true;
 
-			uniforms.maxLayerCount = terrain.maxLayerCount;
 			uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
 			uniforms.heights = terrain.heightBuffer.getBindlessHandle();
 			uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
@@ -162,6 +162,7 @@ void UI::updateTerrain()
 
 		ImGui::DragInt2("Grid Size", &terrain.gridSize.x, 0.5f, 16, 4096);
 		ImGui::DragFloat("Grid Scale [m]", &terrain.gridScale, 0.01f, 0.001f, 10.0f);
+		ImGui::DragInt("Max. Layer Count", &terrain.maxLayerCount, 0.01f, 1, 127);
 
 		ImGui::TreePop();
 	}
@@ -338,6 +339,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 
 	json["Terrain/GridSize"] = { terrain.gridSize.x, terrain.gridSize.y };
 	json["Terrain/GridScale"] = terrain.gridScale;
+	json["Terrain/MaxLayerCount"] = terrain.maxLayerCount;
 
 	json["Simulation/DeltaTime"] = simulation.deltaTime;
 	json["Simulation/Gravity"] = simulation.gravity;
@@ -365,26 +367,39 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/WaterColor"] = { rendering.waterColor.r, rendering.waterColor.g, rendering.waterColor.b };
 	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
 
-	std::ptrdiff_t byteCount{ 0 };
-	byteCount += terrain.layerCountBuffer.getCount();
-	byteCount += terrain.heightBuffer.getCount();
-	byteCount += terrain.fluxBuffer.getCount();
-	byteCount += terrain.stabilityBuffer.getCount();
-	byteCount += terrain.sedimentBuffer.getCount();
-	byteCount += terrain.damageBuffer.getCount();
+	onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
+	const std::ptrdiff_t maxLayerCount{ device::getMaxLayerCount(reinterpret_cast<char*>(layerCountBuffer.getData()), layerCountBuffer.getCount()) };
+	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
+	const std::ptrdiff_t columnCount{ cellCount * maxLayerCount };
+	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
+	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
+	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
+	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
+	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
+	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+	layerCountBuffer.release();
 
-	std::vector<std::byte> destination(byteCount);
-	std::ptrdiff_t i{ 0 };
+	std::ptrdiff_t bytes{ 1 };
+	bytes += layerCountBytes;
+	bytes += heightBytes;
+	bytes += fluxBytes;
+	bytes += stabilityBytes;
+	bytes += sedimentBytes;
+	bytes += damageBytes;
 
-	terrain.layerCountBuffer.download({ destination.data() + i, terrain.layerCountBuffer.getCount() }); i += terrain.layerCountBuffer.getCount();
-	terrain.heightBuffer.download({ destination.data() + i, terrain.heightBuffer.getCount() }); i += terrain.heightBuffer.getCount();
-	terrain.fluxBuffer.download({ destination.data() + i, terrain.fluxBuffer.getCount() }); i += terrain.fluxBuffer.getCount();
-	terrain.stabilityBuffer.download({ destination.data() + i, terrain.stabilityBuffer.getCount() }); i += terrain.stabilityBuffer.getCount();
-	terrain.sedimentBuffer.download({ destination.data() + i, terrain.sedimentBuffer.getCount() }); i += terrain.sedimentBuffer.getCount();
-	terrain.damageBuffer.download({ destination.data() + i, terrain.damageBuffer.getCount() }); i += terrain.damageBuffer.getCount();
+	std::vector<std::byte> destination(bytes);
+	destination[0] = static_cast<std::byte>(maxLayerCount);
+	std::ptrdiff_t i{ 1 };
 
-	onec::writeFile(file, json.dump());
-	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(destination.data()), static_cast<std::size_t>(byteCount) });
+	terrain.layerCountBuffer.download({ destination.data() + i, layerCountBytes }); i += layerCountBytes;
+	terrain.heightBuffer.download({ destination.data() + i, heightBytes }); i += heightBytes;
+	terrain.fluxBuffer.download({ destination.data() + i, fluxBytes }); i += fluxBytes;
+	terrain.stabilityBuffer.download({ destination.data() + i, stabilityBytes }); i += stabilityBytes;
+	terrain.sedimentBuffer.download({ destination.data() + i, sedimentBytes }); i += sedimentBytes;
+	terrain.damageBuffer.download({ destination.data() + i, damageBytes }); i += damageBytes;
+
+	onec::writeFile(file, json.dump(1));
+	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(destination.data()), static_cast<std::size_t>(bytes) });
 }
 
 void UI::loadFromFile(const std::filesystem::path& file)
@@ -410,18 +425,29 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	
 	this->terrain.gridSize = glm::ivec2{ json["Terrain/GridSize"][0], json["Terrain/GridSize"][1] };
 	this->terrain.gridScale = json["Terrain/GridScale"];
+	this->terrain.maxLayerCount = json["Terrain/MaxLayerCount"];
 
-	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale };
+	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
 	const std::string source{ onec::readFile(file.stem().concat(".dat")) };
 	const std::byte* const data{ reinterpret_cast<const std::byte*>(source.data()) };
 
-	std::ptrdiff_t i{ 0 };
-	terrain.layerCountBuffer.upload({ data + i, terrain.layerCountBuffer.getCount() }); i += terrain.layerCountBuffer.getCount();
-	terrain.heightBuffer.upload({ data + i, terrain.heightBuffer.getCount() }); i += terrain.heightBuffer.getCount();
-	terrain.fluxBuffer.upload({ data + i, terrain.fluxBuffer.getCount() }); i += terrain.fluxBuffer.getCount();
-	terrain.stabilityBuffer.upload({ data + i, terrain.stabilityBuffer.getCount() }); i += terrain.stabilityBuffer.getCount();
-	terrain.sedimentBuffer.upload({ data + i, terrain.sedimentBuffer.getCount() }); i += terrain.sedimentBuffer.getCount();
-	terrain.damageBuffer.upload({ data + i, terrain.damageBuffer.getCount() }); i += terrain.damageBuffer.getCount();
+	const std::ptrdiff_t maxLayerCount{ static_cast<char>(*data) };
+	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
+	const std::ptrdiff_t columnCount{ cellCount * maxLayerCount };
+	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
+	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
+	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
+	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
+	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
+	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+
+	std::ptrdiff_t i{ 1 };
+	terrain.layerCountBuffer.upload({ data + i, layerCountBytes }); i += layerCountBytes;
+	terrain.heightBuffer.upload({ data + i, heightBytes }); i += heightBytes;
+	terrain.fluxBuffer.upload({ data + i, fluxBytes }); i += fluxBytes;
+	terrain.stabilityBuffer.upload({ data + i, stabilityBytes }); i += stabilityBytes;
+	terrain.sedimentBuffer.upload({ data + i, sedimentBytes }); i += sedimentBytes;
+	terrain.damageBuffer.upload({ data + i, damageBytes }); i += damageBytes;
 
 	Simulation& simulation{ terrain.simulation };
 	simulation.deltaTime = json["Simulation/DeltaTime"];

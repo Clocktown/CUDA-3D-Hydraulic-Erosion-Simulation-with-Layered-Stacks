@@ -43,14 +43,13 @@ struct Simulation
 
 struct Terrain
 {
-	static constexpr int maxLayerCount{ 8 };
-
 	explicit Terrain() = default;
-	explicit Terrain(glm::ivec2 gridSize, float gridScale, const Simulation& settings = Simulation{});
+	explicit Terrain(glm::ivec2 gridSize, float gridScale, char layerCount = 8, const Simulation& settings = Simulation{});
 
 	int numValidColumns;
 	glm::ivec2 gridSize;
 	float gridScale;
+	char maxLayerCount;
 	onec::GraphicsBuffer layerCountBuffer;
 	onec::GraphicsBuffer heightBuffer;
 	onec::GraphicsBuffer sedimentBuffer;

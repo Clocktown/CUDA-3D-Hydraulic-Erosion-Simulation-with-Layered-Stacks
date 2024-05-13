@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../components/terrain.hpp"
 #include <onec/onec.hpp>
 
 namespace geo
@@ -19,6 +20,7 @@ struct UI
 		entt::entity entity{ entt::null };
 		glm::ivec2 gridSize{ 256 };
 		float gridScale{ 1.0f };
+		int maxLayerCount{ 8 };
 	} terrain;
 
 	struct

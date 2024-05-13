@@ -93,6 +93,7 @@ extern __constant__ int2 offsets[4];
 void setSimulation(const Simulation& simulation);
 
 int fillIndices(const Launch& launch, int* atomicCounter, int* indices);
+char getMaxLayerCount(const char* layerCounts, std::ptrdiff_t count);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);

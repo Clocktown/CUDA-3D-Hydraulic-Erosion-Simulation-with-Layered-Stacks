@@ -83,7 +83,7 @@ inline decltype(auto) World::setSingleton(Args&&... args)
 {
 	if constexpr (std::is_empty_v<Type>)
 	{
-		m_registry.ctx().emplace<Type>(std::forward<Args>(args)...);
+		
 	}
 	else
 	{

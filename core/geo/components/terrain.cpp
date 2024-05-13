@@ -7,9 +7,10 @@
 namespace geo
 {
 
-Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const Simulation& simulation) :
+Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char maxLayerCount, const Simulation& simulation) :
 	gridSize{ gridSize },
 	gridScale{ gridScale },
+	maxLayerCount{ maxLayerCount },
 	simulation{ simulation }
 {
 	const int cellCount{ gridSize.x * gridSize.y };
