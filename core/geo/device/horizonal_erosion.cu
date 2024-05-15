@@ -210,7 +210,7 @@ __global__ void damageKernel()
 void horizontalErosion(const Launch& launch)
 {
 	//CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
-	//CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
+	CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
 	//CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
 }
 

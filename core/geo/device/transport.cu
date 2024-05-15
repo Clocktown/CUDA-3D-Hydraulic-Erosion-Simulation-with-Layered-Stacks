@@ -79,7 +79,7 @@ __global__ void pipeKernel()
 					const float avgWater{ 0.5f * (height[WATER] + neighbor.height[WATER]) };
 					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater, 1.0f)) };
 
-					slippage[i] = glm::max(0.125f * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f);
+					slippage[i] = glm::min(glm::max(0.125f * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f), 0.25f * (neighbor.height[CEILING] - neighbor.height[BEDROCK] - neighbor.height[WATER] - neighbor.height[SAND]));
 
 					break;
 				}
@@ -98,6 +98,11 @@ __global__ void pipeKernel()
 
 		flux *= glm::min(height[WATER] * simulation.gridScale * simulation.gridScale /
 						 ((flux.x + flux.y + flux.z + flux.w) * simulation.deltaTime + glm::epsilon<float>()), 1.0f);
+		const float sedimentFluxScale{ glm::min(simulation.sediments[flatIndex] * simulation.gridScale * simulation.gridScale /
+						 ((flux.x + flux.y + flux.z + flux.w) * simulation.deltaTime + glm::epsilon<float>()), 1.0f)};
+		// TODO: Add an actual buffer for this
+		simulation.stability[flatIndex] = sedimentFluxScale;
+
 
 		slippage *= glm::min(height[SAND] / (slippage.x + slippage.y + slippage.z + slippage.w + glm::epsilon<float>()), 1.0f);
 
@@ -127,7 +132,7 @@ __global__ void transportKernel()
 		glm::vec4 height{ glm::cuda_cast(simulation.heights[flatIndex]) };
 		float sediment{ simulation.sediments[flatIndex] };
 		glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
-		glm::vec4 sedimentFlux{ sediment * flux };
+		glm::vec4 sedimentFlux{ simulation.stability[flatIndex] * flux }; // TODO: use new Buffer
 		glm::vec4 slippage{ glm::cuda_cast(simulation.slippages[flatIndex]) };
 
 		struct
@@ -138,6 +143,7 @@ __global__ void transportKernel()
 			int layerCount;
 			int layer;
 			float sediment;
+			float sedimentFluxScale;
 			float flux;
 			float slippage;
 		} neighbor;
@@ -163,11 +169,12 @@ __global__ void transportKernel()
 				if (reinterpret_cast<char*>(simulation.pipes)[neighbor.flatIndex4 + direction] == layer)
 				{
 					neighbor.sediment = simulation.sediments[neighbor.flatIndex];
+					neighbor.sedimentFluxScale = simulation.stability[neighbor.flatIndex]; // TODO: Use new buffer
 					neighbor.flux = reinterpret_cast<float*>(simulation.fluxes)[neighbor.flatIndex4 + direction];
 					neighbor.slippage = reinterpret_cast<float*>(simulation.slippages)[neighbor.flatIndex4 + direction];
 
 					flux[i] -= neighbor.flux;
-					sedimentFlux[i] -= neighbor.sediment * neighbor.flux;
+					sedimentFlux[i] -= neighbor.sedimentFluxScale * neighbor.flux;
 					slippage[i] -= neighbor.slippage;
 				}
 			}
@@ -184,13 +191,13 @@ __global__ void transportKernel()
 		if (layer == 1 && index.x == 128 && index.y == 128) {
 			printf("%f\n", mag);
 		}
-		//height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
+		height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
 
 		const float petrificationAmount{ glm::min(simulation.petrification * simulation.deltaTime * height[SAND], height[SAND]) };
-		//height[BEDROCK] += petrificationAmount;
-		//height[SAND] -= petrificationAmount;
+		height[BEDROCK] += petrificationAmount;
+		height[SAND] -= petrificationAmount;
 
-		//sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
+		sediment = glm::max(sediment - integrationScale * (sedimentFlux.x + sedimentFlux.y + sedimentFlux.z + sedimentFlux.w), 0.0f);
 
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;
