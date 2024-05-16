@@ -115,13 +115,30 @@ __global__ void sedimentKernel()
 
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
-	float floor{ 0.0f };
+	float floor{ -FLT_MAX };
 
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 	{
 		glm::vec4 height{ glm::cuda_cast(simulation.heights[flatIndex]) };
 		float sediment{ simulation.sediments[flatIndex] };
-		const float slope{ glm::max(simulation.slopes[flatIndex], simulation.minTerrainSlope) };
+		/* https://www.tutorialspoint.com/execute_matplotlib_online.php
+			import matplotlib.pyplot as plt
+			import numpy as np
+
+			x = np.arange(0, 0.5 * np.pi, 0.01)
+			y = np.sin(x)
+			t = np.clip((y - 0.6) / (1 - 0.6), 0.0, 1.0);
+			t =  t * t * (3.0 - 2.0 * t)
+			y = y * (1-t) + 0
+
+			plt.plot(180 * x / np.pi, y)
+			plt.show()
+		*/
+		// Remap sin(alpha)
+		const float actualSlope = simulation.slopes[flatIndex];
+		const float t = glm::smoothstep(0.6f, 1.f, actualSlope);
+		// [0,1] -> [min, max]
+		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
 		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed};
 		

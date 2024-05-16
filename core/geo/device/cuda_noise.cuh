@@ -1,7 +1,7 @@
 // cudaNoise
 // Library of common 3D noise functions for CUDA kernels
 
-#pragma once
+//#pragma once
 
 #include <cuda_runtime.h>
 

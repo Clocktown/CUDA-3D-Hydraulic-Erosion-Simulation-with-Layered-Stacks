@@ -215,11 +215,18 @@ void UI::updateSimulation()
 		ImGui::DragFloat("Sand Dissolving Constant", &simulation.sandDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
 		ImGui::DragFloat("Sediment Deposition Constant", &simulation.sedimentDepositionConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
 
-		float minTerrainAngle{ glm::degrees(simulation.minTerrainAngle) };
+		float minSlopeErosionScale{ simulation.minSlopeErosionScale };
 
-		if (ImGui::DragFloat("Min. Terrain Angle [deg]", &minTerrainAngle, 0.1f, 0.0f, 90.0f))
+		if (ImGui::DragFloat("Min. Slope Erosion Scale [deg]", &minSlopeErosionScale, 0.001f, 0.0f, 1.0f))
 		{
-			simulation.minTerrainAngle = glm::radians(minTerrainAngle);
+			simulation.minSlopeErosionScale = minSlopeErosionScale;
+		}
+
+		float maxSlopeErosionScale{ simulation.maxSlopeErosionScale };
+
+		if (ImGui::DragFloat("Max. Slope Erosion Scale [deg]", &maxSlopeErosionScale, 0.001f, minSlopeErosionScale, 10.0f))
+		{
+			simulation.maxSlopeErosionScale = maxSlopeErosionScale;
 		}
 
 		float dryTalusAngle{ glm::degrees(simulation.dryTalusAngle) };
@@ -350,7 +357,8 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/BedrockDissolvingConstant"] = simulation.bedrockDissolvingConstant;
 	json["Simulation/SandDissolvingConstant"] = simulation.sandDissolvingConstant;
 	json["Simulation/SedimentDepositionConstant"] = simulation.sedimentDepositionConstant;
-	json["Simulation/MinTerrainAngle"] = simulation.minTerrainAngle;
+	json["Simulation/MinSlopeErosionScale"] = simulation.minSlopeErosionScale;
+	json["Simulation/MaxSlopeErosionScale"] = simulation.maxSlopeErosionScale;
 	json["Simulation/DryTalusAngle"] = simulation.dryTalusAngle;
 	json["Simulation/WetTalusAngle"] = simulation.wetTalusAngle;
 	json["Simulation/MinHorizontalErosion"] = simulation.minHorizontalErosion;
@@ -464,7 +472,8 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.bedrockDissolvingConstant = json["Simulation/BedrockDissolvingConstant"];
 	simulation.sandDissolvingConstant = json["Simulation/SandDissolvingConstant"];
 	simulation.sedimentDepositionConstant = json["Simulation/SedimentDepositionConstant"];
-	simulation.minTerrainAngle = json["Simulation/MinTerrainAngle"];
+	simulation.minSlopeErosionScale = json["Simulation/MinSlopeErosionScale"];
+	simulation.maxSlopeErosionScale = json["Simulation/MaxSlopeErosionScale"];
 	simulation.dryTalusAngle = json["Simulation/DryTalusAngle"];
 	simulation.wetTalusAngle = json["Simulation/WetTalusAngle"];
 	simulation.minHorizontalErosion = json["Simulation/MinHorizontalErosion"];

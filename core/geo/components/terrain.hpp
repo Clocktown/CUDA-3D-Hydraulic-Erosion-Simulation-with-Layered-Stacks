@@ -7,20 +7,21 @@ namespace geo
 
 struct Simulation
 {
-	float deltaTime{ 1.0f / 60.0f }; // [s]
+	float deltaTime{ 0.150f }; // [s]
 	float gravity{ -9.81f }; // [m/s²]
-	float rain{ 0.0f }; // [m/(m²s)]
-	float evaporation{ 0.0f }; // [1/s]
+	float rain{ 0.07f }; // [m/(m²s)]
+	float evaporation{ 1.f }; // [1/s]
 	float petrification{ 0.0005f }; // [1/s]
 
-	float sedimentCapacityConstant{ 0.001f };
-	float bedrockDissolvingConstant{ 1.0f };
-	float sandDissolvingConstant{ 60.0f };
-	float sedimentDepositionConstant{ 60.0f };
-	float minTerrainAngle{ glm::radians(5.0f) }; // [rad]
+	float sedimentCapacityConstant{ 0.1f };
+	float bedrockDissolvingConstant{ 0.01f };
+	float sandDissolvingConstant{ 0.05f };
+	float sedimentDepositionConstant{ 0.04f };
+	float minSlopeErosionScale{ 0.1f };
+	float maxSlopeErosionScale{ 1.f };
 
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
-	float wetTalusAngle{ glm::radians(15.0f) }; // [rad]
+	float wetTalusAngle{ glm::radians(10.0f) }; // [rad]
 
 	float minHorizontalErosion{ 0.5f };
 	float horizontalErosionStrength{ 0.1f };
@@ -36,6 +37,7 @@ struct Simulation
 	int maxStabilityPropagationSteps{ 100 };
 	int stabilityPropagationStepsPerIteration{ 10 };
 	int currentStabilityStep{ 0 };
+	int currentSimulationStep{ 0 };
 
 	bool init{ true };
 	bool paused{ true };

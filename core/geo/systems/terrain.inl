@@ -41,7 +41,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.bedrockDissolvingConstant = terrain.simulation.bedrockDissolvingConstant;
 		simulation.sandDissolvingConstant = terrain.simulation.sandDissolvingConstant;
 		simulation.sedimentDepositionConstant = terrain.simulation.sedimentDepositionConstant;
-		simulation.minTerrainSlope = glm::sin(terrain.simulation.minTerrainAngle);
+		simulation.minTerrainSlopeScale = terrain.simulation.minSlopeErosionScale;
+		simulation.maxTerrainSlopeScale = terrain.simulation.maxSlopeErosionScale;
 		simulation.dryTalusSlope = glm::tan(terrain.simulation.dryTalusAngle);
 		simulation.wetTalusSlope = glm::tan(terrain.simulation.wetTalusAngle);
 
@@ -69,6 +70,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.velocities = reinterpret_cast<float2*>(terrain.velocityBuffer.getData());
 		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
 		simulation.sedimentFluxScale = reinterpret_cast<float*>(terrain.sedimentFluxScaleBuffer.getData());
+		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
+		simulation.step = terrain.simulation.currentSimulationStep;
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -79,6 +82,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		if (terrain.simulation.init)
 		{
+			device::setSimulation(simulation);
 			device::init(launch);
 		
 			terrain.simulation.currentStabilityStep = 0;
@@ -108,6 +112,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 				terrain.simulation.currentStabilityStep++;
 				device::stepSupportCheck(launch);
 			}
+			terrain.simulation.currentSimulationStep++;
 	    }
 
 		terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
