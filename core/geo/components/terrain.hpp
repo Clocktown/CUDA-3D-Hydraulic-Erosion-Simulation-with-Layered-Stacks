@@ -10,7 +10,7 @@ struct Simulation
 	float deltaTime{ 0.150f }; // [s]
 	float gravity{ -9.81f }; // [m/s²]
 	float rain{ 0.07f }; // [m/(m²s)]
-	float evaporation{ 1.f }; // [1/s]
+	float evaporation{ 0.01f }; // [1/s]
 	float petrification{ 0.0005f }; // [1/s]
 
 	float sedimentCapacityConstant{ 0.1f };
