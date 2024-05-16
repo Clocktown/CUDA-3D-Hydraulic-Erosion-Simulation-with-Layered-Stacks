@@ -85,6 +85,8 @@ struct Simulation
 	float2* velocities;
 	float* stability;
 	float* damages;
+
+	float* sedimentFluxScale;
 };
 
 extern __constant__ Simulation simulation;

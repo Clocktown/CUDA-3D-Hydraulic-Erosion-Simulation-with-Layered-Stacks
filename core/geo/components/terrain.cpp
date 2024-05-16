@@ -28,6 +28,7 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 	slippageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
 	velocityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
 	damageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
+	sedimentFluxScaleBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
 	atomicCounter.initialize(static_cast<std::ptrdiff_t>(sizeof(int)));
 }
 

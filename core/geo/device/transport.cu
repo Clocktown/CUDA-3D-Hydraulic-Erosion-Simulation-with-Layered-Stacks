@@ -100,8 +100,7 @@ __global__ void pipeKernel()
 						 ((flux.x + flux.y + flux.z + flux.w) * simulation.deltaTime + glm::epsilon<float>()), 1.0f);
 		const float sedimentFluxScale{ glm::min(simulation.sediments[flatIndex] * simulation.gridScale * simulation.gridScale /
 						 ((flux.x + flux.y + flux.z + flux.w) * simulation.deltaTime + glm::epsilon<float>()), 1.0f)};
-		// TODO: Add an actual buffer for this
-		simulation.stability[flatIndex] = sedimentFluxScale;
+		simulation.sedimentFluxScale[flatIndex] = sedimentFluxScale;
 
 
 		slippage *= glm::min(height[SAND] / (slippage.x + slippage.y + slippage.z + slippage.w + glm::epsilon<float>()), 1.0f);
@@ -132,7 +131,7 @@ __global__ void transportKernel()
 		glm::vec4 height{ glm::cuda_cast(simulation.heights[flatIndex]) };
 		float sediment{ simulation.sediments[flatIndex] };
 		glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
-		glm::vec4 sedimentFlux{ simulation.stability[flatIndex] * flux }; // TODO: use new Buffer
+		glm::vec4 sedimentFlux{ simulation.sedimentFluxScale[flatIndex] * flux };
 		glm::vec4 slippage{ glm::cuda_cast(simulation.slippages[flatIndex]) };
 
 		struct
@@ -169,7 +168,7 @@ __global__ void transportKernel()
 				if (reinterpret_cast<char*>(simulation.pipes)[neighbor.flatIndex4 + direction] == layer)
 				{
 					neighbor.sediment = simulation.sediments[neighbor.flatIndex];
-					neighbor.sedimentFluxScale = simulation.stability[neighbor.flatIndex]; // TODO: Use new buffer
+					neighbor.sedimentFluxScale = simulation.sedimentFluxScale[neighbor.flatIndex];
 					neighbor.flux = reinterpret_cast<float*>(simulation.fluxes)[neighbor.flatIndex4 + direction];
 					neighbor.slippage = reinterpret_cast<float*>(simulation.slippages)[neighbor.flatIndex4 + direction];
 

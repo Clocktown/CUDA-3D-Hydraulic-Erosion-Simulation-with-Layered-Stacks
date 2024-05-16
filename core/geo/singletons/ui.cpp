@@ -377,6 +377,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
 	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
 	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+	const std::ptrdiff_t sedimentFluxScaleBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sedimentFluxScale)) };
 	layerCountBuffer.release();
 
 	std::ptrdiff_t bytes{ 1 };
@@ -386,6 +387,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	bytes += stabilityBytes;
 	bytes += sedimentBytes;
 	bytes += damageBytes;
+	bytes += sedimentFluxScaleBytes;
 
 	std::vector<std::byte> destination(bytes);
 	destination[0] = static_cast<std::byte>(maxLayerCount);
@@ -397,6 +399,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	terrain.stabilityBuffer.download({ destination.data() + i, stabilityBytes }); i += stabilityBytes;
 	terrain.sedimentBuffer.download({ destination.data() + i, sedimentBytes }); i += sedimentBytes;
 	terrain.damageBuffer.download({ destination.data() + i, damageBytes }); i += damageBytes;
+	terrain.sedimentFluxScaleBuffer.download({ destination.data() + i, sedimentFluxScaleBytes }); i += sedimentFluxScaleBytes;
 
 	onec::writeFile(file, json.dump(1));
 	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(destination.data()), static_cast<std::size_t>(bytes) });
@@ -440,6 +443,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
 	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
 	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+	const std::ptrdiff_t sedimentFluxScaleBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sedimentFluxScale)) };
 
 	std::ptrdiff_t i{ 1 };
 	terrain.layerCountBuffer.upload({ data + i, layerCountBytes }); i += layerCountBytes;
@@ -448,6 +452,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	terrain.stabilityBuffer.upload({ data + i, stabilityBytes }); i += stabilityBytes;
 	terrain.sedimentBuffer.upload({ data + i, sedimentBytes }); i += sedimentBytes;
 	terrain.damageBuffer.upload({ data + i, damageBytes }); i += damageBytes;
+	terrain.sedimentFluxScaleBuffer.upload({ data + i, sedimentFluxScaleBytes }); i += sedimentFluxScaleBytes;
 
 	Simulation& simulation{ terrain.simulation };
 	simulation.deltaTime = json["Simulation/DeltaTime"];

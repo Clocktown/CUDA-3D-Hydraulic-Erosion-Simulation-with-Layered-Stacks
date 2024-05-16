@@ -62,6 +62,7 @@ struct Terrain
 	onec::Buffer slippageBuffer;
 	onec::Buffer velocityBuffer;
 	onec::Buffer damageBuffer;
+	onec::Buffer sedimentFluxScaleBuffer;
 	Simulation simulation;
 };
 

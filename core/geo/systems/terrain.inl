@@ -68,6 +68,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.slippages = reinterpret_cast<float4*>(terrain.slippageBuffer.getData());
 		simulation.velocities = reinterpret_cast<float2*>(terrain.velocityBuffer.getData());
 		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
+		simulation.sedimentFluxScale = reinterpret_cast<float*>(terrain.sedimentFluxScaleBuffer.getData());
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
