@@ -141,7 +141,8 @@ __global__ void sedimentKernel()
 		// [0,1] -> [min, max]
 		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
-		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed};
+		const float waterScale{ glm::clamp(1.f - tanhf(height[WATER] * simulation.erosionWaterScale), 0.f, 1.f) };
+		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed * waterScale};
 		
 		if ((sedimentCapacity > sediment))
 		{

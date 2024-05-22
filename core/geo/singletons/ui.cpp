@@ -262,6 +262,8 @@ void UI::updateSimulation()
 				simulation.maxSlopeErosionScale = maxSlopeErosionScale;
 			}
 
+			ImGui::DragFloat("Max Erosion Depth", &simulation.erosionWaterMaxHeight, 0.1f, 0.0f, 100.f);
+
 			ImGui::TreePop();
 		}
 
@@ -442,6 +444,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/CurrentSimulationStep"] = simulation.currentSimulationStep;
 	json["Simulation/CurrentStabilityStep"] = simulation.currentStabilityStep;
 	json["Simulation/MinBedrockThickness"] = simulation.minBedrockThickness;
+	json["Simulation/ErosionWaterMaxHeight"] = simulation.erosionWaterMaxHeight;
 
 	const auto backgroundColor{ world.getSingleton<onec::AmbientLight>()->color };
 	json["Rendering/VisualScale"] = world.getComponent<onec::Scale>(this->terrain.entity)->scale;
@@ -541,6 +544,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.currentSimulationStep = json["Simulation/CurrentSimulationStep"];
 	simulation.currentStabilityStep = json["Simulation/CurrentStabilityStep"];
 	simulation.minBedrockThickness = json["Simulation/MinBedrockThickness"];
+	simulation.erosionWaterMaxHeight = json["Simulation/ErosionWaterMaxHeight"];
 
 	simulation.init = false;
 	simulation.paused = true;
