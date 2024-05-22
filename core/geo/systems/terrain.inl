@@ -71,6 +71,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.velocities = reinterpret_cast<float2*>(terrain.velocityBuffer.getData());
 		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
 		simulation.sedimentFluxScale = reinterpret_cast<float*>(terrain.sedimentFluxScaleBuffer.getData());
+		simulation.minBedrockThickness = terrain.simulation.minBedrockThickness;
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
 

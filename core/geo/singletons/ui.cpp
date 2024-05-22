@@ -286,6 +286,7 @@ void UI::updateSimulation()
 			ImGui::DragFloat("Sand density", &simulation.sandDensity);
 			ImGui::DragFloat("Bedrock support", &simulation.bedrockSupport);
 			ImGui::DragFloat("Border support", &simulation.borderSupport);
+			ImGui::DragFloat("Min. Bedrock Thickness", &simulation.minBedrockThickness);
 			ImGui::DragInt("Max. stability propagation steps", &simulation.maxStabilityPropagationSteps);
 			ImGui::DragInt("Stability propagation steps per iteration", &simulation.stabilityPropagationStepsPerIteration);
 
@@ -440,6 +441,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/UseWeightInSupportCheck"] = simulation.useWeightInSupportCheck;
 	json["Simulation/CurrentSimulationStep"] = simulation.currentSimulationStep;
 	json["Simulation/CurrentStabilityStep"] = simulation.currentStabilityStep;
+	json["Simulation/MinBedrockThickness"] = simulation.minBedrockThickness;
 
 	const auto backgroundColor{ world.getSingleton<onec::AmbientLight>()->color };
 	json["Rendering/VisualScale"] = world.getComponent<onec::Scale>(this->terrain.entity)->scale;
@@ -538,6 +540,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.useWeightInSupportCheck = json["Simulation/UseWeightInSupportCheck"];
 	simulation.currentSimulationStep = json["Simulation/CurrentSimulationStep"];
 	simulation.currentStabilityStep = json["Simulation/CurrentStabilityStep"];
+	simulation.minBedrockThickness = json["Simulation/MinBedrockThickness"];
 
 	simulation.init = false;
 	simulation.paused = true;

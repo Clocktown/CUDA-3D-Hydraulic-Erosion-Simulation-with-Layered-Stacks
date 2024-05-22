@@ -66,6 +66,7 @@ struct Simulation
 	float waterDensity; // [kg/m³]
 	float bedrockSupport; // [kg/m²] - how much weight a given surface of bedrock can support
 	float borderSupport; // [kg/m²]
+	float minBedrockThickness;
 	int step; 
 
 	char* layerCounts;

@@ -51,9 +51,6 @@ namespace geo
 			{
 				auto heights = glm::cuda_cast(simulation.heights[itFlatIndex]);
 				float sediment = simulation.sediments[itFlatIndex];
-				if (previousCollapsed) {
-					collapsedBedrock -= heights[CEILING];
-				}
 
 				heights[BEDROCK] += collapsedBedrock;
 				heights[SAND] += collapsedSand;
@@ -68,10 +65,12 @@ namespace geo
 				collapsedSediment = 0.f;
 
 				float stability = simulation.stability[itFlatIndex];
-				if (layer > 0 && stability <= 0.f) {
+				float floor = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING];
+				stability = (heights[BEDROCK] - floor <= simulation.minBedrockThickness) ? 0.f : stability;
+				if (stability <= 0.f) {
 					collapsedWater += heights[WATER];
 					collapsedSand += heights[SAND];
-					collapsedBedrock += heights[BEDROCK];
+					collapsedBedrock += heights[BEDROCK] - floor;
 					collapsedSediment += sediment;
 					previousCeiling = heights[CEILING];
 					heights = glm::vec4(0);

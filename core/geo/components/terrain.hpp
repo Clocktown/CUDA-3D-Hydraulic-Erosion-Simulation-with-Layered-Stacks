@@ -35,6 +35,7 @@ struct Simulation
 	// Water weight will be ignored since water level is constantly changing
 	float bedrockSupport{ 4000.f }; // [kg/m²] - how much weight a given surface of bedrock can support
 	float borderSupport{ 4000.f }; // [kg/m²]
+	float minBedrockThickness{ 0.f };
 	int maxStabilityPropagationSteps{ 100 };
 	int stabilityPropagationStepsPerIteration{ 10 };
 	int currentStabilityStep{ 0 };
