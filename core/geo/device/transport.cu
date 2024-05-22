@@ -77,7 +77,7 @@ __global__ void pipeKernel()
 					}
 
 					const float avgWater{ 0.5f * (height[WATER] + neighbor.height[WATER]) };
-					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater, 1.0f)) };
+					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater * simulation.iSlippageInterpolationRange, 1.0f)) };
 
 					slippage[i] = glm::max(
 						glm::min(

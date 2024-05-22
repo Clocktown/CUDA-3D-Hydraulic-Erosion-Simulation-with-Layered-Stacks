@@ -234,6 +234,8 @@ void UI::updateSimulation()
 				simulation.wetTalusAngle = glm::radians(wetTalusAngle);
 			}
 
+			ImGui::DragFloat("Interpolation range", &simulation.slippageInterpolationRange, 0.01f, 0.f, 10.f);
+
 			ImGui::TreePop();
 		}
 
@@ -426,6 +428,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/MaxSlopeErosionScale"] = simulation.maxSlopeErosionScale;
 	json["Simulation/DryTalusAngle"] = simulation.dryTalusAngle;
 	json["Simulation/WetTalusAngle"] = simulation.wetTalusAngle;
+	json["Simulation/SlippageInterpolationRange"] = simulation.slippageInterpolationRange;
 	json["Simulation/MinHorizontalErosion"] = simulation.minHorizontalErosion;
 	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
 	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
@@ -435,6 +438,8 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/EnableSlippage"] = simulation.slippageEnabled;
 	json["Simulation/EnableSupportCheck"] = simulation.supportCheckEnabled;
 	json["Simulation/UseWeightInSupportCheck"] = simulation.useWeightInSupportCheck;
+	json["Simulation/CurrentSimulationStep"] = simulation.currentSimulationStep;
+	json["Simulation/CurrentStabilityStep"] = simulation.currentStabilityStep;
 
 	const auto backgroundColor{ world.getSingleton<onec::AmbientLight>()->color };
 	json["Rendering/VisualScale"] = world.getComponent<onec::Scale>(this->terrain.entity)->scale;
@@ -521,6 +526,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.maxSlopeErosionScale = json["Simulation/MaxSlopeErosionScale"];
 	simulation.dryTalusAngle = json["Simulation/DryTalusAngle"];
 	simulation.wetTalusAngle = json["Simulation/WetTalusAngle"];
+	simulation.slippageInterpolationRange = json["Simulation/SlippageInterpolationRange"];
 	simulation.minHorizontalErosion = json["Simulation/MinHorizontalErosion"];
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
 	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
@@ -530,6 +536,8 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.slippageEnabled = json["Simulation/EnableSlippage"];
 	simulation.supportCheckEnabled = json["Simulation/EnableSupportCheck"];
 	simulation.useWeightInSupportCheck = json["Simulation/UseWeightInSupportCheck"];
+	simulation.currentSimulationStep = json["Simulation/CurrentSimulationStep"];
+	simulation.currentStabilityStep = json["Simulation/CurrentStabilityStep"];
 
 	simulation.init = false;
 	simulation.paused = true;
