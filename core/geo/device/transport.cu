@@ -59,18 +59,18 @@ __global__ void pipeKernel()
 				neighbor.sand = neighbor.height[BEDROCK] + neighbor.height[SAND];
 				neighbor.water = neighbor.sand + neighbor.height[WATER];
 
-				if (sand < neighbor.height[CEILING])
+				if (sand < neighbor.height[CEILING] && (neighbor.water + 100.f * glm::epsilon<float>()) < neighbor.height[CEILING])
 				{
 					const float deltaHeight{ water - glm::max(neighbor.water, sand)  };
 					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; // dynamic?
 
 					pipe[i] = static_cast<char>(neighbor.layer);
 					heights[i] = neighbor.sand;
-					flux[i] = glm::max(((1.f - 0.001f * simulation.deltaTime) * flux[i]) - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
+					flux[i] = glm::max(((1.f - 0.01f * simulation.deltaTime) * flux[i]) - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
 
 					if (neighbor.height[CEILING] < FLT_MAX)
 					{
-						const float freeSpace{ (neighbor.height[CEILING] - neighbor.water) * simulation.gridScale * simulation.gridScale };
+						const float freeSpace{ glm::max((neighbor.height[CEILING] - neighbor.water) * simulation.gridScale * simulation.gridScale, 0.f) };
 						const float takenSpace{ flux[i] * simulation.deltaTime };
 
 						flux[i] *= glm::min(freeSpace / (takenSpace + glm::epsilon<float>()), 1.0f);
@@ -86,10 +86,6 @@ __global__ void pipeKernel()
 						)
 						, 0.f);
 
-					break;
-				}
-				else if (water < neighbor.height[CEILING])
-				{
 					break;
 				}
 			}
@@ -186,7 +182,7 @@ __global__ void transportKernel()
 
 		float avgWater{ height[WATER] };
 		// TODO: Can this generate/delete water, sand...? => Can delete water but not generate
-		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, height[CEILING] - height[BEDROCK] - height[SAND]);
+		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, glm::max(height[CEILING] - height[BEDROCK] - height[SAND], 0.f));
 		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
 		// avgWater = 0.5f * (avgWater + height[WATER]);
 		const glm::vec2 velocity{ 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
