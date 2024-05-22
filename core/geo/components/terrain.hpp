@@ -20,6 +20,7 @@ struct Simulation
 	float minSlopeErosionScale{ 0.1f };
 	float maxSlopeErosionScale{ 1.f };
 	float erosionWaterMaxHeight{ 10.f }; // Use tanh(2.f * WaterHeight / erosionWaterMaxHeight) as tanh(2)  ~ 1
+	float sandThreshold{ 0.01f };
 
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
 	float wetTalusAngle{ glm::radians(10.0f) }; // [rad]

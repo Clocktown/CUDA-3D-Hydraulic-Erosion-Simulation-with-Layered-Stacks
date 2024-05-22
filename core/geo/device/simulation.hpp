@@ -56,6 +56,7 @@ struct Simulation
 	float wetTalusSlope; // tan(alpha)
 	float iSlippageInterpolationRange;
 	float erosionWaterScale; // 2.f / erosionWaterMaxHeight
+	float iSandThreshold;
 
 	float minHorizontalErosion;
 	float horizontalErosionStrength;

@@ -47,6 +47,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.wetTalusSlope = glm::tan(terrain.simulation.wetTalusAngle);
 		simulation.iSlippageInterpolationRange = 1.f / terrain.simulation.slippageInterpolationRange;
 		simulation.erosionWaterScale = 2.f / terrain.simulation.erosionWaterMaxHeight;
+		simulation.iSandThreshold = 1.f / terrain.simulation.sandThreshold;
 
 		simulation.minHorizontalErosion = terrain.simulation.minHorizontalErosion;
 		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;

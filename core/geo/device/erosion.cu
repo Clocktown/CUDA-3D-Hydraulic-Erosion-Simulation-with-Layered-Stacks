@@ -148,16 +148,14 @@ __global__ void sedimentKernel()
 		{
 			if constexpr (enableVertical) {
 				float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
-				deltaSand = glm::min(deltaSand, (sedimentCapacity - sediment));
+				float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] * simulation.iSandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, glm::max(height[BEDROCK] - floor, 0.f)) };
+				const float iTotal = 1.f / (deltaSand + deltaBedrock + glm::epsilon<float>());
+				const float delta = glm::min(deltaSand + deltaBedrock, (sedimentCapacity - sediment));
+				deltaSand *= delta * iTotal;
+				deltaBedrock *= delta * iTotal;
 				height[SAND] -= deltaSand;
-				sediment += deltaSand;
-
-				constexpr float sandThreshold{ 0.01f };
-
-				float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] / sandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[BEDROCK] - floor) };
-				deltaBedrock = glm::min(deltaBedrock, (sedimentCapacity - sediment));
 				height[BEDROCK] -= deltaBedrock;
-				sediment += deltaBedrock;
+				sediment += delta;
 			}
 		}
 		else
