@@ -79,7 +79,12 @@ __global__ void pipeKernel()
 					const float avgWater{ 0.5f * (height[WATER] + neighbor.height[WATER]) };
 					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater, 1.0f)) };
 
-					slippage[i] = glm::min(glm::max(0.125f * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f), 0.25f * (neighbor.height[CEILING] - neighbor.height[BEDROCK] - neighbor.height[WATER] - neighbor.height[SAND]));
+					slippage[i] = glm::max(
+						glm::min(
+							glm::max(0.125f * (sand - neighbor.sand - talusSlope * simulation.gridScale), 0.0f), 
+							0.25f * (neighbor.height[CEILING] - neighbor.height[BEDROCK] - neighbor.height[WATER] - neighbor.height[SAND])
+						)
+						, 0.f);
 
 					break;
 				}
@@ -102,7 +107,6 @@ __global__ void pipeKernel()
 						 ((flux.x + flux.y + flux.z + flux.w) * simulation.deltaTime + glm::epsilon<float>()), 1.0f)};
 		simulation.sedimentFluxScale[flatIndex] = sedimentFluxScale;
 
-
 		slippage *= glm::min(height[SAND] / (slippage.x + slippage.y + slippage.z + slippage.w + glm::epsilon<float>()), 1.0f);
 
 		simulation.pipes[flatIndex] = glm::cuda_cast(pipe);
@@ -112,6 +116,7 @@ __global__ void pipeKernel()
 	}
 }
 
+template <bool enableSlippage>
 __global__ void transportKernel()
 {
 	const glm::ivec2 index{ getLaunchIndex() };
@@ -190,7 +195,10 @@ __global__ void transportKernel()
 		if (layer == 1 && index.x == 128 && index.y == 128) {
 			printf("%f\n", mag);
 		}
-		height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
+
+		if constexpr (enableSlippage) {
+			height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
+		}
 
 		const float petrificationAmount{ glm::min(simulation.petrification * simulation.deltaTime * height[SAND], height[SAND]) };
 		height[BEDROCK] += petrificationAmount;
@@ -204,10 +212,15 @@ __global__ void transportKernel()
 	}
 }
 
-void transport(const Launch& launch)
+void transport(const Launch& launch, bool enable_slippage)
 {
 	CU_CHECK_KERNEL(pipeKernel<<<launch.gridSize, launch.blockSize>>>());
-	CU_CHECK_KERNEL(transportKernel<<<launch.gridSize, launch.blockSize>>>());
+	if (enable_slippage) {
+		CU_CHECK_KERNEL(transportKernel<true><<<launch.gridSize, launch.blockSize>>>());
+	}
+	else {
+		CU_CHECK_KERNEL(transportKernel<false><<<launch.gridSize, launch.blockSize>>>());
+	}
 }
 
 }

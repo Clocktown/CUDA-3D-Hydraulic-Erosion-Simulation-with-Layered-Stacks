@@ -85,8 +85,10 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			device::setSimulation(simulation);
 			device::init(launch);
 		
-			terrain.simulation.currentStabilityStep = 0;
-			device::startSupportCheck(launch);
+			if (terrain.simulation.supportCheckEnabled) {
+				terrain.simulation.currentStabilityStep = 0;
+				device::startSupportCheck(launch);
+			}
 
 			terrain.simulation.init = false;
 		}
@@ -94,23 +96,23 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (!terrain.simulation.paused)
 		{
 		    device::rain(launch);
-			device::transport(launch);
-			device::horizontalErosion(launch);
+			device::transport(launch, terrain.simulation.slippageEnabled);
+			device::erosion(launch, terrain.simulation.verticalErosionEnabled, terrain.simulation.horizontalErosionEnabled);
 
-			if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps) 
-			{
-				// Uncomment this to test static support check
-				device::endSupportCheck(launch);
+			if (terrain.simulation.supportCheckEnabled) {
+				if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps)
+				{
+					device::endSupportCheck(launch);
 
-				// TODO: uncomment this. Disabled to test static initial stability
-				device::startSupportCheck(launch);
-				terrain.simulation.currentStabilityStep = 0;
-			}
+					device::startSupportCheck(launch);
+					terrain.simulation.currentStabilityStep = 0;
+				}
 
-			for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i) 
-			{
-				terrain.simulation.currentStabilityStep++;
-				device::stepSupportCheck(launch);
+				for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i)
+				{
+					terrain.simulation.currentStabilityStep++;
+					device::stepSupportCheck(launch, terrain.simulation.useWeightInSupportCheck);
+				}
 			}
 			terrain.simulation.currentSimulationStep++;
 	    }

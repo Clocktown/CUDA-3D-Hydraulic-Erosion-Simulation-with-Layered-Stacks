@@ -104,6 +104,7 @@ __global__ void horizontalErosionKernel()
 	}
 }
 
+template <bool enableVertical>
 __global__ void sedimentKernel()
 {
 	const glm::ivec2 index{ getLaunchIndex() };
@@ -142,19 +143,21 @@ __global__ void sedimentKernel()
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
 		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed};
 		
-		if (sedimentCapacity > sediment)
+		if ((sedimentCapacity > sediment))
 		{
-			float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
-			deltaSand = glm::min(deltaSand, (sedimentCapacity - sediment));
-			height[SAND] -= deltaSand;
-			sediment += deltaSand;
+			if constexpr (enableVertical) {
+				float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
+				deltaSand = glm::min(deltaSand, (sedimentCapacity - sediment));
+				height[SAND] -= deltaSand;
+				sediment += deltaSand;
 
-			constexpr float sandThreshold{ 0.01f };
+				constexpr float sandThreshold{ 0.01f };
 
-			float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] / sandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[BEDROCK] - floor) };
-			deltaBedrock = glm::min(deltaBedrock, (sedimentCapacity - sediment));
-			height[BEDROCK] -= deltaBedrock;
-			sediment += deltaBedrock;
+				float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] / sandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[BEDROCK] - floor) };
+				deltaBedrock = glm::min(deltaBedrock, (sedimentCapacity - sediment));
+				height[BEDROCK] -= deltaBedrock;
+				sediment += deltaBedrock;
+			}
 		}
 		else
 		{
@@ -224,11 +227,16 @@ __global__ void damageKernel()
 	simulation.layerCounts[flatBase] = layerCount;
 }
 
-void horizontalErosion(const Launch& launch)
+void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal)
 {
-	//CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
-	CU_CHECK_KERNEL(sedimentKernel<<<launch.gridSize, launch.blockSize>>>());
-	//CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
+	if(enable_horizontal) CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
+	if (enable_vertical) {
+		CU_CHECK_KERNEL(sedimentKernel<true><<<launch.gridSize, launch.blockSize>>>());
+	}
+	else {
+		CU_CHECK_KERNEL(sedimentKernel<false><<<launch.gridSize, launch.blockSize>>>());
+	}
+	if(enable_horizontal) CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
 }
 
 }

@@ -100,10 +100,10 @@ char getMaxLayerCount(const char* layerCounts, std::ptrdiff_t count);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);
-void transport(const Launch& launch);
-void horizontalErosion(const Launch& launch);
+void transport(const Launch& launch, bool enable_slippage);
+void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal);
 
-void stepSupportCheck(const Launch& launch);
+void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
 

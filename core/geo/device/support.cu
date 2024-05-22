@@ -43,7 +43,7 @@ namespace geo
 			float collapsedSand = 0.f;
 			float collapsedSediment = 0.f;
 			float collapsedBedrock = 0.f;
-			float previousCeiling = 0.f;
+			float previousCeiling = FLT_MAX;
 
 			bool previousCollapsed = false;
 
@@ -68,7 +68,7 @@ namespace geo
 				collapsedSediment = 0.f;
 
 				float stability = simulation.stability[itFlatIndex];
-				if (stability <= 0.f) {
+				if (layer > 0 && stability <= 0.f) {
 					collapsedWater += heights[WATER];
 					collapsedSand += heights[SAND];
 					collapsedBedrock += heights[BEDROCK];
@@ -110,7 +110,8 @@ namespace geo
 			simulation.layerCounts[flatIndex] = newLayerCount;
 		}
 
-		__global__ void stepSupportCheckKernel(/*int i*/)
+		template<bool UseWeight>
+		__global__ void stepSupportCheckKernel()//int i)
 		{
 			const glm::ivec2 index{ getLaunchIndex() };
 
@@ -120,7 +121,7 @@ namespace geo
 			}
 
 			//if ((index.x + ((index.y + i) % 2)) % 2 == 0) {
-				//return; // Checkerboard update to avoid race conditions (evil hack)
+			//	return; // Checkerboard update to avoid race conditions (evil hack)
 			//}
 
 			int flatIndex{ flattenIndex(index, simulation.gridSize) };
@@ -134,11 +135,13 @@ namespace geo
 				glm::vec4 heights = glm::cuda_cast(simulation.heights[flatIndex]);
 				float bedrockMax = heights[BEDROCK];
 				float oldStability = simulation.stability[flatIndex];
+				oldStability = (oldStability == FLT_MAX) ? 0.f : oldStability;
 				float stability = 0.f;
 
-				float weight = (bedrockMax - bedrockMin) * simulation.bedrockDensity +
-								heights[SAND] * simulation.sandDensity +
-								heights[WATER] * simulation.waterDensity;
+				float weight = fmaxf((bedrockMax - bedrockMin) * simulation.bedrockDensity +
+									heights[SAND] * simulation.sandDensity +
+									heights[WATER] * simulation.waterDensity
+					, 0.f);
 				weight *= simulation.gridScale * simulation.gridScale;
 
 				struct
@@ -158,7 +161,7 @@ namespace geo
 
 					if (isOutside(neighbor.index, simulation.gridSize))
 					{
-						stability += simulation.gridScale * (bedrockMax - bedrockMin) * simulation.borderSupport;
+						stability += simulation.gridScale * fmaxf((bedrockMax - bedrockMin), 0.f) * simulation.borderSupport;
 						continue;
 					}
 
@@ -171,20 +174,26 @@ namespace geo
 					{
 						auto heights = glm::cuda_cast(simulation.heights[neighbor.flatIndex]);
 						neighbor.stability = simulation.stability[neighbor.flatIndex];
-						neighbor.bedrockMax = ((float*)(simulation.heights + neighbor.flatIndex))[BEDROCK];;
+						neighbor.stability = (neighbor.layer > 0 && neighbor.stability == FLT_MAX) ? 0.f : neighbor.stability;
+						neighbor.bedrockMax = ((float*)(simulation.heights + neighbor.flatIndex))[BEDROCK];
 
-						// TODO: Overlap Check, compute stability
 						float overlap = fminf(neighbor.bedrockMax, bedrockMax) - fmaxf(neighbor.bedrockMin, bedrockMin);
 						if (overlap > 0.f && neighbor.stability > oldStability) {
 							float support = simulation.gridScale * overlap * simulation.bedrockSupport;
 							stability += fminf(support, neighbor.stability);
 						}
 
-						neighbor.bedrockMin = ((float*)(simulation.heights + neighbor.flatIndex))[CEILING];;
+						neighbor.bedrockMin = ((float*)(simulation.heights + neighbor.flatIndex))[CEILING];
 					}
 				}
 
-				stability = fmaxf(stability - weight, oldStability);
+				if constexpr (UseWeight) {
+					stability = fmaxf(stability - weight, oldStability);
+				}
+				else {
+					stability = fmaxf(stability, oldStability);
+					stability = stability > 0.f ? 1.f : 0.f;
+				}
 
 				bedrockMin = heights[CEILING];
 				simulation.stability[flatIndex] = stability;
@@ -192,20 +201,24 @@ namespace geo
 		}
 
 		void startSupportCheck(const Launch& launch) {
-			//CU_CHECK_KERNEL(startSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
+			CU_CHECK_KERNEL(startSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 
 		void endSupportCheck(const Launch& launch) {
-			//CU_CHECK_KERNEL(endSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
+			CU_CHECK_KERNEL(endSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 
-		void stepSupportCheck(const Launch& launch) {
-			// TODO: uncomment this. Disabled to test static initial stability, also not yet fully implemented
-			//CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > ());
-
-			// weird checkerboard update version for race conditions
-			//CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > (0));
-			//CU_CHECK_KERNEL(stepSupportCheckKernel << <launch.gridSize, launch.blockSize >> > (1));
+		void stepSupportCheck(const Launch& launch, bool use_weight) {
+			if (use_weight) {
+				CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > ());
+				//CU_CHECK_KERNEL(stepSupportCheckKernel <true> << <launch.gridSize, launch.blockSize >> > (0));
+				//CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > (1));
+			}
+			else {
+				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > ());
+				//CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (0));
+				//CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (1));
+			}
 		}
 	}
 }

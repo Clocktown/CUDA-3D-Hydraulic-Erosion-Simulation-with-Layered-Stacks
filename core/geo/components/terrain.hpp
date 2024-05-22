@@ -41,6 +41,11 @@ struct Simulation
 
 	bool init{ true };
 	bool paused{ true };
+	bool verticalErosionEnabled{ true };
+	bool horizontalErosionEnabled{ true };
+	bool supportCheckEnabled{ true };
+	bool slippageEnabled{ true };
+	bool useWeightInSupportCheck{ true };
 };
 
 struct Terrain

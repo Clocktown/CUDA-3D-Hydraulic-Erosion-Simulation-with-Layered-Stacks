@@ -191,65 +191,94 @@ void UI::updateSimulation()
 				simulation.paused = true;
 			}
 		}
+		
+		if (ImGui::TreeNode("General")) {
+			
+			ImGui::DragFloat("Delta Time [s]", &simulation.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Gravity [m/s^2]", &simulation.gravity, 0.1f);
+			ImGui::DragFloat("Rain [m/(m^2 * s)]", &simulation.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
 
-		ImGui::DragFloat("Delta Time [s]", &simulation.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Gravity [m/s^2]", &simulation.gravity, 0.1f);
-		ImGui::DragFloat("Rain [m/(m^2 * s)]", &simulation.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
+			float evaporation{ 100.0f * simulation.evaporation };
 
-		float evaporation{ 100.0f * simulation.evaporation };
+			if (ImGui::DragFloat("Evaporation [%/s]", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max()))
+			{
+				simulation.evaporation = 0.01f * evaporation;
+			}
 
-		if (ImGui::DragFloat("Evaporation [%/s]", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max()))
-		{
-			simulation.evaporation = 0.01f * evaporation;
+			float petrification{ 100.0f * simulation.petrification };
+
+			if (ImGui::DragFloat("Petrification [%/s]", &petrification, 0.01f, 0.0f, std::numeric_limits<float>::max()))
+			{
+				simulation.petrification = 0.01f * petrification;
+			}
+
+			ImGui::TreePop();
 		}
 
-		float petrification{ 100.0f * simulation.petrification };
+		ImGui::Checkbox("##enableSlippage", &simulation.slippageEnabled);
+		ImGui::SameLine();
+		if (ImGui::TreeNode("Sand Slippage")) {
 
-		if (ImGui::DragFloat("Petrification [%/s]", &petrification, 0.01f, 0.0f, std::numeric_limits<float>::max()))
-		{
-			simulation.petrification = 0.01f * petrification;
+			float dryTalusAngle{ glm::degrees(simulation.dryTalusAngle) };
+
+			if (ImGui::DragFloat("Dry Talus Angle [deg]", &dryTalusAngle, 0.1f, 0.0f, 90.0f))
+			{
+				simulation.dryTalusAngle = glm::radians(dryTalusAngle);
+			}
+
+			float wetTalusAngle{ glm::degrees(simulation.wetTalusAngle) };
+
+			if (ImGui::DragFloat("Wet Talus Angle [deg]", &wetTalusAngle, 0.1f, 0.0f, 90.0f))
+			{
+				simulation.wetTalusAngle = glm::radians(wetTalusAngle);
+			}
+
+			ImGui::TreePop();
 		}
 
-		ImGui::DragFloat("Sediment Capacity Constant", &simulation.sedimentCapacityConstant, 0.01f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Bedrock Dissolving Constant", &simulation.bedrockDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Sand Dissolving Constant", &simulation.sandDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Sediment Deposition Constant", &simulation.sedimentDepositionConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
+		ImGui::Checkbox("##enableVerticalErosion", &simulation.verticalErosionEnabled);
+		ImGui::SameLine();
+		if (ImGui::TreeNode("Vertical Erosion")) {
 
-		float minSlopeErosionScale{ simulation.minSlopeErosionScale };
+			ImGui::DragFloat("Sediment Capacity Constant", &simulation.sedimentCapacityConstant, 0.01f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Bedrock Dissolving Constant", &simulation.bedrockDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Sand Dissolving Constant", &simulation.sandDissolvingConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Sediment Deposition Constant", &simulation.sedimentDepositionConstant, 0.1f, 0.0f, std::numeric_limits<float>::max());
 
-		if (ImGui::DragFloat("Min. Slope Erosion Scale [deg]", &minSlopeErosionScale, 0.001f, 0.0f, 1.0f))
-		{
-			simulation.minSlopeErosionScale = minSlopeErosionScale;
+			float minSlopeErosionScale{ simulation.minSlopeErosionScale };
+
+			if (ImGui::DragFloat("Min. Slope Erosion Scale", &minSlopeErosionScale, 0.001f, 0.0f, 1.0f))
+			{
+				simulation.minSlopeErosionScale = minSlopeErosionScale;
+			}
+
+			float maxSlopeErosionScale{ simulation.maxSlopeErosionScale };
+
+			if (ImGui::DragFloat("Max. Slope Erosion Scale", &maxSlopeErosionScale, 0.001f, minSlopeErosionScale, 10.0f))
+			{
+				simulation.maxSlopeErosionScale = maxSlopeErosionScale;
+			}
+
+			ImGui::TreePop();
 		}
 
-		float maxSlopeErosionScale{ simulation.maxSlopeErosionScale };
+		ImGui::Checkbox("##enableHorizontalErosion", &simulation.horizontalErosionEnabled);
+		ImGui::SameLine();
+		if (ImGui::TreeNode("Horizontal Erosion")) {
 
-		if (ImGui::DragFloat("Max. Slope Erosion Scale [deg]", &maxSlopeErosionScale, 0.001f, minSlopeErosionScale, 10.0f))
-		{
-			simulation.maxSlopeErosionScale = maxSlopeErosionScale;
+			ImGui::DragFloat("Min. Horizontal Erosion", &simulation.minHorizontalErosion, 0.001f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
+
+			ImGui::TreePop();
 		}
 
-		float dryTalusAngle{ glm::degrees(simulation.dryTalusAngle) };
-
-		if (ImGui::DragFloat("Dry Talus Angle [deg]", &dryTalusAngle, 0.1f, 0.0f, 90.0f))
-		{
-			simulation.dryTalusAngle = glm::radians(dryTalusAngle);
-		}
-
-		float wetTalusAngle{ glm::degrees(simulation.wetTalusAngle) };
-
-		if (ImGui::DragFloat("Wet Talus Angle [deg]", &wetTalusAngle, 0.1f, 0.0f, 90.0f))
-		{
-			simulation.wetTalusAngle = glm::radians(wetTalusAngle);
-		}
-
-		ImGui::DragFloat("Min. Horizontal Erosion", &simulation.minHorizontalErosion, 0.001f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
-		ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
-
+		ImGui::Checkbox("##enableSupportCheck", &simulation.supportCheckEnabled);
+		ImGui::SameLine();
 		if (ImGui::TreeNode("Support Check")) {
 
+			ImGui::Checkbox("Use weight", &simulation.useWeightInSupportCheck);
 			ImGui::DragFloat("Bedrock density", &simulation.bedrockDensity);
 			ImGui::DragFloat("Sand density", &simulation.sandDensity);
 			ImGui::DragFloat("Bedrock support", &simulation.bedrockSupport);
@@ -365,6 +394,11 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
 	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
 	json["Simulation/SplitThreshold"] = simulation.splitThreshold;
+	json["Simulation/EnableVerticalErosion"] = simulation.verticalErosionEnabled;
+	json["Simulation/EnableHorizontalErosion"] = simulation.horizontalErosionEnabled;
+	json["Simulation/EnableSlippage"] = simulation.slippageEnabled;
+	json["Simulation/EnableSupportCheck"] = simulation.supportCheckEnabled;
+	json["Simulation/UseWeightInSupportCheck"] = simulation.useWeightInSupportCheck;
 
 	const auto backgroundColor{ world.getSingleton<onec::AmbientLight>()->color };
 	json["Rendering/VisualScale"] = world.getComponent<onec::Scale>(this->terrain.entity)->scale;
@@ -480,6 +514,12 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
 	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
 	simulation.splitThreshold = json["Simulation/SplitThreshold"];
+	simulation.verticalErosionEnabled = json["Simulation/EnableVerticalErosion"];
+	simulation.horizontalErosionEnabled = json["Simulation/EnableHorizontalErosion"];
+	simulation.slippageEnabled = json["Simulation/EnableSlippage"];
+	simulation.supportCheckEnabled = json["Simulation/EnableSupportCheck"];
+	simulation.useWeightInSupportCheck = json["Simulation/UseWeightInSupportCheck"];
+
 	simulation.init = false;
 	simulation.paused = true;
 
