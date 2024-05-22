@@ -8,6 +8,7 @@
 #include <tinyfiledialogs/tinyfiledialogs.h>
 #include <tinyexr.h>
 #include <nlohmann/json.hpp>
+#include <zlib.h>
 #include <fstream>
 
 namespace geo
@@ -373,9 +374,44 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Camera/FarPlane"] = camera.farPlane;
 	json["Camera/Exposure"] = world.getComponent<onec::Exposure>(this->camera.entity)->exposure;
 
+	onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
+	const int usedLayerCount{ device::getMaxLayerCount(reinterpret_cast<char*>(layerCountBuffer.getData()), layerCountBuffer.getCount()) };
+	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
+	const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
+	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
+	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
+	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
+	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
+	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
+	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+	layerCountBuffer.release();
+
+	uLongf bytes{ 0 };
+	bytes += layerCountBytes;
+	bytes += heightBytes;
+	bytes += fluxBytes;
+	bytes += stabilityBytes;
+	bytes += sedimentBytes;
+	bytes += damageBytes;
+
+	std::vector<std::byte> uncompressed(bytes);
+	std::ptrdiff_t i{ 0 };
+
+	terrain.layerCountBuffer.download({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
+	terrain.heightBuffer.download({ uncompressed.data() + i, heightBytes }); i += heightBytes;
+	terrain.fluxBuffer.download({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
+	terrain.stabilityBuffer.download({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
+	terrain.sedimentBuffer.download({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
+	terrain.damageBuffer.download({ uncompressed.data() + i, damageBytes }); i += damageBytes;
+
+	std::vector<std::byte> compressed(compressBound(bytes));
+	uLongf compressedSize;
+	compress(reinterpret_cast<Bytef*>(compressed.data()), &compressedSize, reinterpret_cast<Bytef*>(uncompressed.data()), uncompressed.size());
+
 	json["Terrain/GridSize"] = { terrain.gridSize.x, terrain.gridSize.y };
 	json["Terrain/GridScale"] = terrain.gridScale;
 	json["Terrain/MaxLayerCount"] = terrain.maxLayerCount;
+	json["Terrain/UsedLayerCount"] = usedLayerCount;
 
 	json["Simulation/DeltaTime"] = simulation.deltaTime;
 	json["Simulation/Gravity"] = simulation.gravity;
@@ -409,42 +445,8 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/WaterColor"] = { rendering.waterColor.r, rendering.waterColor.g, rendering.waterColor.b };
 	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
 
-	onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
-	const std::ptrdiff_t maxLayerCount{ device::getMaxLayerCount(reinterpret_cast<char*>(layerCountBuffer.getData()), layerCountBuffer.getCount()) };
-	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
-	const std::ptrdiff_t columnCount{ cellCount * maxLayerCount };
-	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
-	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
-	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
-	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
-	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
-	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
-	const std::ptrdiff_t sedimentFluxScaleBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sedimentFluxScale)) };
-	layerCountBuffer.release();
-
-	std::ptrdiff_t bytes{ 1 };
-	bytes += layerCountBytes;
-	bytes += heightBytes;
-	bytes += fluxBytes;
-	bytes += stabilityBytes;
-	bytes += sedimentBytes;
-	bytes += damageBytes;
-	bytes += sedimentFluxScaleBytes;
-
-	std::vector<std::byte> destination(bytes);
-	destination[0] = static_cast<std::byte>(maxLayerCount);
-	std::ptrdiff_t i{ 1 };
-
-	terrain.layerCountBuffer.download({ destination.data() + i, layerCountBytes }); i += layerCountBytes;
-	terrain.heightBuffer.download({ destination.data() + i, heightBytes }); i += heightBytes;
-	terrain.fluxBuffer.download({ destination.data() + i, fluxBytes }); i += fluxBytes;
-	terrain.stabilityBuffer.download({ destination.data() + i, stabilityBytes }); i += stabilityBytes;
-	terrain.sedimentBuffer.download({ destination.data() + i, sedimentBytes }); i += sedimentBytes;
-	terrain.damageBuffer.download({ destination.data() + i, damageBytes }); i += damageBytes;
-	terrain.sedimentFluxScaleBuffer.download({ destination.data() + i, sedimentFluxScaleBytes }); i += sedimentFluxScaleBytes;
-
 	onec::writeFile(file, json.dump(1));
-	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(destination.data()), static_cast<std::size_t>(bytes) });
+	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressedSize });
 }
 
 void UI::loadFromFile(const std::filesystem::path& file)
@@ -473,12 +475,11 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	this->terrain.maxLayerCount = json["Terrain/MaxLayerCount"];
 
 	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
-	const std::string source{ onec::readFile(file.stem().concat(".dat")) };
-	const std::byte* const data{ reinterpret_cast<const std::byte*>(source.data()) };
+	const std::string compressed{ onec::readFile(file.stem().concat(".dat")) };
 
-	const std::ptrdiff_t maxLayerCount{ static_cast<char>(*data) };
+	const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
 	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
-	const std::ptrdiff_t columnCount{ cellCount * maxLayerCount };
+	const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
 	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
 	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
 	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
@@ -487,14 +488,24 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
 	const std::ptrdiff_t sedimentFluxScaleBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sedimentFluxScale)) };
 
-	std::ptrdiff_t i{ 1 };
-	terrain.layerCountBuffer.upload({ data + i, layerCountBytes }); i += layerCountBytes;
-	terrain.heightBuffer.upload({ data + i, heightBytes }); i += heightBytes;
-	terrain.fluxBuffer.upload({ data + i, fluxBytes }); i += fluxBytes;
-	terrain.stabilityBuffer.upload({ data + i, stabilityBytes }); i += stabilityBytes;
-	terrain.sedimentBuffer.upload({ data + i, sedimentBytes }); i += sedimentBytes;
-	terrain.damageBuffer.upload({ data + i, damageBytes }); i += damageBytes;
-	terrain.sedimentFluxScaleBuffer.upload({ data + i, sedimentFluxScaleBytes }); i += sedimentFluxScaleBytes;
+	uLongf bytes{ 0 };
+	bytes += layerCountBytes;
+	bytes += heightBytes;
+	bytes += fluxBytes;
+	bytes += stabilityBytes;
+	bytes += sedimentBytes;
+	bytes += damageBytes;
+
+	std::vector<std::byte> uncompressed(bytes);
+	uncompress(reinterpret_cast<Bytef*>(uncompressed.data()), &bytes, reinterpret_cast<const Bytef*>(compressed.data()), compressed.size());
+	
+	std::ptrdiff_t i{ 0 };
+	terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes}); i += layerCountBytes;
+	terrain.heightBuffer.upload({ uncompressed.data() + i, heightBytes }); i += heightBytes;
+	terrain.fluxBuffer.upload({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
+	terrain.stabilityBuffer.upload({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
+	terrain.sedimentBuffer.upload({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
+	terrain.damageBuffer.upload({ uncompressed.data() + i, damageBytes }); i += damageBytes;
 
 	Simulation& simulation{ terrain.simulation };
 	simulation.deltaTime = json["Simulation/DeltaTime"];
