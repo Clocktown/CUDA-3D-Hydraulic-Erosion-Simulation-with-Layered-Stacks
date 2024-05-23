@@ -18,7 +18,7 @@ __global__ void horizontalErosionKernel()
 	const int layerCount{ simulation.layerCounts[flatIndex] };
 
 	const float integrationScale{ simulation.rGridScale * simulation.rGridScale * simulation.deltaTime };
-	float floor{ 0.0f };
+	float floor{ -FLT_MAX };
 
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 	{
@@ -205,18 +205,20 @@ __global__ void damageKernel()
 			simulation.fluxes[above] = simulation.fluxes[below];
 			simulation.stability[above] = simulation.stability[below];
 			simulation.sediments[above] = simulation.sediments[below];
-			simulation.damages[above] = 0.0f;
+			simulation.damages[above] = simulation.damages[below];
 		}
 
+		// Upper part of split
 		simulation.heights[above] = simulation.heights[below];
 		simulation.fluxes[above] = simulation.fluxes[below];
-		simulation.stability[above] = FLT_MAX;
+		simulation.stability[above] = simulation.stability[below];
 		simulation.sediments[above] = simulation.sediments[below];
 		simulation.damages[above] = 0.0f;
 
+		// Lower part of split
 		simulation.heights[below] = float4{ glm::max(split.y - damage, split.x), 0.0f, 0.0f, split.y };
 		simulation.fluxes[below] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-		simulation.stability[below] = FLT_MAX;
+		//simulation.stability[below] = FLT_MAX;
 		simulation.sediments[below] = 0.0f;
 		simulation.damages[below] = 0.0f;
 
@@ -229,13 +231,14 @@ __global__ void damageKernel()
 void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal)
 {
 	if(enable_horizontal) CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
+	if(enable_horizontal) CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
 	if (enable_vertical) {
 		CU_CHECK_KERNEL(sedimentKernel<true><<<launch.gridSize, launch.blockSize>>>());
 	}
 	else {
 		CU_CHECK_KERNEL(sedimentKernel<false><<<launch.gridSize, launch.blockSize>>>());
 	}
-	if(enable_horizontal) CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
+	
 }
 
 }

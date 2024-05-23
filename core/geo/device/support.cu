@@ -19,8 +19,6 @@ namespace geo
 			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 			{
 				simulation.stability[flatIndex] = layer == 0.f ? FLT_MAX :  0.f;
-				//simulation.stability[flatIndex] = float((layer + 1) % 2);
-				//simulation.stability[flatIndex] = float(layer % 4 == 0);
 			}
 		}
 
@@ -66,11 +64,15 @@ namespace geo
 
 				float stability = simulation.stability[itFlatIndex];
 				float floor = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING];
-				stability = (heights[BEDROCK] - floor <= simulation.minBedrockThickness) ? 0.f : stability;
+				const bool isTooThin = heights[BEDROCK] - floor <= simulation.minBedrockThickness;
+				stability = isTooThin ? 0.f : stability;
 				if (stability <= 0.f) {
 					collapsedWater += heights[WATER];
 					collapsedSand += heights[SAND];
 					collapsedBedrock += heights[BEDROCK] - floor;
+					// if a damaged column collapses, the damage has been converted to sand already but not yet been removed from the bedrock
+					float damage = glm::min(simulation.damages[itFlatIndex], collapsedBedrock);
+					collapsedBedrock -= damage;
 					collapsedSediment += sediment;
 					previousCeiling = heights[CEILING];
 					heights = glm::vec4(0);
@@ -85,6 +87,7 @@ namespace geo
 
 				simulation.heights[itFlatIndex] = glm::cuda_cast(heights);
 				simulation.sediments[itFlatIndex] = sediment;
+				simulation.stability[itFlatIndex] = stability;
 			}
 
 			itFlatIndex = flatIndex + simulation.layerStride; // set index to layer 1
@@ -134,7 +137,6 @@ namespace geo
 				glm::vec4 heights = glm::cuda_cast(simulation.heights[flatIndex]);
 				float bedrockMax = heights[BEDROCK];
 				float oldStability = simulation.stability[flatIndex];
-				oldStability = (oldStability == FLT_MAX) ? 0.f : oldStability;
 				float stability = 0.f;
 
 				float weight = fmaxf((bedrockMax - bedrockMin) * simulation.bedrockDensity +
@@ -173,7 +175,6 @@ namespace geo
 					{
 						auto heights = glm::cuda_cast(simulation.heights[neighbor.flatIndex]);
 						neighbor.stability = simulation.stability[neighbor.flatIndex];
-						neighbor.stability = (neighbor.layer > 0 && neighbor.stability == FLT_MAX) ? 0.f : neighbor.stability;
 						neighbor.bedrockMax = ((float*)(simulation.heights + neighbor.flatIndex))[BEDROCK];
 
 						float overlap = fminf(neighbor.bedrockMax, bedrockMax) - fmaxf(neighbor.bedrockMin, bedrockMin);

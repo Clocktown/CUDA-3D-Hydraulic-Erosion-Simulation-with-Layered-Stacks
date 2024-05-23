@@ -181,16 +181,16 @@ __global__ void transportKernel()
 		}
 
 		float avgWater{ height[WATER] };
-		// TODO: Can this generate/delete water, sand...? => Can delete water but not generate
+
 		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, glm::max(height[CEILING] - height[BEDROCK] - height[SAND], 0.f));
 		height[WATER] = glm::max((1.0f - simulation.evaporation * simulation.deltaTime) * height[WATER], 0.0f);
 		// avgWater = 0.5f * (avgWater + height[WATER]);
 		const glm::vec2 velocity{ 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
 
-		const float mag = glm::length(velocity);
-		if (layer == 1 && index.x == 128 && index.y == 128) {
-			printf("%f\n", mag);
-		}
+		//const float mag = glm::length(velocity);
+		//if (layer == 1 && index.x == 128 && index.y == 128) {
+		//	printf("%f\n", mag);
+		//}
 
 		if constexpr (enableSlippage) {
 			height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
