@@ -264,6 +264,7 @@ void UI::updateSimulation()
 
 			ImGui::DragFloat("Max Erosion Depth", &simulation.erosionWaterMaxHeight, 0.1f, 0.0f, 100.f);
 			ImGui::DragFloat("Bedrock Erosion Sand Threshold", &simulation.sandThreshold, 0.0001f, 0.f, 1.f);
+			ImGui::DragFloat("Slope Falloff Start", &simulation.verticalErosionSlopeFadeStart, 0.001f, 0.f, 1.f);
 
 			ImGui::TreePop();
 		}
@@ -272,7 +273,7 @@ void UI::updateSimulation()
 		ImGui::SameLine();
 		if (ImGui::TreeNode("Horizontal Erosion")) {
 
-			ImGui::DragFloat("Min. Horizontal Erosion", &simulation.minHorizontalErosion, 0.001f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Min. Horizontal Erosion Slope (sine)", &simulation.minHorizontalErosionSlope, 0.001f, 0.0f, 1.f);
 			ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
@@ -433,7 +434,8 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/DryTalusAngle"] = simulation.dryTalusAngle;
 	json["Simulation/WetTalusAngle"] = simulation.wetTalusAngle;
 	json["Simulation/SlippageInterpolationRange"] = simulation.slippageInterpolationRange;
-	json["Simulation/MinHorizontalErosion"] = simulation.minHorizontalErosion;
+	json["Simulation/MinHorizontalErosionSlope"] = simulation.minHorizontalErosionSlope;
+	json["Simulation/VerticalErosionSlopeFadeStart"] = simulation.verticalErosionSlopeFadeStart;
 	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
 	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
 	json["Simulation/SplitThreshold"] = simulation.splitThreshold;
@@ -535,7 +537,8 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.dryTalusAngle = json["Simulation/DryTalusAngle"];
 	simulation.wetTalusAngle = json["Simulation/WetTalusAngle"];
 	simulation.slippageInterpolationRange = json["Simulation/SlippageInterpolationRange"];
-	simulation.minHorizontalErosion = json["Simulation/MinHorizontalErosion"];
+	simulation.minHorizontalErosionSlope = json["Simulation/MinHorizontalErosion"];
+	simulation.verticalErosionSlopeFadeStart = json["Simulation/VerticalErosionSlopeFadeStart"];
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
 	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
 	simulation.splitThreshold = json["Simulation/SplitThreshold"];

@@ -57,8 +57,9 @@ struct Simulation
 	float iSlippageInterpolationRange;
 	float erosionWaterScale; // 2.f / erosionWaterMaxHeight
 	float iSandThreshold;
+	float verticalErosionSlopeFadeStart; // sin(alpha)
 
-	float minHorizontalErosion;
+	float minHorizontalErosionSlope; // sin(alpha)
 	float horizontalErosionStrength;
 	float minSplitDamage;
 	float splitThreshold;

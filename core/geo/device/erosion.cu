@@ -63,15 +63,19 @@ __global__ void horizontalErosionKernel()
 
 				const glm::vec2 split{ glm::max(floor, neighbor.sand), glm::min(height[BEDROCK], neighbor.water) };
 
-				if (split.y - split.x > simulation.minHorizontalErosion)
+				if (split.y - split.x > 0.f)
 				{
 					const float area{ (split.y - split.x) * simulation.gridScale };
+					const float heightDifference{ height[BEDROCK] - neighbor.sand };
+					const float sinSlope{ sin(atan2(heightDifference, simulation.gridScale)) };
+					const float t = glm::smoothstep(simulation.minHorizontalErosionSlope, 1.f, sinSlope); // see sedimentKernel for a plot of the function
+					const float slopeScale{ t * sinSlope };
 					const glm::vec2 velocity{ glm::cuda_cast(simulation.velocities[neighbor.flatIndices[i]]) };
 					const float speed{ glm::length(velocity) };
 					const glm::vec2 normal{ glm::cuda_cast(offsets[i]) };
-					const float attenuation{ 1.0f - glm::max(glm::dot(normal, velocity / (speed + glm::epsilon<float>())), 0.0f) };
+					const float attenuation{ 0.5f - 0.5f * glm::dot(normal, velocity / (speed + glm::epsilon<float>()))};
 					
-					erosions[i] = simulation.horizontalErosionStrength * attenuation * speed * area * integrationScale;
+					erosions[i] = simulation.horizontalErosionStrength * slopeScale * speed * attenuation * area * integrationScale;
 					
 					if (erosions[i] > maxErosion)
 					{
@@ -84,14 +88,17 @@ __global__ void horizontalErosionKernel()
 			}
 		}
 
-		const float totalErosion{ erosions.x + erosions.y + erosions.z + erosions.w };
-		erosions *= glm::min((maxSplit.y - maxSplit.x - damage) / (totalErosion + glm::epsilon<float>()), 1.0f);
+		float totalErosion{ erosions.x + erosions.y + erosions.z + erosions.w };
+		erosions *= glm::clamp((maxSplit.y - maxSplit.x - damage) / (totalErosion + glm::epsilon<float>()), 0.f, 1.0f);
 
+		totalErosion = 0.f;
 		for (int i{ 0 }; i < 4; ++i)
 		{
 			if (erosions[i] > 0.0f)
 			{
-				atomicAdd(simulation.sediments + neighbor.flatIndices[i], erosions[i]);
+				// TODO: Idea: counteract damage by slowly removing damage and lowering bedrock height?
+				totalErosion += erosions[i];
+				atomicAdd((float*)(simulation.heights + neighbor.flatIndices[i]) + SAND, erosions[i]);
 			}
 		}
 
@@ -128,16 +135,22 @@ __global__ void sedimentKernel()
 
 			x = np.arange(0, 0.5 * np.pi, 0.01)
 			y = np.sin(x)
-			t = np.clip((y - 0.6) / (1 - 0.6), 0.0, 1.0);
+			t = np.clip((y - 0.6) / (1 - 0.6), 0.0, 1.0); # where 0.6 is simulation.verticalErosionSlopeFadeStart
 			t =  t * t * (3.0 - 2.0 * t)
 			y = y * (1-t) + 0
 
+			z = np.sin(x)
+			t = np.clip((z - 0.9) / (1 - 0.9), 0.0, 1.0); # where 0.9 is simulation.minHorizontalErosionSlope
+			t =  t * t * (3.0 - 2.0 * t)
+			z = t * z
+
 			plt.plot(180 * x / np.pi, y)
+			plt.plot(180 * x / np.pi, z)
 			plt.show()
 		*/
 		// Remap sin(alpha)
 		const float actualSlope = simulation.slopes[flatIndex];
-		const float t = glm::smoothstep(0.6f, 1.f, actualSlope);
+		const float t = glm::smoothstep(simulation.verticalErosionSlopeFadeStart, 1.f, actualSlope);
 		// [0,1] -> [min, max]
 		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };

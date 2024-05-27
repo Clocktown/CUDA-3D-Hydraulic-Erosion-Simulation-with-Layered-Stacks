@@ -25,6 +25,7 @@ __global__ void rainKernel()
 	flatIndex += topLayer * simulation.layerStride;
 
 	simulation.heights[flatIndex].z += (noiseVal > 0.99f) ? 100.f * simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
+	//simulation.heights[flatIndex].z += index.x < 64 ? simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
 }
 
 void rain(const Launch& launch)

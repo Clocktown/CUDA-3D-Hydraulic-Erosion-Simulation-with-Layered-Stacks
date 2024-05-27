@@ -48,8 +48,9 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.iSlippageInterpolationRange = 1.f / terrain.simulation.slippageInterpolationRange;
 		simulation.erosionWaterScale = 2.f / terrain.simulation.erosionWaterMaxHeight;
 		simulation.iSandThreshold = 1.f / terrain.simulation.sandThreshold;
+		simulation.verticalErosionSlopeFadeStart = terrain.simulation.verticalErosionSlopeFadeStart;
 
-		simulation.minHorizontalErosion = terrain.simulation.minHorizontalErosion;
+		simulation.minHorizontalErosionSlope = terrain.simulation.minHorizontalErosionSlope;
 		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;
 		simulation.minSplitDamage = terrain.simulation.minSplitDamage;
 		simulation.splitThreshold = terrain.simulation.splitThreshold;

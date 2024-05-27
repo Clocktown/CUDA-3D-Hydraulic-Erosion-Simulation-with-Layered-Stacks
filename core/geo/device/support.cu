@@ -137,7 +137,7 @@ namespace geo
 				glm::vec4 heights = glm::cuda_cast(simulation.heights[flatIndex]);
 				float bedrockMax = heights[BEDROCK];
 				float oldStability = simulation.stability[flatIndex];
-				oldStability = (oldStability == FLT_MAX) ? 0.f : oldStability; // If layer 0 is split in horizontal Erosion, layer 1 can have FLT_MAX as stability 
+				oldStability = (oldStability == FLT_MAX) ? 0.f : oldStability; // If layer 0 is split in horizontal Erosion, layer 1 can have FLT_MAX as stability. Check might not really be necessary though
 				float stability = 0.f;
 
 				float weight = fmaxf((bedrockMax - bedrockMin) * simulation.bedrockDensity +
