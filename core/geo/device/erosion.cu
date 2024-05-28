@@ -187,8 +187,15 @@ __global__ void sedimentKernel()
 			height[SAND] += deltaSediment;
 		}
 
+		// Damage recovery
+		float damage = simulation.damages[flatIndex];
+		float deltaDamage{ glm::min(simulation.damageRecovery * simulation.deltaTime, glm::min(damage, height[BEDROCK] - floor)) };
+		damage -= deltaDamage;
+		height[BEDROCK] -= deltaDamage;
+
 		simulation.heights[flatIndex] = glm::cuda_cast(height);
 		simulation.sediments[flatIndex] = sediment;
+		simulation.damages[flatIndex] = damage;
 
 		floor = height[CEILING];
 	}

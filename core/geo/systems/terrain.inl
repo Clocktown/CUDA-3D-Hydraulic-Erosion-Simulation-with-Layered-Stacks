@@ -54,6 +54,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;
 		simulation.minSplitDamage = terrain.simulation.minSplitDamage;
 		simulation.splitThreshold = terrain.simulation.splitThreshold;
+		simulation.damageRecovery = terrain.simulation.damageRecovery;
 
 		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
 		simulation.sandDensity = terrain.simulation.sandDensity;

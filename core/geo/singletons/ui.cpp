@@ -277,6 +277,7 @@ void UI::updateSimulation()
 			ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Damage Recovery", &simulation.damageRecovery, 0.001f, 0.0f, 1.0f);
 
 			ImGui::TreePop();
 		}
@@ -439,6 +440,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
 	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
 	json["Simulation/SplitThreshold"] = simulation.splitThreshold;
+	json["Simulation/DamageRecovery"] = simulation.damageRecovery;
 	json["Simulation/EnableVerticalErosion"] = simulation.verticalErosionEnabled;
 	json["Simulation/EnableHorizontalErosion"] = simulation.horizontalErosionEnabled;
 	json["Simulation/EnableSlippage"] = simulation.slippageEnabled;
@@ -542,6 +544,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
 	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
 	simulation.splitThreshold = json["Simulation/SplitThreshold"];
+	simulation.damageRecovery = json["Simulation/DamageRecovery"];
 	simulation.verticalErosionEnabled = json["Simulation/EnableVerticalErosion"];
 	simulation.horizontalErosionEnabled = json["Simulation/EnableHorizontalErosion"];
 	simulation.slippageEnabled = json["Simulation/EnableSlippage"];
