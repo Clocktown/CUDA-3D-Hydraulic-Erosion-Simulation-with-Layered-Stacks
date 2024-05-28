@@ -155,27 +155,28 @@ __global__ void sedimentKernel()
 		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
 		const float waterScale{ glm::clamp(1.f - tanhf(height[WATER] * simulation.erosionWaterScale), 0.f, 1.f) };
-		const float topErosionWaterScale{ glm::max(1.0f - glm::max(0.025f * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f), 0.0f)};
-		const float topSedimentCapacity{ simulation.sedimentCapacityConstant * speed * topErosionWaterScale * simulation.minTerrainSlopeScale };
+		const float topErosionWaterScale{ glm::max(1.0f - glm::max(0.5f * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f), 0.0f)};
+		const float topBedrockScale{ simulation.bedrockDissolvingConstant * speed * topErosionWaterScale * simulation.minTerrainSlopeScale };
+		const float bedrockScale{ glm::max(1.0f - height[SAND] * simulation.iSandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * slope * speed * waterScale };
 		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed * waterScale};
 		
+		if constexpr (enableVertical) {
+			const float bedrockTop = ((layer + 1) < layerCount) ? ((float*)(simulation.heights + flatIndex + simulation.layerStride))[BEDROCK] : height[CEILING];
+			const float deltaBedrockTop{ glm::min(topBedrockScale * simulation.deltaTime, glm::max(bedrockTop - height[CEILING], 0.f)) };
+			const float deltaBedrock{ glm::min(bedrockScale * simulation.deltaTime, glm::max(height[BEDROCK] - floor, 0.f)) };
+
+			height[CEILING] += deltaBedrockTop;
+			height[SAND] += deltaBedrockTop + deltaBedrock;
+			height[BEDROCK] -= deltaBedrock;
+		}
+
 		if ((sedimentCapacity > sediment))
 		{
 			if constexpr (enableVertical) {
-				const float bedrockTop = ((layer + 1) < layerCount) ? ((float*)(simulation.heights + flatIndex + simulation.layerStride))[BEDROCK] : height[CEILING];
-				float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
-				float deltaBedrock{ glm::min(glm::max(1.0f - height[SAND] * simulation.iSandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, glm::max(height[BEDROCK] - floor, 0.f)) };
-				float deltaBedrockTop{ glm::min(simulation.bedrockDissolvingConstant * topSedimentCapacity * simulation.deltaTime, glm::max(bedrockTop - height[CEILING], 0.f))};
+				const float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
 
-				const float iTotal = 1.f / (deltaSand + deltaBedrock + glm::epsilon<float>());
-				const float delta = glm::min(deltaSand + deltaBedrock, (sedimentCapacity - sediment));
-				deltaSand *= delta * iTotal;
-				deltaBedrock *= delta * iTotal;
 				height[SAND] -= deltaSand;
-				height[BEDROCK] -= deltaBedrock;
-				height[CEILING] += deltaBedrockTop;
-				height[SAND] += deltaBedrockTop;
-				sediment += delta;
+				sediment += deltaSand;
 			}
 		}
 		else
