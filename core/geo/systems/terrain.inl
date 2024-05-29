@@ -2,6 +2,7 @@
 #include "../components/terrain.hpp"
 #include "../device/simulation.hpp"
 #include "../components/point_renderer.hpp"
+#include "../singletons/ui.hpp"
 
 namespace geo
 {
@@ -12,6 +13,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 	onec::World& world{ onec::getWorld() };
 
 	const auto view{ world.getView<Terrain, PointRenderer, Includes...>(excludes) };
+
+	auto ui = world.getSingleton<geo::UI>();
 	
 	for (const entt::entity entity : view)
 	{
@@ -49,6 +52,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.erosionWaterScale = 2.f / terrain.simulation.erosionWaterMaxHeight;
 		simulation.iSandThreshold = 1.f / terrain.simulation.sandThreshold;
 		simulation.verticalErosionSlopeFadeStart = terrain.simulation.verticalErosionSlopeFadeStart;
+		simulation.iEvaporationEmptySpaceScale = 1.f / terrain.simulation.evaporationEmptySpaceScale;
+		simulation.iTopErosionWaterScale = 1.f / terrain.simulation.topErosionWaterScale;
 
 		simulation.minHorizontalErosionSlope = terrain.simulation.minHorizontalErosionSlope;
 		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;
@@ -101,29 +106,79 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		if (!terrain.simulation.paused)
 		{
-		    device::rain(launch);
-			device::transport(launch, terrain.simulation.slippageEnabled);
-			device::erosion(launch, terrain.simulation.verticalErosionEnabled, terrain.simulation.horizontalErosionEnabled);
+			if(ui->performance.measurePerformance && !ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.globalStart);
 
+			if(ui->performance.measureParts || ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
+		    device::rain(launch);
+			if(ui->performance.measureParts || ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
+			if (ui->performance.measureParts || ui->performance.measureIndividualKernels) {
+				ui->performance.measure("Rain", ui->performance.localStart, ui->performance.localStop);
+			}
+
+			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
+			device::transport(launch, terrain.simulation.slippageEnabled, ui->performance);
+			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
+			if (ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
+				ui->performance.measure("Transport", ui->performance.localStart, ui->performance.localStop);
+			}
+
+			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
+			device::erosion(launch, terrain.simulation.verticalErosionEnabled, terrain.simulation.horizontalErosionEnabled, ui->performance);
+			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
+			if (ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
+				ui->performance.measure("Erosion", ui->performance.localStart, ui->performance.localStop);
+			}
+
+			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
 			if (terrain.simulation.supportCheckEnabled) {
 				if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps)
 				{
+					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStart);
 					device::endSupportCheck(launch);
+					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStop);
+					if (ui->performance.measureIndividualKernels) {
+						ui->performance.measure("End Support Check", ui->performance.kernelStart, ui->performance.kernelStop);
+					}
 
+					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStart);
 					device::startSupportCheck(launch);
+					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStop);
+					if (ui->performance.measureIndividualKernels) {
+						ui->performance.measure("Start Support Check", ui->performance.kernelStart, ui->performance.kernelStop);
+					}
 					terrain.simulation.currentStabilityStep = 0;
 				}
 
 				for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i)
 				{
 					terrain.simulation.currentStabilityStep++;
+					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStart);
 					device::stepSupportCheck(launch, terrain.simulation.useWeightInSupportCheck);
+					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStop);
+					if (ui->performance.measureIndividualKernels) {
+						ui->performance.measure("Step Support Check", ui->performance.kernelStart, ui->performance.kernelStop);
+					}
 				}
 			}
+			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
+			if (ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
+				ui->performance.measure("Support", ui->performance.localStart, ui->performance.localStop);
+			}
+
 			terrain.simulation.currentSimulationStep++;
+			if(ui->performance.measurePerformance && !ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.globalStop);
+
+			if (ui->performance.measurePerformance && !ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
+				ui->performance.measure("Global Simulation", ui->performance.globalStart, ui->performance.globalStop);
+			}
 	    }
 
+		cudaEventRecord(ui->performance.kernelStart);
 		terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
+		cudaEventRecord(ui->performance.kernelStop);
+		if (ui->performance.measureRendering) {
+			ui->performance.measure("Build Draw List", ui->performance.kernelStart, ui->performance.kernelStop);
+		}
 		PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
 		pointRenderer.count = terrain.numValidColumns;
 	}

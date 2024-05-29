@@ -6,6 +6,8 @@
 #include <fstream>
 #include <filesystem>
 
+#include <chrono>
+
 void start()
 {
 	onec::Application& application{ onec::getApplication() };
@@ -116,6 +118,13 @@ void update()
 	renderPipeline.clearColor = glm::vec4{ clearColor, 1.0f };
 
 	geo::updateTerrains();
+
+	std::chrono::steady_clock::time_point timestamp;
+
+	if (ui.performance.measureRendering) {
+		glFinish();
+		timestamp = std::chrono::steady_clock::now();
+	}
 	onec::updateTrackballs();
 	onec::updateModelMatrices(entt::exclude<onec::Static>);
 	onec::updateViewMatrices(entt::exclude<onec::Static>);
@@ -123,6 +132,13 @@ void update()
 
 	renderPipeline.update();
 	renderPipeline.render();
+
+	if (ui.performance.measureRendering) {
+		glFinish();
+		auto time = std::chrono::steady_clock::now() - timestamp;
+		float milliseconds = time.count() * 1e-6f;
+		ui.performance.measurements["Rendering"].update(milliseconds);
+	}
 }
 
 void render()

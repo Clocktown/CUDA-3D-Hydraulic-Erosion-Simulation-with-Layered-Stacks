@@ -17,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="geo\components\terrain.cpp" />
+    <ClCompile Include="geo\singletons\performance.cpp" />
     <ClCompile Include="geo\singletons\ui.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
@@ -27,6 +28,7 @@
     <ClInclude Include="geo\geo.hpp" />
     <ClInclude Include="geo\components\terrain.hpp" />
     <ClInclude Include="geo\resources\simple_material.hpp" />
+    <ClInclude Include="geo\singletons\performance.hpp" />
     <ClInclude Include="geo\singletons\point_render_pipeline.hpp" />
     <ClInclude Include="geo\singletons\ui.hpp" />
     <ClInclude Include="geo\systems\terrain.hpp" />

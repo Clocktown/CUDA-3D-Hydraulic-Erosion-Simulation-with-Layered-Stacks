@@ -183,7 +183,7 @@ __global__ void transportKernel()
 		float avgWater{ height[WATER] };
 
 		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, glm::max(height[CEILING] - height[BEDROCK] - height[SAND], 0.f));
-		const float evaporationScale = glm::clamp(0.1f * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.01f, 1.0f);
+		const float evaporationScale = glm::clamp(simulation.iEvaporationEmptySpaceScale * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.01f, 1.0f);
 		height[WATER] = glm::max((1.0f - simulation.evaporation * evaporationScale * simulation.deltaTime) * height[WATER], 0.0f);
 		// avgWater = 0.5f * (avgWater + height[WATER]);
 		const glm::vec2 velocity{ 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
@@ -209,14 +209,25 @@ __global__ void transportKernel()
 	}
 }
 
-void transport(const Launch& launch, bool enable_slippage)
+void transport(const Launch& launch, bool enable_slippage, geo::Performance& perf)
 {
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
 	CU_CHECK_KERNEL(pipeKernel<<<launch.gridSize, launch.blockSize>>>());
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
+	if (perf.measureIndividualKernels) {
+		perf.measure("Setup Pipes", perf.kernelStart, perf.kernelStop);
+	}
+
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
 	if (enable_slippage) {
 		CU_CHECK_KERNEL(transportKernel<true><<<launch.gridSize, launch.blockSize>>>());
 	}
 	else {
 		CU_CHECK_KERNEL(transportKernel<false><<<launch.gridSize, launch.blockSize>>>());
+	}
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
+	if (perf.measureIndividualKernels) {
+		perf.measure("Resolve Pipes", perf.kernelStart, perf.kernelStop);
 	}
 }
 

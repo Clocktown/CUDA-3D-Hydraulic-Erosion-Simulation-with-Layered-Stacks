@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../components/terrain.hpp"
+#include "performance.hpp"
 #include <onec/onec.hpp>
 
 namespace geo
@@ -30,6 +31,8 @@ struct UI
 		glm::vec3 waterColor{ 0.2f, 0.4f, 0.7f };
 		int useInterpolation{ true };
 	} rendering;
+
+	Performance performance;
 
 	bool visable{ true };
 private:

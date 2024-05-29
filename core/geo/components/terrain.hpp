@@ -26,6 +26,8 @@ struct Simulation
 	float wetTalusAngle{ glm::radians(10.0f) }; // [rad]
 	float slippageInterpolationRange{ 1.f };
 	float verticalErosionSlopeFadeStart{ 0.6f }; // sin(alpha)
+	float topErosionWaterScale{ 2.f };
+	float evaporationEmptySpaceScale{ 10.f };
 
 	float minHorizontalErosionSlope{ 0.9f }; // sin(alpha)
 	float horizontalErosionStrength{ 0.1f };

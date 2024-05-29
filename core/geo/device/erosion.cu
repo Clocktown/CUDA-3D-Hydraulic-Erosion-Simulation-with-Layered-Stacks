@@ -96,7 +96,6 @@ __global__ void horizontalErosionKernel()
 		{
 			if (erosions[i] > 0.0f)
 			{
-				// TODO: Idea: counteract damage by slowly removing damage and lowering bedrock height?
 				totalErosion += erosions[i];
 				atomicAdd((float*)(simulation.heights + neighbor.flatIndices[i]) + SAND, erosions[i]);
 			}
@@ -155,7 +154,7 @@ __global__ void sedimentKernel()
 		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
 		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
 		const float waterScale{ glm::clamp(1.f - tanhf(height[WATER] * simulation.erosionWaterScale), 0.f, 1.f) };
-		const float topErosionWaterScale{ glm::max(1.0f - glm::max(0.5f * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f), 0.0f)};
+		const float topErosionWaterScale{ glm::max(1.0f - glm::max(simulation.iTopErosionWaterScale * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f), 0.0f)};
 		const float topBedrockScale{ simulation.bedrockDissolvingConstant * speed * topErosionWaterScale * simulation.minTerrainSlopeScale };
 		const float bedrockScale{ glm::max(1.0f - height[SAND] * simulation.iSandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * slope * speed * waterScale };
 		const float sedimentCapacity{ simulation.sedimentCapacityConstant * slope * speed * waterScale};
@@ -256,17 +255,33 @@ __global__ void damageKernel()
 	simulation.layerCounts[flatBase] = layerCount;
 }
 
-void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal)
+void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal, geo::Performance& perf)
 {
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
 	if(enable_horizontal) CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
+	if (perf.measureIndividualKernels) {
+		perf.measure("Horizontal Erosion", perf.kernelStart, perf.kernelStop);
+	}
+
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
 	if(enable_horizontal) CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
+	if (perf.measureIndividualKernels) {
+		perf.measure("Split Kernel", perf.kernelStart, perf.kernelStop);
+	}
+
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
 	if (enable_vertical) {
 		CU_CHECK_KERNEL(sedimentKernel<true><<<launch.gridSize, launch.blockSize>>>());
 	}
 	else {
 		CU_CHECK_KERNEL(sedimentKernel<false><<<launch.gridSize, launch.blockSize>>>());
 	}
-	
+	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
+	if (perf.measureIndividualKernels) {
+		perf.measure("Vertical Erosion", perf.kernelStart, perf.kernelStop);
+	}
 }
 
 }

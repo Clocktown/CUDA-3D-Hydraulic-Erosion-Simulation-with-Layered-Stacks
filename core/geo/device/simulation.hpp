@@ -4,6 +4,7 @@
 #include <onec/config/glm.hpp>
 #include <onec/utility/launch.hpp>
 #include <onec/utility/grid.hpp>
+#include"../singletons/performance.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <float.h>
@@ -58,6 +59,8 @@ struct Simulation
 	float erosionWaterScale; // 2.f / erosionWaterMaxHeight
 	float iSandThreshold;
 	float verticalErosionSlopeFadeStart; // sin(alpha)
+	float iTopErosionWaterScale;
+	float iEvaporationEmptySpaceScale;
 
 	float minHorizontalErosionSlope; // sin(alpha)
 	float horizontalErosionStrength;
@@ -106,8 +109,8 @@ char getMaxLayerCount(const char* layerCounts, std::ptrdiff_t count);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);
-void transport(const Launch& launch, bool enable_slippage);
-void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal);
+void transport(const Launch& launch, bool enable_slippage, geo::Performance& perf);
+void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal, geo::Performance& perf);
 
 void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
