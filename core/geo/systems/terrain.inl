@@ -104,81 +104,56 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			terrain.simulation.init = false;
 		}
 
+		auto& perf = ui->performance;
+
 		if (!terrain.simulation.paused)
 		{
-			if(ui->performance.measurePerformance && !ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.globalStart);
+			if (perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].start();
 
-			if(ui->performance.measureParts || ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
+			if (perf.measureParts || perf.measureIndividualKernels) perf.measurements["Rain"].start();
 		    device::rain(launch);
-			if(ui->performance.measureParts || ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
-			if (ui->performance.measureParts || ui->performance.measureIndividualKernels) {
-				ui->performance.measure("Rain", ui->performance.localStart, ui->performance.localStop);
-			}
+			if(perf.measureParts || perf.measureIndividualKernels) perf.measurements["Rain"].stop();
 
-			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
-			device::transport(launch, terrain.simulation.slippageEnabled, ui->performance);
-			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
-			if (ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
-				ui->performance.measure("Transport", ui->performance.localStart, ui->performance.localStop);
-			}
+			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Transport"].start();
+			device::transport(launch, terrain.simulation.slippageEnabled, perf);
+			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Transport"].stop();
 
-			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
-			device::erosion(launch, terrain.simulation.verticalErosionEnabled, terrain.simulation.horizontalErosionEnabled, ui->performance);
-			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
-			if (ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
-				ui->performance.measure("Erosion", ui->performance.localStart, ui->performance.localStop);
-			}
+			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Erosion"].start();
+			device::erosion(launch, terrain.simulation.verticalErosionEnabled, terrain.simulation.horizontalErosionEnabled, perf);
+			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Erosion"].stop();
 
-			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStart);
+			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Support"].start();
 			if (terrain.simulation.supportCheckEnabled) {
 				if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps)
 				{
-					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStart);
+					if (perf.measureIndividualKernels) perf.measurements["End Support Check"].start();
 					device::endSupportCheck(launch);
-					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStop);
-					if (ui->performance.measureIndividualKernels) {
-						ui->performance.measure("End Support Check", ui->performance.kernelStart, ui->performance.kernelStop);
-					}
+					if (perf.measureIndividualKernels) perf.measurements["End Support Check"].stop();
 
-					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStart);
+					if (perf.measureIndividualKernels) perf.measurements["Start Support Check"].start();
 					device::startSupportCheck(launch);
-					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStop);
-					if (ui->performance.measureIndividualKernels) {
-						ui->performance.measure("Start Support Check", ui->performance.kernelStart, ui->performance.kernelStop);
-					}
+					if (perf.measureIndividualKernels) perf.measurements["Start Support Check"].stop();
 					terrain.simulation.currentStabilityStep = 0;
 				}
 
+				if (perf.measureIndividualKernels) perf.measurements["Step Support Check"].start();
 				for (int i = 0; i < terrain.simulation.stabilityPropagationStepsPerIteration; ++i)
 				{
 					terrain.simulation.currentStabilityStep++;
-					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStart);
 					device::stepSupportCheck(launch, terrain.simulation.useWeightInSupportCheck);
-					if (ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.kernelStop);
-					if (ui->performance.measureIndividualKernels) {
-						ui->performance.measure("Step Support Check", ui->performance.kernelStart, ui->performance.kernelStop);
-					}
 				}
+				if (perf.measureIndividualKernels) perf.measurements["Step Support Check"].stop();
 			}
-			if(ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.localStop);
-			if (ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
-				ui->performance.measure("Support", ui->performance.localStart, ui->performance.localStop);
-			}
+			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Support"].stop();
 
 			terrain.simulation.currentSimulationStep++;
-			if(ui->performance.measurePerformance && !ui->performance.measureParts && !ui->performance.measureIndividualKernels) cudaEventRecord(ui->performance.globalStop);
-
-			if (ui->performance.measurePerformance && !ui->performance.measureParts && !ui->performance.measureIndividualKernels) {
-				ui->performance.measure("Global Simulation", ui->performance.globalStart, ui->performance.globalStop);
-			}
+			if(perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].stop();
 	    }
 
-		cudaEventRecord(ui->performance.kernelStart);
+		if (perf.measureRendering) perf.measurements["Build Draw List"].start();
 		terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
-		cudaEventRecord(ui->performance.kernelStop);
-		if (ui->performance.measureRendering) {
-			ui->performance.measure("Build Draw List", ui->performance.kernelStart, ui->performance.kernelStop);
-		}
+		if (perf.measureRendering) perf.measurements["Build Draw List"].stop();
+
 		PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
 		pointRenderer.count = terrain.numValidColumns;
 	}

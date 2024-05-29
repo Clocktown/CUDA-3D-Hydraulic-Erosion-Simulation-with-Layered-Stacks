@@ -133,6 +133,8 @@ void update()
 	renderPipeline.update();
 	renderPipeline.render();
 
+	ui.performance.measureAll();
+
 	if (ui.performance.measureRendering) {
 		glFinish();
 		auto time = std::chrono::steady_clock::now() - timestamp;

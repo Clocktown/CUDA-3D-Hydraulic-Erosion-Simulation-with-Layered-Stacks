@@ -2,34 +2,45 @@
 #include "performance.hpp"
 
 namespace geo {
-	Performance::Performance() {
-		cudaEventCreate(&globalStart);
-		cudaEventCreate(&globalStop);
-		cudaEventCreate(&localStart);
-		cudaEventCreate(&localStop);
-		cudaEventCreate(&kernelStart);
-		cudaEventCreate(&kernelStop);
+	measurement::measurement() {
+		CU_CHECK_ERROR(cudaEventCreate(&startE));
+		CU_CHECK_ERROR(cudaEventCreate(&stopE));
 	}
 
-	Performance::~Performance() {
-		cudaEventDestroy(globalStart);
-		cudaEventDestroy(globalStop);
-		cudaEventDestroy(localStart);
-		cudaEventDestroy(localStop);
-		cudaEventDestroy(kernelStart);
-		cudaEventDestroy(kernelStop);
+	measurement::~measurement() {
+		CU_CHECK_ERROR(cudaEventDestroy(startE));
+		CU_CHECK_ERROR(cudaEventDestroy(stopE));
 	}
 
-	void Performance::measure(const std::string& name, cudaEvent_t& start, cudaEvent_t& stop) {
-		cudaEventSynchronize(stop);
-		float milliseconds = 0;
-		cudaEventElapsedTime(&milliseconds, start, stop);
-		measurements[name].update(milliseconds);
+	void measurement::start() {
+		cudaEventRecord(startE);
+		wasMeasured = true;
 	}
 
-	void Performance::reset() {
+	void measurement::stop() {
+		cudaEventRecord(stopE);
+		wasMeasured = true;
+	}
+
+	void measurement::measure() {
+		if (wasMeasured) {
+			cudaEventSynchronize(stopE);
+			float milliseconds = 0;
+			cudaEventElapsedTime(&milliseconds, startE, stopE);
+			update(milliseconds);
+			wasMeasured = false;
+		}
+	}
+
+	void performance::resetAll() {
 		for (auto& measurement : measurements) {
-			measurement.second = {};
+			measurement.second.reset();
+		}
+	}
+
+	void performance::measureAll() {
+		for (auto& measurement : measurements) {
+			measurement.second.measure();
 		}
 	}
 }

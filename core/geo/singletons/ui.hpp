@@ -32,7 +32,7 @@ struct UI
 		int useInterpolation{ true };
 	} rendering;
 
-	Performance performance;
+	performance performance{};
 
 	bool visable{ true };
 private:

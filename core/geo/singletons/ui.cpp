@@ -53,7 +53,7 @@ void UI::updateFile()
 		Simulation& simulation{ world.getComponent<Terrain>(entity)->simulation };
 
 		if (ImGui::Button("Reset")) {
-			performance.reset();
+			performance.resetAll();
 		}
 		ImGui::Checkbox("Measure Performance", &performance.measurePerformance);
 		ImGui::Checkbox("Measure Rendering", &performance.measureRendering);
@@ -73,7 +73,7 @@ void UI::updateFile()
 		float endSupport = performance.measurements["End Support Check"].mean;
 		float stepSupport = performance.measurements["Step Support Check"].mean;
 		float startSupport = performance.measurements["Start Support Check"].mean;
-		float support = performance.measureIndividualKernels ? (float(simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationSteps) * (startSupport + endSupport) + simulation.stabilityPropagationStepsPerIteration * stepSupport : performance.measurements["Support"].mean;
+		float support = performance.measureIndividualKernels ? (float(simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationSteps) * (startSupport + endSupport) + stepSupport : performance.measurements["Support"].mean;
 
 		float totalSim = (performance.measureParts || performance.measureIndividualKernels) ? rain + transport + erosion + support : performance.measurements["Global Simulation"].mean;
 
@@ -90,7 +90,7 @@ void UI::updateFile()
 
 		ImGui::LabelText("Support", "%f [ms]", support);
 		ImGui::LabelText("Start Support Check", "%f [ms]", startSupport);
-		ImGui::LabelText("Step Support Check", "%f [ms]", stepSupport);
+		ImGui::LabelText("Step Support Check", "%f [ms]", stepSupport / simulation.stabilityPropagationStepsPerIteration);
 		ImGui::LabelText("End Support Check", "%f [ms]", endSupport);
 
 

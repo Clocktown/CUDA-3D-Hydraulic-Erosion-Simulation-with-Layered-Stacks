@@ -255,33 +255,24 @@ __global__ void damageKernel()
 	simulation.layerCounts[flatBase] = layerCount;
 }
 
-void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal, geo::Performance& perf)
+void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal, geo::performance& perf)
 {
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
+	if (perf.measureIndividualKernels) perf.measurements["Horizontal Erosion"].start();
 	if(enable_horizontal) CU_CHECK_KERNEL(horizontalErosionKernel<<<launch.gridSize, launch.blockSize>>>());
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
-	if (perf.measureIndividualKernels) {
-		perf.measure("Horizontal Erosion", perf.kernelStart, perf.kernelStop);
-	}
+	if (perf.measureIndividualKernels) perf.measurements["Horizontal Erosion"].stop();
 
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
+	if (perf.measureIndividualKernels) perf.measurements["Split Kernel"].start();
 	if(enable_horizontal) CU_CHECK_KERNEL(damageKernel<<<launch.gridSize, launch.blockSize>>>());
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
-	if (perf.measureIndividualKernels) {
-		perf.measure("Split Kernel", perf.kernelStart, perf.kernelStop);
-	}
+	if (perf.measureIndividualKernels) perf.measurements["Split Kernel"].stop();
 
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
+	if (perf.measureIndividualKernels) perf.measurements["Vertical Erosion"].start();
 	if (enable_vertical) {
 		CU_CHECK_KERNEL(sedimentKernel<true><<<launch.gridSize, launch.blockSize>>>());
 	}
 	else {
 		CU_CHECK_KERNEL(sedimentKernel<false><<<launch.gridSize, launch.blockSize>>>());
 	}
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
-	if (perf.measureIndividualKernels) {
-		perf.measure("Vertical Erosion", perf.kernelStart, perf.kernelStop);
-	}
+	if (perf.measureIndividualKernels) perf.measurements["Vertical Erosion"].stop();
 }
 
 }

@@ -209,26 +209,20 @@ __global__ void transportKernel()
 	}
 }
 
-void transport(const Launch& launch, bool enable_slippage, geo::Performance& perf)
+void transport(const Launch& launch, bool enable_slippage, geo::performance& perf)
 {
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
+	if (perf.measureIndividualKernels) perf.measurements["Setup Pipes"].start();
 	CU_CHECK_KERNEL(pipeKernel<<<launch.gridSize, launch.blockSize>>>());
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
-	if (perf.measureIndividualKernels) {
-		perf.measure("Setup Pipes", perf.kernelStart, perf.kernelStop);
-	}
+	if (perf.measureIndividualKernels) perf.measurements["Setup Pipes"].stop();
 
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStart);
+	if (perf.measureIndividualKernels) perf.measurements["Resolve Pipes"].start();
 	if (enable_slippage) {
 		CU_CHECK_KERNEL(transportKernel<true><<<launch.gridSize, launch.blockSize>>>());
 	}
 	else {
 		CU_CHECK_KERNEL(transportKernel<false><<<launch.gridSize, launch.blockSize>>>());
 	}
-	if (perf.measureIndividualKernels) cudaEventRecord(perf.kernelStop);
-	if (perf.measureIndividualKernels) {
-		perf.measure("Resolve Pipes", perf.kernelStart, perf.kernelStop);
-	}
+	if (perf.measureIndividualKernels) perf.measurements["Resolve Pipes"].stop();
 }
 
 }
