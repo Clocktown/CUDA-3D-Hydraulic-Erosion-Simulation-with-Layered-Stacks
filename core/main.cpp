@@ -55,6 +55,17 @@ void start()
 		world.addComponent<onec::Static>(entity);
 	}
 
+		{
+		const entt::entity entity{ world.addEntity() };
+
+		world.addComponent<onec::DirectionalLight>(entity, onec::DirectionalLight{ {0.5f,0.5f,0.75f}, 50000.f });
+		world.addComponent<onec::Position>(entity);
+		world.addComponent<onec::Rotation>(entity, glm::quat{ glm::radians(glm::vec3{ 50.0f, -30.0f, 0.0f }) });
+		world.addComponent<onec::Scale>(entity);
+		world.addComponent<onec::LocalToWorld>(entity);
+		world.addComponent<onec::Static>(entity);
+	}
+
 	{
 		const entt::entity entity{ world.addEntity() };
 
