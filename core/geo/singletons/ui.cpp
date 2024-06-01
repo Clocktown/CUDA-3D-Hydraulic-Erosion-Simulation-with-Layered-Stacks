@@ -35,6 +35,7 @@ void UI::update()
 
 	ImGui::Begin("UI", &this->visable);
 
+	updatePerformance();
 	updateFile();
 	updateApplication();
 	updateCamera();
@@ -45,8 +46,7 @@ void UI::update()
 	ImGui::End();
 }
 
-void UI::updateFile()
-{
+void UI::updatePerformance() {
 	ImGui::LabelText("Frametime", "%f [ms]", performance.measurements["Frametime"].mean);
 
 	if (ImGui::TreeNode("Performance")) {
@@ -123,6 +123,10 @@ void UI::updateFile()
 		
 		ImGui::TreePop();
 	}
+}
+
+void UI::updateFile()
+{
 	if (ImGui::TreeNode("File"))
 	{
 		if (ImGui::Button("Open"))
@@ -287,6 +291,18 @@ void UI::updateSimulation()
 			if (ImGui::DragFloat("Petrification [%/s]", &petrification, 0.01f, 0.0f, std::numeric_limits<float>::max()))
 			{
 				simulation.petrification = 0.01f * petrification;
+			}
+
+			for (int i = 0; i < 4; ++i) {
+				std::string label = "Source ";
+				label += std::to_string(i + 1);
+				if (ImGui::TreeNode(label.c_str())) {
+					ImGui::DragFloat("Strength", &simulation.sourceStrengths[i], 0.01f, 0.0f, std::numeric_limits<float>::max());
+					ImGui::DragFloat("Radius", &simulation.sourceSize[i], 0.01f, 0.0f, 1000.f);
+					ImGui::DragInt2("Location", &simulation.sourceLocations[i].x, 0.1f, 0, glm::max(terrain.gridSize.x, terrain.gridSize.y));
+
+					ImGui::TreePop();
+				}
 			}
 
 			ImGui::TreePop();
@@ -531,6 +547,15 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/EvaporationEmptySpaceScale"] = simulation.evaporationEmptySpaceScale;
 	json["Simulation/SandThreshold"] =	simulation.sandThreshold;
 
+	json["Simulation/SourceStrengths"] = { simulation.sourceStrengths.x, simulation.sourceStrengths.y, simulation.sourceStrengths.z, simulation.sourceStrengths.w };
+	json["Simulation/SourceSize"] = { simulation.sourceSize.x, simulation.sourceSize.y, simulation.sourceSize.z, simulation.sourceSize.w };
+	json["Simulation/SourceLocations"] = { 
+		{ simulation.sourceLocations[0].x, simulation.sourceLocations[0].y }, 
+		{ simulation.sourceLocations[1].x, simulation.sourceLocations[1].y }, 
+		{ simulation.sourceLocations[2].x, simulation.sourceLocations[2].y }, 
+		{ simulation.sourceLocations[3].x, simulation.sourceLocations[3].y }
+	};
+
 
 	const auto backgroundColor{ world.getSingleton<onec::AmbientLight>()->color };
 	json["Rendering/VisualScale"] = world.getComponent<onec::Scale>(this->terrain.entity)->scale;
@@ -618,7 +643,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.dryTalusAngle = json["Simulation/DryTalusAngle"];
 	simulation.wetTalusAngle = json["Simulation/WetTalusAngle"];
 	simulation.slippageInterpolationRange = json["Simulation/SlippageInterpolationRange"];
-	simulation.minHorizontalErosionSlope = json["Simulation/MinHorizontalErosion"];
+	simulation.minHorizontalErosionSlope = json["Simulation/MinHorizontalErosionSlope"];
 	simulation.verticalErosionSlopeFadeStart = json["Simulation/VerticalErosionSlopeFadeStart"];
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
 	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
@@ -636,6 +661,26 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.sandThreshold = json["Simulation/SandThreshold"];
 	simulation.topErosionWaterScale = json["Simulation/TopErosionWaterScale"];
 	simulation.evaporationEmptySpaceScale = json["Simulation/EvaporationEmptySpaceScale"];
+
+
+	simulation.sourceStrengths = glm::vec4{
+		json["Simulation/SourceStrengths"][0],
+		json["Simulation/SourceStrengths"][1],
+		json["Simulation/SourceStrengths"][2],
+		json["Simulation/SourceStrengths"][3]
+	};
+	simulation.sourceSize = glm::vec4{
+		json["Simulation/SourceSize"][0],
+		json["Simulation/SourceSize"][1],
+		json["Simulation/SourceSize"][2],
+		json["Simulation/SourceSize"][3]
+	};
+	for (int i = 0; i < 4; ++i) {
+		simulation.sourceLocations[i] = glm::ivec2{
+			json["Simulation/SourceLocations"][i][0],
+			json["Simulation/SourceLocations"][i][1]
+		};
+	}
 
 	simulation.init = false;
 	simulation.paused = true;

@@ -13,6 +13,10 @@ struct Simulation
 	float evaporation{ 0.01f }; // [1/s]
 	float petrification{ 0.0005f }; // [1/s]
 
+	glm::vec4 sourceStrengths{ 0.f }; // [m/(m²s)]
+	glm::ivec2 sourceLocations[4]{ {0,0},{0,0},{0,0},{0,0} }; // index
+	glm::vec4 sourceSize; // m, radius
+
 	float sedimentCapacityConstant{ 0.1f };
 	float bedrockDissolvingConstant{ 0.01f };
 	float sandDissolvingConstant{ 0.05f };

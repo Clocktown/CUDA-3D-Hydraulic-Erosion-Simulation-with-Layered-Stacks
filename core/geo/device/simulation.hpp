@@ -45,7 +45,10 @@ struct Simulation
 	float gravity; // [m/s²]
 	float rain; // [m/(m²s)]
 	float evaporation; // [1/s]
-	float petrification; // [1/s]                                                                                                                                                                                           
+	float petrification; // [1/s]           
+	glm::vec4 sourceStrengths; // [m/(m²s)]
+	glm::ivec2 sourceLocations[4]; // index
+	glm::vec4 sourceSize; // m, radius
 
 	float sedimentCapacityConstant;
 	float bedrockDissolvingConstant;

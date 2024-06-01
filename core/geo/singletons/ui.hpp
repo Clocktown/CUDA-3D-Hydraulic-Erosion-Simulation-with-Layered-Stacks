@@ -36,6 +36,7 @@ struct UI
 
 	bool visable{ true };
 private:
+	void updatePerformance();
 	void updateFile();
 	void updateApplication();
 	void updateCamera();

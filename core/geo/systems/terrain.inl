@@ -40,6 +40,12 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.evaporation = terrain.simulation.evaporation;
 		simulation.petrification = terrain.simulation.petrification;
 
+		simulation.sourceStrengths = terrain.simulation.sourceStrengths;
+		simulation.sourceSize = terrain.simulation.sourceSize;
+		for (int i = 0; i < 4; ++i) {
+			simulation.sourceLocations[i] = terrain.simulation.sourceLocations[i];
+		}
+
 		simulation.sedimentCapacityConstant = terrain.simulation.sedimentCapacityConstant;
 		simulation.bedrockDissolvingConstant = terrain.simulation.bedrockDissolvingConstant;
 		simulation.sandDissolvingConstant = terrain.simulation.sandDissolvingConstant;
