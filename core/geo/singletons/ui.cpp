@@ -505,9 +505,11 @@ void UI::saveToFile(const std::filesystem::path& file)
 	terrain.sedimentBuffer.download({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
 	terrain.damageBuffer.download({ uncompressed.data() + i, damageBytes }); i += damageBytes;
 
-	std::vector<std::byte> compressed(compressBound(bytes));
-	uLongf compressedSize;
-	compress(reinterpret_cast<Bytef*>(compressed.data()), &compressedSize, reinterpret_cast<Bytef*>(uncompressed.data()), uncompressed.size());
+	uLongf compressedSize{ compressBound(bytes) };
+	std::vector<std::byte> compressed(compressedSize);
+	const int status{ compress(reinterpret_cast<Bytef*>(compressed.data()), &compressedSize, reinterpret_cast<Bytef*>(uncompressed.data()), uncompressed.size()) };
+
+	ONEC_ASSERT(status == Z_OK, "Failed to compress data");
 
 	json["Terrain/GridSize"] = { terrain.gridSize.x, terrain.gridSize.y };
 	json["Terrain/GridScale"] = terrain.gridScale;
@@ -567,7 +569,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
 
 	onec::writeFile(file, json.dump(1));
-	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressedSize });
+	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
 }
 
 void UI::loadFromFile(const std::filesystem::path& file)
@@ -596,7 +598,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	this->terrain.maxLayerCount = json["Terrain/MaxLayerCount"];
 
 	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
-	const std::string compressed{ onec::readFile(file.stem().concat(".dat")) };
+	std::string compressed{ onec::readFile(file.stem().concat(".dat")) };
 
 	const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
 	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
@@ -607,7 +609,6 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
 	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
 	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
-	const std::ptrdiff_t sedimentFluxScaleBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sedimentFluxScale)) };
 
 	uLongf bytes{ 0 };
 	bytes += layerCountBytes;
@@ -618,7 +619,9 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	bytes += damageBytes;
 
 	std::vector<std::byte> uncompressed(bytes);
-	uncompress(reinterpret_cast<Bytef*>(uncompressed.data()), &bytes, reinterpret_cast<const Bytef*>(compressed.data()), compressed.size());
+	const int status{ uncompress(reinterpret_cast<Bytef*>(uncompressed.data()), &bytes, reinterpret_cast<const Bytef*>(compressed.data()), compressed.size()) };
+
+	ONEC_ASSERT(status == Z_OK, "Failed to uncompress data");
 	
 	std::ptrdiff_t i{ 0 };
 	terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes}); i += layerCountBytes;
@@ -661,7 +664,6 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.sandThreshold = json["Simulation/SandThreshold"];
 	simulation.topErosionWaterScale = json["Simulation/TopErosionWaterScale"];
 	simulation.evaporationEmptySpaceScale = json["Simulation/EvaporationEmptySpaceScale"];
-
 
 	simulation.sourceStrengths = glm::vec4{
 		json["Simulation/SourceStrengths"][0],

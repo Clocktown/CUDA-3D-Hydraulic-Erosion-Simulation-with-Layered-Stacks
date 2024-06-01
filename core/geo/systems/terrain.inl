@@ -99,7 +99,6 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		if (terrain.simulation.init)
 		{
-			device::setSimulation(simulation);
 			device::init(launch);
 		
 			if (terrain.simulation.supportCheckEnabled) {
