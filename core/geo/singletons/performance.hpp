@@ -35,7 +35,7 @@ namespace geo {
 		bool measureRendering{ false };
 		bool measureParts{ false };
 		bool measureIndividualKernels{ false };
-		bool pauseAfterStepCount{ 0 };
+		int pauseAfterStepCount{ 0 };
 
 		std::map<std::string, measurement> measurements {
 			{"Global Simulation", {}},
@@ -52,7 +52,8 @@ namespace geo {
 			{"Vertical Erosion", {}},
 			{"Start Support Check", {}},
 			{"Step Support Check", {}},
-			{"End Support Check", {}}
+			{"End Support Check", {}},
+			{"Frametime", {}}
 		};
 
 		void measureAll();

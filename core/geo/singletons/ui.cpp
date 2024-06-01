@@ -20,10 +20,10 @@ void UI::update()
 	onec::Window& window{ onec::getWindow() };
 	onec::World& world{ onec::getWorld() };
 
-	const std::string fps{ std::to_string(application.getFrameRate()) + "fps" };
-	const std::string ms{ std::to_string(1000.0 * application.getUnscaledDeltaTime()) + "ms" };
-	const std::string title{ application.getName() + " @ " + fps + " / " + ms };
-	window.setTitle(title);
+	//const std::string fps{ std::to_string(application.getFrameRate()) + "fps" };
+	//const std::string ms{ std::to_string(1000.0 * application.getUnscaledDeltaTime()) + "ms" };
+	//const std::string title{ application.getName() + " @ " + fps + " / " + ms };
+	//window.setTitle(title);
 
 	const bool visable{ this->visable != window.isKeyPressed(GLFW_KEY_ESCAPE) };
 	this->visable = visable;
@@ -47,6 +47,8 @@ void UI::update()
 
 void UI::updateFile()
 {
+	ImGui::LabelText("Frametime", "%f [ms]", performance.measurements["Frametime"].mean);
+
 	if (ImGui::TreeNode("Performance")) {
 		onec::World& world{onec::getWorld()};
 		const entt::entity entity{ terrain.entity };
@@ -55,6 +57,8 @@ void UI::updateFile()
 		if (ImGui::Button("Reset")) {
 			performance.resetAll();
 		}
+		ImGui::LabelText("Step", "%i", simulation.currentSimulationStep);
+		ImGui::DragInt("Pause every n steps", &performance.pauseAfterStepCount, 0.1f, 0, 100000);
 		ImGui::Checkbox("Measure Performance", &performance.measurePerformance);
 		ImGui::Checkbox("Measure Rendering", &performance.measureRendering);
 		ImGui::Checkbox("Measure Categories", &performance.measureParts);
@@ -78,24 +82,44 @@ void UI::updateFile()
 		float totalSim = (performance.measureParts || performance.measureIndividualKernels) ? rain + transport + erosion + support : performance.measurements["Global Simulation"].mean;
 
 		ImGui::LabelText("Total Simulation", "%f [ms]", totalSim);
-		ImGui::LabelText("Rain", "%f [ms]", rain);
-		ImGui::LabelText("Transport", "%f [ms]", transport);
-		ImGui::LabelText("Setup Pipes", "%f [ms]", setupPipes);
-		ImGui::LabelText("Resolve Pipes", "%f [ms]", resolvePipes);
+		if (ImGui::TreeNode("Simulation Details")) {
+			ImGui::LabelText("Rain", "%f [ms]", rain);
+			ImGui::LabelText("Transport", "%f [ms]", transport);
+			if (ImGui::TreeNode("Transport Details")) {
+				ImGui::LabelText("Setup Pipes", "%f [ms]", setupPipes);
+				ImGui::LabelText("Resolve Pipes", "%f [ms]", resolvePipes);
+			
+				ImGui::TreePop();
+			}
 
-		ImGui::LabelText("Erosion", "%f [ms]", erosion);
-		ImGui::LabelText("Horizontal Erosion", "%f [ms]", horizontalErosion);
-		ImGui::LabelText("Split Kernel", "%f [ms]", splitKernel);
-		ImGui::LabelText("Vertical Erosion", "%f [ms]", verticalErosion);
+			ImGui::LabelText("Erosion", "%f [ms]", erosion);
+			if (ImGui::TreeNode("Erosion Details")) {
+				ImGui::LabelText("Horizontal Erosion", "%f [ms]", horizontalErosion);
+				ImGui::LabelText("Split Kernel", "%f [ms]", splitKernel);
+				ImGui::LabelText("Vertical Erosion", "%f [ms]", verticalErosion);
+			
+				ImGui::TreePop();
+			}
 
-		ImGui::LabelText("Support", "%f [ms]", support);
-		ImGui::LabelText("Start Support Check", "%f [ms]", startSupport);
-		ImGui::LabelText("Step Support Check", "%f [ms]", stepSupport / simulation.stabilityPropagationStepsPerIteration);
-		ImGui::LabelText("End Support Check", "%f [ms]", endSupport);
+			ImGui::LabelText("Support", "%f [ms]", support);
+			if (ImGui::TreeNode("Support Details")) {
+				ImGui::LabelText("Start Support Check", "%f [ms]", startSupport);
+				ImGui::LabelText("Step Support Check", "%f [ms]", stepSupport / simulation.stabilityPropagationStepsPerIteration);
+				ImGui::LabelText("End Support Check", "%f [ms]", endSupport);
+			
+				ImGui::TreePop();
+			}
 
+			ImGui::TreePop();
+		}
 
-		ImGui::LabelText("Rendering", "%f [ms]", performance.measurements["Rendering"].mean);
-		ImGui::LabelText("Build Draw List", "%f [ms]", performance.measurements["Build Draw List"].mean);
+		ImGui::LabelText("Total Rendering", "%f [ms]", performance.measurements["Rendering"].mean + performance.measurements["Build Draw List"].mean);
+		if (ImGui::TreeNode("Rendering Details")) {
+			ImGui::LabelText("Draw Call", "%f [ms]", performance.measurements["Rendering"].mean);
+			ImGui::LabelText("Build Draw List", "%f [ms]", performance.measurements["Build Draw List"].mean);
+
+			ImGui::TreePop();
+		}
 		
 		ImGui::TreePop();
 	}

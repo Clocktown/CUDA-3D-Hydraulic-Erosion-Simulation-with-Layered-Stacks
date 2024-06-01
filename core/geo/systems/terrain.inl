@@ -147,6 +147,9 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Support"].stop();
 
 			terrain.simulation.currentSimulationStep++;
+			if (ui->performance.pauseAfterStepCount > 0 && (terrain.simulation.currentSimulationStep % ui->performance.pauseAfterStepCount) == 0) {
+				terrain.simulation.paused = true;
+			}
 			if(perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].stop();
 	    }
 

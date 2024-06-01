@@ -8,10 +8,14 @@
 
 #include <chrono>
 
+GLuint oglQuery;
+
 void start()
 {
 	onec::Application& application{ onec::getApplication() };
 	onec::World& world{ onec::getWorld() };
+
+	glGenQueries(1, &oglQuery);
 
 	world.addSingleton<onec::Viewport>();
 	glm::vec3 backgroundColor = glm::vec3(0.3f, 0.65f, 0.98f);
@@ -121,9 +125,14 @@ void update()
 
 	std::chrono::steady_clock::time_point timestamp;
 
+	GLuint64 timeElapsed{ 0 };
+
 	if (ui.performance.measureRendering) {
-		glFinish();
-		timestamp = std::chrono::steady_clock::now();
+		glGetQueryObjectui64v(oglQuery, GL_QUERY_RESULT_NO_WAIT, &timeElapsed);
+		if (timeElapsed > 0) {
+			ui.performance.measurements["Rendering"].update(timeElapsed / 1000000.0);
+		}
+		glBeginQuery(GL_TIME_ELAPSED, oglQuery);
 	}
 	onec::updateTrackballs();
 	onec::updateModelMatrices(entt::exclude<onec::Static>);
@@ -134,12 +143,10 @@ void update()
 	renderPipeline.render();
 
 	ui.performance.measureAll();
+	ui.performance.measurements["Frametime"].update(onec::getApplication().getUnscaledDeltaTime() * 1000.f);
 
 	if (ui.performance.measureRendering) {
-		glFinish();
-		auto time = std::chrono::steady_clock::now() - timestamp;
-		float milliseconds = time.count() * 1e-6f;
-		ui.performance.measurements["Rendering"].update(milliseconds);
+		glEndQuery(GL_TIME_ELAPSED);
 	}
 }
 
@@ -177,4 +184,5 @@ int main()
 	world.addSystem<onec::OnRender, &render>();
 
 	application.run();
+	glDeleteQueries(1, &oglQuery);
 }
