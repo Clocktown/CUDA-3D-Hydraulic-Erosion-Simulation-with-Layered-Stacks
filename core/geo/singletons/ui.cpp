@@ -274,6 +274,7 @@ void UI::updateSimulation()
 		
 		if (ImGui::TreeNode("General")) {
 			
+			ImGui::Checkbox("Use Outflow Borders", &simulation.useOutflowBorders);
 			ImGui::DragFloat("Delta Time [s]", &simulation.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Gravity [m/s^2]", &simulation.gravity, 0.1f);
 			ImGui::DragFloat("Rain [m/(m^2 * s)]", &simulation.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
@@ -514,6 +515,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Terrain/MaxLayerCount"] = terrain.maxLayerCount;
 	json["Terrain/UsedLayerCount"] = usedLayerCount;
 
+	json["Simulation/UseOutflowBorders"] = simulation.useOutflowBorders;
 	json["Simulation/DeltaTime"] = simulation.deltaTime;
 	json["Simulation/Gravity"] = simulation.gravity;
 	json["Simulation/Rain"] = simulation.rain;
@@ -629,6 +631,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	terrain.damageBuffer.upload({ uncompressed.data() + i, damageBytes }); i += damageBytes;
 
 	Simulation& simulation{ terrain.simulation };
+	simulation.useOutflowBorders = json["Simulation/UseOutflowBorders"];
 	simulation.deltaTime = json["Simulation/DeltaTime"];
 	simulation.gravity = json["Simulation/Gravity"];
 	simulation.rain = json["Simulation/Rain"];

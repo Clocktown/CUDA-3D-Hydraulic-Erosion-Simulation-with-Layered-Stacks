@@ -5,6 +5,7 @@ namespace geo
 namespace device
 {
 
+template <bool outflowBorders>
 __global__ void pipeKernel()
 {
 	const glm::ivec2 index{ getLaunchIndex() };
@@ -47,6 +48,21 @@ __global__ void pipeKernel()
 
 			if (isOutside(neighbor.index, simulation.gridSize))
 			{
+				if constexpr (outflowBorders) {
+					heights[i] = height[BEDROCK];
+
+					const float deltaHeight{ water - height[BEDROCK]};
+					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; 
+
+					flux[i] = glm::max(((1.f - 0.01f * simulation.deltaTime) * flux[i]) - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
+
+					const float avgWater{ 0.5f * height[WATER] };
+					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater * simulation.iSlippageInterpolationRange, 1.0f)) };
+
+					slippage[i] = glm::max(
+							glm::max(0.125f * (sand - height[BEDROCK] - talusSlope * simulation.gridScale), 0.0f)
+						, 0.f);
+				}
 				continue;
 			}
 
@@ -209,10 +225,15 @@ __global__ void transportKernel()
 	}
 }
 
-void transport(const Launch& launch, bool enable_slippage, geo::performance& perf)
+void transport(const Launch& launch, bool enable_slippage, bool use_outflow_borders, geo::performance& perf)
 {
 	if (perf.measureIndividualKernels) perf.measurements["Setup Pipes"].start();
-	CU_CHECK_KERNEL(pipeKernel<<<launch.gridSize, launch.blockSize>>>());
+	if (use_outflow_borders) {
+		CU_CHECK_KERNEL(pipeKernel<true><<<launch.gridSize, launch.blockSize>>>());
+	}
+	else {
+		CU_CHECK_KERNEL(pipeKernel<false><<<launch.gridSize, launch.blockSize>>>());
+	}
 	if (perf.measureIndividualKernels) perf.measurements["Setup Pipes"].stop();
 
 	if (perf.measureIndividualKernels) perf.measurements["Resolve Pipes"].start();

@@ -24,8 +24,20 @@ __global__ void rainKernel()
 	const int topLayer{ simulation.layerCounts[flatIndex] - 1 };
 	flatIndex += topLayer * simulation.layerStride;
 
-	simulation.heights[flatIndex].z += (noiseVal > 0.9f) ? 10.f * simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
-	//simulation.heights[flatIndex].z += index.x < 64 ? simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
+	float water = simulation.heights[flatIndex].z;
+
+	for (int i = 0; i < 4; ++i) {
+		const glm::vec2 dVec = glm::vec2(simulation.sourceLocations[i] - index);
+		const float d2 = glm::dot(dVec, dVec);
+		const float r2 = simulation.sourceSize[i] * simulation.sourceSize[i];
+		if (d2 <= r2 && r2 > 0.f) {
+			water += /*(1.f - (r2 - d2) / r2) */ simulation.sourceStrengths[i] * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
+		}
+	}
+
+	water += (noiseVal > 0.9f) ? 10.f * simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
+
+	simulation.heights[flatIndex].z = water;
 }
 
 void rain(const Launch& launch)

@@ -58,6 +58,7 @@ struct Simulation
 	bool supportCheckEnabled{ true };
 	bool slippageEnabled{ true };
 	bool useWeightInSupportCheck{ true };
+	bool useOutflowBorders{ false };
 };
 
 struct Terrain

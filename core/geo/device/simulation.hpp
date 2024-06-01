@@ -112,7 +112,7 @@ char getMaxLayerCount(const char* layerCounts, std::ptrdiff_t count);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);
-void transport(const Launch& launch, bool enable_slippage, geo::performance& perf);
+void transport(const Launch& launch, bool enable_slippage, bool use_outflow_borders, geo::performance& perf);
 void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal, geo::performance& perf);
 
 void stepSupportCheck(const Launch&, bool use_weight);

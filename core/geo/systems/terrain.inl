@@ -121,7 +121,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if(perf.measureParts || perf.measureIndividualKernels) perf.measurements["Rain"].stop();
 
 			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Transport"].start();
-			device::transport(launch, terrain.simulation.slippageEnabled, perf);
+			device::transport(launch, terrain.simulation.slippageEnabled, terrain.simulation.useOutflowBorders, perf);
 			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Transport"].stop();
 
 			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Erosion"].start();
