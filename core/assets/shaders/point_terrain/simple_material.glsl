@@ -12,10 +12,15 @@
 layout(binding = materialBufferLocation, std140) uniform SimpleMaterialUniforms
 {
 	vec3 colors[3];
+
     ivec2 gridSize;
     float gridScale;
 	int maxLayerCount;
+
 	bool useInterpolation;
+	bool renderSand;
+	bool renderWater;
+
 	int* layerCounts;
 	vec4* heights;
 	float* stability;

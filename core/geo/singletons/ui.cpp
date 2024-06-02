@@ -448,6 +448,18 @@ void UI::updateRendering()
 			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.useInterpolation, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, useInterpolation)), sizeof(int));
 		}
 
+		bool renderSand = bool(rendering.renderSand);
+		if (ImGui::Checkbox("Render Sand", &renderSand)) {
+			rendering.renderSand = int(renderSand);
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.renderSand, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, renderSand)), sizeof(int));
+		}
+
+		bool renderWater = bool(rendering.renderWater);
+		if (ImGui::Checkbox("Render Water", &renderWater)) {
+			rendering.renderWater = int(renderWater);
+			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.renderWater, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, renderWater)), sizeof(int));
+		}
+
 		ImGui::TreePop();
 	}
 }
@@ -569,6 +581,8 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/SandColor"] = { rendering.sandColor.r, rendering.sandColor.g, rendering.sandColor.b };
 	json["Rendering/WaterColor"] = { rendering.waterColor.r, rendering.waterColor.g, rendering.waterColor.b };
 	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
+	json["Rendering/RenderSand"] = rendering.renderSand;
+	json["Rendering/RenderWater"] = rendering.renderWater;
 
 	onec::writeFile(file, json.dump(1));
 	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
@@ -697,6 +711,8 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	rendering.sandColor = glm::vec3{ json["Rendering/SandColor"][0], json["Rendering/SandColor"][1], json["Rendering/SandColor"][2] };
 	rendering.waterColor = glm::vec3{ json["Rendering/WaterColor"][0], json["Rendering/WaterColor"][1], json["Rendering/WaterColor"][2] };
 	rendering.useInterpolation = json["Rendering/UseInterpolation"];
+	rendering.renderSand = json["Rendering/RenderSand"];
+	rendering.renderWater = json["Rendering/RenderWater"];
 
     PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(this->terrain.entity) };
 	geo::SimpleMaterialUniforms uniforms;
@@ -704,6 +720,8 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
 	uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
 	uniforms.useInterpolation = rendering.useInterpolation;
+	uniforms.renderSand = rendering.renderSand;
+	uniforms.renderWater = rendering.renderWater;
 	uniforms.gridSize = terrain.gridSize;
 	uniforms.gridScale = terrain.gridScale;
 	uniforms.maxLayerCount = terrain.maxLayerCount;

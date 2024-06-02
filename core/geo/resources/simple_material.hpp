@@ -13,10 +13,14 @@ struct SimpleMaterialUniforms
 	int pad2;
 	glm::vec3 waterColor;
 	int pad3;
+
 	glm::ivec2 gridSize;
 	float gridScale;
 	int maxLayerCount;
+
 	int useInterpolation;
+	int renderSand;
+	int renderWater;
 	int pad4;
 	// TODO: Sediment buffer
 	GLuint64EXT layerCounts;
