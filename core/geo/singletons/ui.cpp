@@ -220,6 +220,8 @@ void UI::updateTerrain()
 			uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
 			uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
 			uniforms.useInterpolation = rendering.useInterpolation;
+			uniforms.renderSand = rendering.renderSand;
+			uniforms.renderWater = rendering.renderWater;
 			uniforms.gridSize = terrain.gridSize;
 			uniforms.gridScale = terrain.gridScale;
 			uniforms.maxLayerCount = terrain.maxLayerCount;

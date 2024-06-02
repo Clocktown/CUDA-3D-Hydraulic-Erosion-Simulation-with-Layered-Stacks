@@ -18,7 +18,7 @@ __global__ void rainKernel()
 		return;
 	}
 
-	const float noiseVal = rainNoise::cudaNoise::discreteNoise(make_float3(index.x, index.y, 0.f), 1.f, simulation.step);
+	const float noiseVal = 0.5f + 0.5f * rainNoise::cudaNoise::discreteNoise(make_float3(index.x, index.y, 0.f), 1.f, simulation.step);
 
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 	const int topLayer{ simulation.layerCounts[flatIndex] - 1 };
@@ -31,11 +31,11 @@ __global__ void rainKernel()
 		const float d2 = glm::dot(dVec, dVec);
 		const float r2 = simulation.sourceSize[i] * simulation.sourceSize[i];
 		if (d2 <= r2 && r2 > 0.f) {
-			water += /*(1.f - (r2 - d2) / r2) */ simulation.sourceStrengths[i] * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
+			water += /*(1.f - (r2 - d2) / r2) */ 2.f * noiseVal * simulation.sourceStrengths[i] * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
 		}
 	}
 
-	water += (noiseVal > 0.9f) ? 10.f * simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
+	water += (noiseVal > 0.95f) ? 20.f * simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
 
 	simulation.heights[flatIndex].z = water;
 }

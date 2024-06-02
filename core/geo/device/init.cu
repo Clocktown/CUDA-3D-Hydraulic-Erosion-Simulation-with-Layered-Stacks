@@ -35,15 +35,23 @@ __global__ void initKernel()
 
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 
-	/*for (int i = 0; i < 8; ++i, flatIndex += simulation.layerStride) {
-		if(i == 0)
-			simulation.layerCounts[flatIndex] = 8;
-		simulation.heights[flatIndex] = float4{ i * 20.f + 10.f, 0.f, 0.f,  i == 7 ? FLT_MAX : (i + 1) * 20.f };
-		simulation.sediments[flatIndex] = 0.0f;
-		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	}*/
 
-	const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.rGridScale, 42);
+	float bedrockHeight = 0.f;
+	if (index.x > 64) {
+		bedrockHeight = 50.f;
+	}
+
+	if (index.x > 70 && index.y > 120 && index.y < 136 && index.x < 240) {
+		bedrockHeight = 25.f * (index.x - 70) / (240.f - 70.f);
+	}
+
+	simulation.layerCounts[flatIndex] = 1;
+	simulation.heights[flatIndex] = float4{ bedrockHeight, 0.0f, 0.0f, FLT_MAX};
+	simulation.sediments[flatIndex] = 0.0f;
+	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	simulation.damages[flatIndex] = 0.0f;
+
+	/*const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.rGridScale, 42);
 	const float noiseVal2 = 10.f * (1.f + fbm(index, 8, 0.005f * simulation.rGridScale, 69));
 
 	if (index.x > 64)
@@ -66,24 +74,7 @@ __global__ void initKernel()
 		simulation.sediments[flatIndex] = 0.0f;
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		simulation.damages[flatIndex] = 0.0f;
-	}
-
-	//if (isInside(index - simulation.gridSize / 2 + 25, glm::ivec2{ 10 }))
-	//{
-	//	simulation.layerCounts[flatIndex] = 1;
-	//	simulation.heights[flatIndex] = float4{ 55.0f, 0.0f, 0.0f, FLT_MAX };
-	//	simulation.sediments[flatIndex] = 0.0f;
-	//	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	//	simulation.damages[flatIndex] = 0.0f;
-	//}
-	//else
-	//{
-	//	simulation.layerCounts[flatIndex] = 1;
-	//	simulation.heights[flatIndex] = float4{ 5.0f, 0.0f, glm::max((simulation.gridSize.x / 2 - index.x) / 4.0f, 0.0f), FLT_MAX };
-	//	simulation.sediments[flatIndex] = 0.0f;
-	//	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	//	simulation.damages[flatIndex] = 0.0f;
-	//}
+	}*/
 }
 
 void init(const Launch& launch)

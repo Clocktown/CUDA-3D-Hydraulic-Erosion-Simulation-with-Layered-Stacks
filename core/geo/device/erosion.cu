@@ -73,7 +73,7 @@ __global__ void horizontalErosionKernel()
 					const glm::vec2 velocity{ glm::cuda_cast(simulation.velocities[neighbor.flatIndices[i]]) };
 					const float speed{ glm::length(velocity) };
 					const glm::vec2 normal{ glm::cuda_cast(offsets[i]) };
-					const float attenuation{ 0.5f - 0.5f * glm::dot(normal, velocity / (speed + glm::epsilon<float>()))};
+					const float attenuation{ 1.f };// { 0.5f - 0.5f * glm::dot(normal, velocity / (speed + glm::epsilon<float>()))};
 					
 					erosions[i] = simulation.horizontalErosionStrength * slopeScale * speed * attenuation * area * integrationScale;
 					
