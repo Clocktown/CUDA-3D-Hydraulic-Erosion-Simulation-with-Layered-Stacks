@@ -37,12 +37,12 @@ __global__ void initKernel()
 
 
 	float bedrockHeight = 0.f;
-	if (index.x > 64) {
+	if (index.x > (64.f/256.f) * simulation.gridSize.x) {
 		bedrockHeight = 50.f;
 	}
 
-	if (index.x > 70 && index.y > 120 && index.y < 136 && index.x < 240) {
-		bedrockHeight = 25.f * (index.x - 70) / (240.f - 70.f);
+	if (index.x > (70.f/256.f) * simulation.gridSize.x && index.y > (120.f/256.f) * simulation.gridSize.y && index.y < (136.f/256.f) * simulation.gridSize.y && index.x < (240.f/256.f) * simulation.gridSize.x) {
+		bedrockHeight = 25.f * (256.f / simulation.gridSize.x) * (index.x - 70) / (240.f - 70.f);
 	}
 
 	simulation.layerCounts[flatIndex] = 1;

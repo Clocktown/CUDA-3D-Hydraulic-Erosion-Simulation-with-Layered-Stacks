@@ -35,7 +35,7 @@ __global__ void rainKernel()
 		}
 	}
 
-	water += (noiseVal > 0.95f) ? 20.f * simulation.rain * simulation.gridScale * simulation.gridScale * simulation.deltaTime : 0.f;
+	water += 2.f * noiseVal * simulation.rain * simulation.deltaTime;
 
 	simulation.heights[flatIndex].z = water;
 }
