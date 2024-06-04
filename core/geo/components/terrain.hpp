@@ -36,7 +36,7 @@ struct Simulation
 	float minHorizontalErosionSlope{ 0.9f }; // sin(alpha)
 	float horizontalErosionStrength{ 0.1f };
 	float minSplitDamage{ 2.0f };
-	float splitThreshold{ 0.75f };
+	float splitSize{ 0.75f };
 	float damageRecovery{ 0.005f };
 
 	float bedrockDensity{ 2600.f }; // [kg/m³]
@@ -53,6 +53,7 @@ struct Simulation
 
 	bool init{ true };
 	bool paused{ true };
+	bool stabilityWasReenabled{ false };
 	bool verticalErosionEnabled{ true };
 	bool horizontalErosionEnabled{ true };
 	bool supportCheckEnabled{ true };

@@ -44,16 +44,26 @@ namespace geo
 			float previousCeiling = FLT_MAX;
 
 			bool previousCollapsed = false;
+			bool isTooClose = false;
 
 			for (int layer{ layerCount - 1 }; layer >= 0; --layer, itFlatIndex -= simulation.layerStride)
 			{
 				auto heights = glm::cuda_cast(simulation.heights[itFlatIndex]);
 				float sediment = simulation.sediments[itFlatIndex];
 
-				heights[BEDROCK] += collapsedBedrock;
-				heights[SAND] += collapsedSand;
-				heights[WATER] += collapsedWater;
-				sediment += collapsedSediment;
+				//heights[BEDROCK] += collapsedBedrock;
+				if (isTooClose) {
+					heights[BEDROCK] += heights[SAND] + collapsedBedrock;
+					heights[SAND] = collapsedSand;
+					heights[WATER] += collapsedWater;
+					sediment += collapsedSediment;
+				}
+				else {
+					const float sand = collapsedBedrock + collapsedSand;
+					heights[SAND] += sand;
+					heights[WATER] += collapsedWater;
+					sediment += collapsedSediment;
+				}
 				if (previousCollapsed) {
 					heights[CEILING] = previousCeiling;
 				}
@@ -63,9 +73,11 @@ namespace geo
 				collapsedSediment = 0.f;
 
 				float stability = simulation.stability[itFlatIndex];
-				float floor = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING];
+				const float floor = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING];
+				const float bedrockBelow = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[BEDROCK];
+				isTooClose = layer > 0 && floor - bedrockBelow < simulation.splitSize;
 				const bool isTooThin = heights[BEDROCK] - floor <= simulation.minBedrockThickness;
-				stability = isTooThin ? 0.f : stability;
+				stability = (isTooThin || isTooClose) ? 0.f : stability;
 				if (stability <= 0.f) {
 					collapsedWater += heights[WATER];
 					collapsedSand += heights[SAND];

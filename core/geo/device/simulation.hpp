@@ -68,7 +68,7 @@ struct Simulation
 	float minHorizontalErosionSlope; // sin(alpha)
 	float horizontalErosionStrength;
 	float minSplitDamage;
-	float splitThreshold;
+	float splitSize;
 	float damageRecovery;
 
 	float bedrockDensity; // [kg/m³]

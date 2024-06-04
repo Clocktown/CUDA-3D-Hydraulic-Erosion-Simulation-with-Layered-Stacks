@@ -372,13 +372,15 @@ void UI::updateSimulation()
 			ImGui::DragFloat("Min. Horizontal Erosion Slope (sine)", &simulation.minHorizontalErosionSlope, 0.001f, 0.0f, 1.f);
 			ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
-			ImGui::DragFloat("Split Threshold", &simulation.splitThreshold, 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("Damage Recovery", &simulation.damageRecovery, 0.001f, 0.0f, 1.0f);
+			ImGui::DragFloat("Split Size", &simulation.splitSize, 0.01f, 0.0f, 1.0f);
+			ImGui::DragFloat("Damage Recovery Rate", &simulation.damageRecovery, 0.001f, 0.0f, 1.0f);
 
 			ImGui::TreePop();
 		}
 
-		ImGui::Checkbox("##enableSupportCheck", &simulation.supportCheckEnabled);
+		if (ImGui::Checkbox("##enableSupportCheck", &simulation.supportCheckEnabled)) {
+			simulation.stabilityWasReenabled = simulation.supportCheckEnabled;
+		}
 		ImGui::SameLine();
 		if (ImGui::TreeNode("Support Check")) {
 
@@ -550,7 +552,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/VerticalErosionSlopeFadeStart"] = simulation.verticalErosionSlopeFadeStart;
 	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
 	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
-	json["Simulation/SplitThreshold"] = simulation.splitThreshold;
+	json["Simulation/SplitSize"] = simulation.splitSize;
 	json["Simulation/DamageRecovery"] = simulation.damageRecovery;
 	json["Simulation/EnableVerticalErosion"] = simulation.verticalErosionEnabled;
 	json["Simulation/EnableHorizontalErosion"] = simulation.horizontalErosionEnabled;
@@ -669,7 +671,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.verticalErosionSlopeFadeStart = json["Simulation/VerticalErosionSlopeFadeStart"];
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
 	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
-	simulation.splitThreshold = json["Simulation/SplitThreshold"];
+	simulation.splitSize = json["Simulation/SplitSize"];
 	simulation.damageRecovery = json["Simulation/DamageRecovery"];
 	simulation.verticalErosionEnabled = json["Simulation/EnableVerticalErosion"];
 	simulation.horizontalErosionEnabled = json["Simulation/EnableHorizontalErosion"];

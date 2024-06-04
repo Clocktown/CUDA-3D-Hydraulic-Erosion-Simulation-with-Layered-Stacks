@@ -64,7 +64,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.minHorizontalErosionSlope = terrain.simulation.minHorizontalErosionSlope;
 		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;
 		simulation.minSplitDamage = terrain.simulation.minSplitDamage;
-		simulation.splitThreshold = terrain.simulation.splitThreshold;
+		simulation.splitSize = terrain.simulation.splitSize;
 		simulation.damageRecovery = terrain.simulation.damageRecovery;
 
 		simulation.bedrockDensity = terrain.simulation.bedrockDensity;
@@ -101,8 +101,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		{
 			device::init(launch);
 		
+			terrain.simulation.currentStabilityStep = 0;
 			if (terrain.simulation.supportCheckEnabled) {
-				terrain.simulation.currentStabilityStep = 0;
 				device::startSupportCheck(launch);
 			}
 
@@ -127,6 +127,11 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			device::erosion(launch, terrain.simulation.verticalErosionEnabled, terrain.simulation.horizontalErosionEnabled, perf);
 			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Erosion"].stop();
 
+			if (terrain.simulation.stabilityWasReenabled) {
+				device::startSupportCheck(launch);
+				terrain.simulation.currentStabilityStep = 0;
+				terrain.simulation.stabilityWasReenabled = false;
+			}
 			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Support"].start();
 			if (terrain.simulation.supportCheckEnabled) {
 				if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps)

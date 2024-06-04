@@ -17,7 +17,7 @@ __global__ void horizontalErosionKernel()
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
 
-	const float integrationScale{ simulation.rGridScale * simulation.rGridScale * simulation.deltaTime };
+	const float integrationScale{ simulation.rGridScale * simulation.rGridScale * simulation.deltaTime};
 	float floor{ -FLT_MAX };
 
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
@@ -61,19 +61,25 @@ __global__ void horizontalErosionKernel()
 				neighbor.sand = neighbor.height[BEDROCK] + neighbor.height[SAND];
 				neighbor.water = neighbor.sand + neighbor.height[WATER];
 
+				// New stop condition
+				if (neighbor.water <= floor) {
+					break;
+				}
+
 				const glm::vec2 split{ glm::max(floor, neighbor.sand), glm::min(height[BEDROCK], neighbor.water) };
 
-				if (split.y - split.x > 0.f)
+				if (split.y - split.x > 0.f && neighbor.water < height[BEDROCK])
 				{
-					const float area{ (split.y - split.x) * simulation.gridScale };
-					const float heightDifference{ height[BEDROCK] - neighbor.sand };
-					const float sinSlope{ sin(atan2(heightDifference, simulation.gridScale)) };
+					const float area{ 1.f };// { (split.y - split.x) /** simulation.gridScale*/ }; // gridScale here is wrong, I think
+					const float heightDifference{ glm::min(height[BEDROCK], neighbor.height[CEILING]) /*height[BEDROCK]*/ - neighbor.sand};
+					const float sinSlope{ floor > neighbor.sand ? 1.f : sin(atan2(heightDifference, simulation.gridScale)) };
 					const float t = glm::smoothstep(simulation.minHorizontalErosionSlope, 1.f, sinSlope); // see sedimentKernel for a plot of the function
 					const float slopeScale{ t * sinSlope };
 					const glm::vec2 velocity{ glm::cuda_cast(simulation.velocities[neighbor.flatIndices[i]]) };
-					const float speed{ glm::length(velocity) };
+					const float speed{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * glm::length(velocity) };
 					const glm::vec2 normal{ glm::cuda_cast(offsets[i]) };
-					const float attenuation{ 1.f };// { 0.5f - 0.5f * glm::dot(normal, velocity / (speed + glm::epsilon<float>()))};
+					// TODO: Test this again
+					const float attenuation { 0.5f - 0.5f * glm::dot(normal, velocity / (speed + glm::epsilon<float>()))};
 					
 					erosions[i] = simulation.horizontalErosionStrength * slopeScale * speed * attenuation * area * integrationScale;
 					
@@ -83,13 +89,13 @@ __global__ void horizontalErosionKernel()
 						maxSplit = split;
 					}
 
-					break;
+					//break; // not breaking here to actually find the maximum
 				}
 			}
 		}
 
-		float totalErosion{ erosions.x + erosions.y + erosions.z + erosions.w };
-		erosions *= glm::clamp((maxSplit.y - maxSplit.x - damage) / (totalErosion + glm::epsilon<float>()), 0.f, 1.0f);
+		float totalErosion{ maxErosion };//{ erosions.x + erosions.y + erosions.z + erosions.w };
+		/*erosions *= glm::clamp((maxSplit.y - maxSplit.x - damage) / (totalErosion + glm::epsilon<float>()), 0.f, 1.0f);
 
 		totalErosion = 0.f;
 		for (int i{ 0 }; i < 4; ++i)
@@ -99,7 +105,7 @@ __global__ void horizontalErosionKernel()
 				totalErosion += erosions[i];
 				atomicAdd((float*)(simulation.heights + neighbor.flatIndices[i]) + SAND, erosions[i]);
 			}
-		}
+		}*/
 
 		damage += totalErosion;
 
@@ -152,8 +158,9 @@ __global__ void sedimentKernel()
 		const float t = glm::smoothstep(simulation.verticalErosionSlopeFadeStart, 1.f, actualSlope);
 		// [0,1] -> [min, max]
 		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
-		const float speed{ glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
-		const float waterScale{ glm::clamp(1.f - tanhf(height[WATER] * simulation.erosionWaterScale), 0.f, 1.f) };
+		const float speed{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
+		float waterScale{ glm::clamp(1.f - tanhf(height[WATER] * simulation.erosionWaterScale), 0.f, 1.f) };
+		waterScale = glm::mix(0.f, waterScale, glm::min(100.f * height[WATER], 1.f));
 		const float topErosionWaterScale{ glm::max(1.0f - glm::max(simulation.iTopErosionWaterScale * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f), 0.0f)};
 		const float topBedrockScale{ simulation.bedrockDissolvingConstant * speed * topErosionWaterScale * simulation.minTerrainSlopeScale };
 		const float bedrockScale{ glm::max(1.0f - height[SAND] * simulation.iSandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * slope * speed * waterScale };
@@ -218,7 +225,7 @@ __global__ void damageKernel()
 		const glm::vec2 split{ glm::cuda_cast(simulation.splits[flatIndex]) };
 		const float damage{ simulation.damages[flatIndex] };
 
-		if (damage < simulation.minSplitDamage || damage < simulation.splitThreshold * (split.y - split.x) || layerCount == simulation.maxLayerCount)
+		if (damage < simulation.minSplitDamage || layerCount == simulation.maxLayerCount)
 		{
 			continue;
 		}
@@ -242,8 +249,11 @@ __global__ void damageKernel()
 		simulation.sediments[above] = simulation.sediments[below];
 		simulation.damages[above] = 0.0f;
 
+		const float bedrockHeight = glm::max(split.y - simulation.splitSize, split.x);// glm::max(0.5f * (split.x + split.y - simulation.minSplitDamage), split.x);
+		const float ceiling = split.y;//; glm::min(0.5f * (split.x + split.y + simulation.minSplitDamage), simulation.heights[above].x);
+
 		// Lower part of split
-		simulation.heights[below] = float4{ glm::max(split.y - damage, split.x), 0.0f, 0.0f, split.y };
+		simulation.heights[below] = float4{ bedrockHeight, ceiling - bedrockHeight, 0.0f, ceiling };
 		simulation.fluxes[below] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		//simulation.stability[below] = FLT_MAX;
 		simulation.sediments[below] = 0.0f;

@@ -18,7 +18,7 @@ __global__ void rainKernel()
 		return;
 	}
 
-	const float noiseVal = 0.5f + 0.5f * rainNoise::cudaNoise::discreteNoise(make_float3(index.x, index.y, 0.f), 1.f, simulation.step);
+	const float noiseVal = 0.5f + 0.5f * rainNoise::cudaNoise::discreteNoise(make_float3(index.x, index.y, 0.f), simulation.gridScale, simulation.step);
 
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 	const int topLayer{ simulation.layerCounts[flatIndex] - 1 };
