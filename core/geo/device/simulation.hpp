@@ -43,11 +43,11 @@ struct Simulation
 
 	float deltaTime; // [s]
 	float gravity; // [m/s²]
-	float rain; // [m/(m²s)]
-	float evaporation; // [1/s]
-	float petrification; // [1/s]           
-	glm::vec4 sourceStrengths; // [m/(m²s)]
-	glm::ivec2 sourceLocations[4]; // index
+	float rain; // [m/s]
+	float evaporation; // [m/s]
+	float petrification; // [m/s]           
+	glm::vec4 sourceStrengths; // [m/s]
+	glm::vec2 sourceLocations[4]; // index
 	glm::vec4 sourceSize; // m, radius
 
 	float sedimentCapacityConstant;
@@ -67,7 +67,7 @@ struct Simulation
 
 	float minHorizontalErosionSlope; // sin(alpha)
 	float horizontalErosionStrength;
-	float minSplitDamage;
+	//float minSplitDamage;
 	float splitSize;
 	float damageRecovery;
 

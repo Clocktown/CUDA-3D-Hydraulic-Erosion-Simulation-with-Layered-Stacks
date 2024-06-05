@@ -200,7 +200,7 @@ __global__ void transportKernel()
 
 		height[WATER] = glm::clamp(height[WATER] - integrationScale * (flux.x + flux.y + flux.z + flux.w), 0.0f, glm::max(height[CEILING] - height[BEDROCK] - height[SAND], 0.f));
 		const float evaporationScale = glm::clamp(simulation.iEvaporationEmptySpaceScale * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.01f, 1.0f);
-		height[WATER] = glm::max((1.0f - simulation.evaporation * evaporationScale * simulation.deltaTime) * height[WATER], 0.0f);
+		height[WATER] = glm::max(height[WATER] - simulation.evaporation * evaporationScale * simulation.deltaTime, 0.0f);
 		// avgWater = 0.5f * (avgWater + height[WATER]);
 		const glm::vec2 velocity{ simulation.rGridScale * simulation.rGridScale * 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
 

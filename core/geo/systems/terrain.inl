@@ -63,7 +63,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		simulation.minHorizontalErosionSlope = terrain.simulation.minHorizontalErosionSlope;
 		simulation.horizontalErosionStrength = terrain.simulation.horizontalErosionStrength;
-		simulation.minSplitDamage = terrain.simulation.minSplitDamage;
+		//simulation.minSplitDamage = terrain.simulation.minSplitDamage;
 		simulation.splitSize = terrain.simulation.splitSize;
 		simulation.damageRecovery = terrain.simulation.damageRecovery;
 

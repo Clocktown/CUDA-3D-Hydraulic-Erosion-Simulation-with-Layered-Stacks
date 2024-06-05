@@ -9,12 +9,12 @@ struct Simulation
 {
 	float deltaTime{ 0.150f }; // [s]
 	float gravity{ -9.81f }; // [m/s²]
-	float rain{ 0.07f }; // [m/(m²s)]
-	float evaporation{ 0.01f }; // [1/s]
-	float petrification{ 0.0005f }; // [1/s]
+	float rain{ 0.07f }; // [m/s]
+	float evaporation{ 0.09f }; // [m/s]
+	float petrification{ 0.0001f }; // [1/s]
 
-	glm::vec4 sourceStrengths{ 0.f }; // [m/(m²s)]
-	glm::ivec2 sourceLocations[4]{ {0,0},{0,0},{0,0},{0,0} }; // index
+	glm::vec4 sourceStrengths{ 0.f }; // [m/s]
+	glm::vec2 sourceLocations[4]{ {0,0},{0,0},{0,0},{0,0} }; // index
 	glm::vec4 sourceSize; // m, radius
 
 	float sedimentCapacityConstant{ 0.1f };
@@ -35,7 +35,7 @@ struct Simulation
 
 	float minHorizontalErosionSlope{ 0.9f }; // sin(alpha)
 	float horizontalErosionStrength{ 0.1f };
-	float minSplitDamage{ 2.0f };
+	//float minSplitDamage{ 2.0f };
 	float splitSize{ 0.75f };
 	float damageRecovery{ 0.005f };
 

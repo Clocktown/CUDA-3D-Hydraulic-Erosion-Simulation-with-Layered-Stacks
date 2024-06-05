@@ -27,11 +27,11 @@ __global__ void rainKernel()
 	float water = simulation.heights[flatIndex].z;
 
 	for (int i = 0; i < 4; ++i) {
-		const glm::vec2 dVec = glm::vec2(simulation.sourceLocations[i] - index);
+		const glm::vec2 dVec = simulation.sourceLocations[i] - glm::vec2(index) * simulation.gridScale;
 		const float d2 = glm::dot(dVec, dVec);
 		const float r2 = simulation.sourceSize[i] * simulation.sourceSize[i];
 		if (d2 <= r2 && r2 > 0.f) {
-			water += /*(1.f - (r2 - d2) / r2) */ 2.f * noiseVal * simulation.sourceStrengths[i] * simulation.gridScale * simulation.gridScale * simulation.deltaTime;
+			water += 2.f * noiseVal * simulation.sourceStrengths[i]  * simulation.deltaTime;
 		}
 	}
 

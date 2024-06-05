@@ -70,7 +70,7 @@ __global__ void horizontalErosionKernel()
 
 				if (split.y - split.x > 0.f && neighbor.water < height[BEDROCK])
 				{
-					const float area{ 1.f };// { (split.y - split.x) /** simulation.gridScale*/ }; // gridScale here is wrong, I think
+					const float area{ (split.y - split.x) * simulation.gridScale };
 					const float heightDifference{ glm::min(height[BEDROCK], neighbor.height[CEILING]) /*height[BEDROCK]*/ - neighbor.sand};
 					const float sinSlope{ floor > neighbor.sand ? 1.f : sin(atan2(heightDifference, simulation.gridScale)) };
 					const float t = glm::smoothstep(simulation.minHorizontalErosionSlope, 1.f, sinSlope); // see sedimentKernel for a plot of the function
@@ -160,7 +160,7 @@ __global__ void sedimentKernel()
 		const float slope{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * actualSlope * (1.f - t)};
 		const float speed{ simulation.minTerrainSlopeScale + (simulation.maxTerrainSlopeScale - simulation.minTerrainSlopeScale) * glm::length(glm::cuda_cast(simulation.velocities[flatIndex])) };
 		float waterScale{ glm::clamp(1.f - tanhf(height[WATER] * simulation.erosionWaterScale), 0.f, 1.f) };
-		waterScale = glm::mix(0.f, waterScale, glm::min(100.f * height[WATER], 1.f));
+		waterScale = glm::mix(0.f, waterScale, glm::min(1000.f * height[WATER], 1.f)); // Full Erosion reached at 1mm Water Height
 		const float topErosionWaterScale{ glm::max(1.0f - glm::max(simulation.iTopErosionWaterScale * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f), 0.0f)};
 		const float topBedrockScale{ simulation.bedrockDissolvingConstant * speed * topErosionWaterScale * simulation.minTerrainSlopeScale };
 		const float bedrockScale{ glm::max(1.0f - height[SAND] * simulation.iSandThreshold, 0.0f) * simulation.bedrockDissolvingConstant * slope * speed * waterScale };
@@ -225,7 +225,7 @@ __global__ void damageKernel()
 		const glm::vec2 split{ glm::cuda_cast(simulation.splits[flatIndex]) };
 		const float damage{ simulation.damages[flatIndex] };
 
-		if (damage < simulation.minSplitDamage || layerCount == simulation.maxLayerCount)
+		if (damage < simulation.splitSize || layerCount == simulation.maxLayerCount)
 		{
 			continue;
 		}
@@ -257,7 +257,7 @@ __global__ void damageKernel()
 		simulation.fluxes[below] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		//simulation.stability[below] = FLT_MAX;
 		simulation.sediments[below] = 0.0f;
-		simulation.damages[below] = 0.0f;
+		simulation.damages[below] = glm::max(damage - simulation.splitSize, 0.f);
 
 		++layer;
 	}

@@ -279,22 +279,12 @@ void UI::updateSimulation()
 			ImGui::Checkbox("Use Outflow Borders", &simulation.useOutflowBorders);
 			ImGui::DragFloat("Delta Time [s]", &simulation.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Gravity [m/s^2]", &simulation.gravity, 0.1f);
-			ImGui::DragFloat("Rain [m/(m^2 * s)]", &simulation.rain, 0.01f, 0.0f, std::numeric_limits<float>::max());
+			ImGui::DragFloat("Rain [m/s]", &simulation.rain, 0.001f, 0.0f, std::numeric_limits<float>::max(), "%.4f");
 
-			float evaporation{ 100.0f * simulation.evaporation };
-
-			if (ImGui::DragFloat("Evaporation [%/s]", &evaporation, 0.5f, 0.0f, std::numeric_limits<float>::max()))
-			{
-				simulation.evaporation = 0.01f * evaporation;
-			}
+			ImGui::DragFloat("Evaporation [m/s]", &simulation.evaporation, 0.001f, 0.0f, std::numeric_limits<float>::max(), "%.4f");
 			ImGui::DragFloat("Evaporation ceiling falloff", &simulation.evaporationEmptySpaceScale, 0.01f, 0.f, 100.f);
 
-			float petrification{ 100.0f * simulation.petrification };
-
-			if (ImGui::DragFloat("Petrification [%/s]", &petrification, 0.01f, 0.0f, std::numeric_limits<float>::max()))
-			{
-				simulation.petrification = 0.01f * petrification;
-			}
+			ImGui::DragFloat("Petrification [m/(s*m)]", &simulation.petrification, 0.0001f, 0.0f, std::numeric_limits<float>::max(), "%.5f");
 
 			for (int i = 0; i < 4; ++i) {
 				std::string label = "Source ";
@@ -302,7 +292,7 @@ void UI::updateSimulation()
 				if (ImGui::TreeNode(label.c_str())) {
 					ImGui::DragFloat("Strength", &simulation.sourceStrengths[i], 0.01f, 0.0f, std::numeric_limits<float>::max());
 					ImGui::DragFloat("Radius", &simulation.sourceSize[i], 0.01f, 0.0f, 1000.f);
-					ImGui::DragInt2("Location", &simulation.sourceLocations[i].x, 0.1f, 0, glm::max(terrain.gridSize.x, terrain.gridSize.y));
+					ImGui::DragFloat2("Location", &simulation.sourceLocations[i].x, 0.1f, 0.f, terrain.gridScale * glm::max(terrain.gridSize.x, terrain.gridSize.y));
 
 					ImGui::TreePop();
 				}
@@ -371,7 +361,7 @@ void UI::updateSimulation()
 
 			ImGui::DragFloat("Min. Horizontal Erosion Slope (sine)", &simulation.minHorizontalErosionSlope, 0.001f, 0.0f, 1.f);
 			ImGui::DragFloat("Horizontal Erosion Strength", &simulation.horizontalErosionStrength, 0.001f, 0.0f, std::numeric_limits<float>::max());
-			ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
+			//ImGui::DragFloat("Min. Split Damage", &simulation.minSplitDamage, 0.1f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Split Size", &simulation.splitSize, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Damage Recovery Rate", &simulation.damageRecovery, 0.001f, 0.0f, 1.0f);
 
@@ -553,7 +543,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Simulation/MinHorizontalErosionSlope"] = simulation.minHorizontalErosionSlope;
 	json["Simulation/VerticalErosionSlopeFadeStart"] = simulation.verticalErosionSlopeFadeStart;
 	json["Simulation/HorizontalErosionStrength"] = simulation.horizontalErosionStrength;
-	json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
+	//json["Simulation/MinSplitDamage"] = simulation.minSplitDamage;
 	json["Simulation/SplitSize"] = simulation.splitSize;
 	json["Simulation/DamageRecovery"] = simulation.damageRecovery;
 	json["Simulation/EnableVerticalErosion"] = simulation.verticalErosionEnabled;
@@ -672,7 +662,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	simulation.minHorizontalErosionSlope = json["Simulation/MinHorizontalErosionSlope"];
 	simulation.verticalErosionSlopeFadeStart = json["Simulation/VerticalErosionSlopeFadeStart"];
 	simulation.horizontalErosionStrength = json["Simulation/HorizontalErosionStrength"];
-	simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
+	//simulation.minSplitDamage = json["Simulation/MinSplitDamage"];
 	simulation.splitSize = json["Simulation/SplitSize"];
 	simulation.damageRecovery = json["Simulation/DamageRecovery"];
 	simulation.verticalErosionEnabled = json["Simulation/EnableVerticalErosion"];
