@@ -204,10 +204,10 @@ __global__ void transportKernel()
 		// avgWater = 0.5f * (avgWater + height[WATER]);
 		const glm::vec2 velocity{ simulation.rGridScale * simulation.rGridScale * 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
 
-		const float mag = glm::length(velocity);
-		if (layer == (layerCount - 1) && index.x ==  int(glm::ceil(70.f/256.f)) && index.y == 0) {
-			printf("%f\n", mag);
-		}
+		//const float mag = glm::length(velocity);
+		//if (layer == (layerCount - 1) && index.x ==  int(glm::ceil(70.f/256.f)) && index.y == 0) {
+		//	printf("%f\n", mag);
+		//}
 
 		if constexpr (enableSlippage) {
 			height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);
