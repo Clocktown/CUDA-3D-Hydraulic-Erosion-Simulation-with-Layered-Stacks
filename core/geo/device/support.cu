@@ -75,7 +75,7 @@ namespace geo
 				float stability = simulation.stability[itFlatIndex];
 				const float floor = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING];
 				const float bedrockBelow = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[BEDROCK];
-				isTooClose = layer > 0 && floor - bedrockBelow < simulation.splitSize;
+				isTooClose = (layer > 0) && ((floor - bedrockBelow) < 0.05 * simulation.splitSize);
 				const bool isTooThin = heights[BEDROCK] - floor <= simulation.minBedrockThickness;
 				stability = (isTooThin || isTooClose) ? 0.f : stability;
 				if (stability <= 0.f) {

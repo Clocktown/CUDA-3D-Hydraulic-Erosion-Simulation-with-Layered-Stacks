@@ -140,7 +140,7 @@ void update()
 
 	GLuint64 timeElapsed{ 0 };
 
-	if (ui.performance.measureRendering) {
+	if (ui.rendering.renderScene && ui.performance.measureRendering) {
 		glGetQueryObjectui64v(oglQuery, GL_QUERY_RESULT_NO_WAIT, &timeElapsed);
 		if (timeElapsed > 0) {
 			ui.performance.measurements["Rendering"].update(timeElapsed / 1000000.0);
@@ -152,13 +152,15 @@ void update()
 	onec::updateViewMatrices(entt::exclude<onec::Static>);
 	onec::updateProjectionMatrices();
 
-	renderPipeline.update();
-	renderPipeline.render();
+	if (ui.rendering.renderScene) {
+		renderPipeline.update();
+		renderPipeline.render();
+	}
 
 	ui.performance.measureAll();
 	ui.performance.measurements["Frametime"].update(onec::getApplication().getUnscaledDeltaTime() * 1000.f);
 
-	if (ui.performance.measureRendering) {
+	if (ui.rendering.renderScene && ui.performance.measureRendering) {
 		glEndQuery(GL_TIME_ELAPSED);
 	}
 }

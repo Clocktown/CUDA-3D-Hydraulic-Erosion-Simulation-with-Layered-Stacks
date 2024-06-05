@@ -163,12 +163,14 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if(perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].stop();
 	    }
 
-		if (perf.measureRendering) perf.measurements["Build Draw List"].start();
-		terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
-		if (perf.measureRendering) perf.measurements["Build Draw List"].stop();
+		if (ui->rendering.renderScene) {
+			if (perf.measureRendering) perf.measurements["Build Draw List"].start();
+			terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
+			if (perf.measureRendering) perf.measurements["Build Draw List"].stop();
 
-		PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
-		pointRenderer.count = terrain.numValidColumns;
+			PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
+			pointRenderer.count = terrain.numValidColumns;
+		}
 	}
 }
 

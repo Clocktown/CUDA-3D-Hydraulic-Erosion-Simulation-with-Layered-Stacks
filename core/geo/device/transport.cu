@@ -202,12 +202,12 @@ __global__ void transportKernel()
 		const float evaporationScale = glm::clamp(simulation.iEvaporationEmptySpaceScale * (height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.01f, 1.0f);
 		height[WATER] = glm::max((1.0f - simulation.evaporation * evaporationScale * simulation.deltaTime) * height[WATER], 0.0f);
 		// avgWater = 0.5f * (avgWater + height[WATER]);
-		const glm::vec2 velocity{ 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
+		const glm::vec2 velocity{ simulation.rGridScale * simulation.rGridScale * 0.5f * glm::vec2(flux[RIGHT] - flux[LEFT], flux[UP] - flux[DOWN]) };
 
-		//const float mag = glm::length(velocity);
-		//if (layer == 1 && index.x == 128 && index.y == 128) {
-		//	printf("%f\n", mag);
-		//}
+		const float mag = glm::length(velocity);
+		if (layer == (layerCount - 1) && index.x ==  int(glm::ceil(70.f/256.f)) && index.y == 0) {
+			printf("%f\n", mag);
+		}
 
 		if constexpr (enableSlippage) {
 			height[SAND] = glm::clamp(height[SAND] - (slippage.x + slippage.y + slippage.z + slippage.w), 0.0f, height[CEILING] - height[BEDROCK] - height[WATER]);

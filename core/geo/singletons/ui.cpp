@@ -345,14 +345,14 @@ void UI::updateSimulation()
 
 			float minSlopeErosionScale{ simulation.minSlopeErosionScale };
 
-			if (ImGui::DragFloat("Min. Slope Erosion Scale", &minSlopeErosionScale, 0.001f, 0.0f, 1.0f))
+			if (ImGui::DragFloat("Min. Slope/Velocity Erosion Scale", &minSlopeErosionScale, 0.001f, 0.0f, 1.0f))
 			{
 				simulation.minSlopeErosionScale = minSlopeErosionScale;
 			}
 
 			float maxSlopeErosionScale{ simulation.maxSlopeErosionScale };
 
-			if (ImGui::DragFloat("Max. Slope Erosion Scale", &maxSlopeErosionScale, 0.001f, minSlopeErosionScale, 10.0f))
+			if (ImGui::DragFloat("Max. Slope/Velocity Erosion Scale", &maxSlopeErosionScale, 0.001f, minSlopeErosionScale, 10.0f))
 			{
 				simulation.maxSlopeErosionScale = maxSlopeErosionScale;
 			}
@@ -402,6 +402,8 @@ void UI::updateSimulation()
 
 void UI::updateRendering()
 {
+	ImGui::Checkbox("##doRender", &rendering.renderScene);
+	ImGui::SameLine();
 	if (ImGui::TreeNode("Rendering"))
 	{
 		if (ImGui::Button("Reload Shaders")) {

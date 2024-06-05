@@ -32,6 +32,7 @@ struct UI
 		int useInterpolation{ true };
 		int renderSand{ true };
 		int renderWater{ true };
+		bool renderScene{ true };
 	} rendering;
 
 	performance performance{};
