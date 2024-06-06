@@ -75,9 +75,9 @@ __global__ void pipeKernel()
 				neighbor.sand = neighbor.height[BEDROCK] + neighbor.height[SAND];
 				neighbor.water = neighbor.sand + neighbor.height[WATER];
 
-				if (height[BEDROCK] < neighbor.height[CEILING] && (neighbor.water + 100.f * glm::epsilon<float>()) < neighbor.height[CEILING])
+				if (height[BEDROCK] < neighbor.height[CEILING] && (neighbor.water + glm::epsilon<float>()) < neighbor.height[CEILING])
 				{
-					const float deltaHeight{ water - glm::max(neighbor.water, sand)  };
+					const float deltaHeight{ glm::min(water, neighbor.height[CEILING]) - glm::max(neighbor.water, sand)  };
 					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; // dynamic?
 
 					pipe[i] = static_cast<char>(neighbor.layer);
@@ -86,8 +86,8 @@ __global__ void pipeKernel()
 
 					if (neighbor.height[CEILING] < FLT_MAX)
 					{
-						const float freeSpace{ glm::max((neighbor.height[CEILING] - neighbor.water) * simulation.gridScale * simulation.gridScale, 0.f) };
-						const float takenSpace{ flux[i] * simulation.deltaTime };
+						const float freeSpace{ glm::max((neighbor.height[CEILING] - neighbor.water), 0.f) };
+						const float takenSpace{ flux[i] * simulation.rGridScale * simulation.rGridScale * simulation.deltaTime };
 
 						flux[i] *= glm::min(freeSpace / (takenSpace + glm::epsilon<float>()), 1.0f);
 					}

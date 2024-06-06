@@ -27,7 +27,7 @@ struct Simulation
 	float sandThreshold{ 0.01f };
 
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
-	float wetTalusAngle{ glm::radians(10.0f) }; // [rad]
+	float wetTalusAngle{ glm::radians(5.0f) }; // [rad]
 	float slippageInterpolationRange{ 1.f };
 	float verticalErosionSlopeFadeStart{ 0.6f }; // sin(alpha)
 	float topErosionWaterScale{ 2.f };
