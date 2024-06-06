@@ -75,7 +75,7 @@ __global__ void pipeKernel()
 				neighbor.sand = neighbor.height[BEDROCK] + neighbor.height[SAND];
 				neighbor.water = neighbor.sand + neighbor.height[WATER];
 
-				if (sand < neighbor.height[CEILING] && (neighbor.water + 100.f * glm::epsilon<float>()) < neighbor.height[CEILING])
+				if (height[BEDROCK] < neighbor.height[CEILING] && (neighbor.water + 100.f * glm::epsilon<float>()) < neighbor.height[CEILING])
 				{
 					const float deltaHeight{ water - glm::max(neighbor.water, sand)  };
 					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; // dynamic?
