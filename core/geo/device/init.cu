@@ -36,7 +36,7 @@ __global__ void initKernel()
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 
 
-	/*float bedrockHeight = 0.f;
+	float bedrockHeight = 0.f;
 	if (index.x > (64.f/256.f) * simulation.gridSize.x) {
 		bedrockHeight = 50.f;
 	}
@@ -49,7 +49,7 @@ __global__ void initKernel()
 	simulation.heights[flatIndex] = float4{ bedrockHeight, 0.0f, 0.0f, FLT_MAX};
 	simulation.sediments[flatIndex] = 0.0f;
 	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	simulation.damages[flatIndex] = 0.0f;*/
+	simulation.damages[flatIndex] = 0.0f;
 
 	/*float bedrockHeight = 0.f;
 	if (index.x > (64.f/256.f) * simulation.gridSize.x) {
@@ -67,7 +67,7 @@ __global__ void initKernel()
 	simulation.damages[flatIndex] = 0.0f;
 	*/
 
-	const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
+	/*const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
 	const float noiseVal2 = 10.f * (1.f + fbm(index, 8, 0.005f * simulation.gridScale, 69));
 
 	if (float(index.x) / simulation.gridSize.x  > 0.25f)
@@ -90,7 +90,7 @@ __global__ void initKernel()
 		simulation.sediments[flatIndex] = 0.0f;
 		simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 		simulation.damages[flatIndex] = 0.0f;
-	}
+	}*/
 }
 
 void init(const Launch& launch)

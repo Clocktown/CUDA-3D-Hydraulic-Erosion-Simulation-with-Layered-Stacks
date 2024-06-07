@@ -27,7 +27,7 @@ __global__ void horizontalErosionKernel()
 		const float water{ sand + height[WATER] };
 		float damage{ simulation.damages[flatIndex] };
 
-		glm::vec4 erosions{ 0.0f };
+		//glm::vec4 erosions{ 0.0f };
 		float maxErosion{ 0.0f };
 		glm::vec2 maxSplit{ floor, height[BEDROCK] };
 
@@ -68,7 +68,7 @@ __global__ void horizontalErosionKernel()
 
 				const glm::vec2 split{ glm::max(floor, neighbor.sand), glm::min(height[BEDROCK], neighbor.water) };
 
-				if (split.y - split.x > 0.f && neighbor.water < height[BEDROCK])
+				if (split.y - split.x > 0.f)//&& neighbor.water < height[BEDROCK])
 				{
 					const float area{ (split.y - split.x) * simulation.gridScale };
 					const float heightDifference{ glm::min(height[BEDROCK], neighbor.height[CEILING]) /*height[BEDROCK]*/ - neighbor.sand};
@@ -81,11 +81,11 @@ __global__ void horizontalErosionKernel()
 					// TODO: Test this again
 					const float attenuation { 0.5f - 0.5f * glm::dot(normal, velocity / (speed + glm::epsilon<float>()))};
 					
-					erosions[i] = simulation.horizontalErosionStrength * slopeScale * speed * attenuation * area * integrationScale;
+					const float erosion = simulation.horizontalErosionStrength * slopeScale * speed * attenuation * area * integrationScale;
 					
-					if (erosions[i] > maxErosion)
+					if (erosion > maxErosion)
 					{
-						maxErosion = erosions[i];
+						maxErosion = erosion;
 						maxSplit = split;
 					}
 
