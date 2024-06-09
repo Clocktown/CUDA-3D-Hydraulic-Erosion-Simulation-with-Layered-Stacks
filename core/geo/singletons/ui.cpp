@@ -47,7 +47,7 @@ void UI::update()
 }
 
 void UI::updatePerformance() {
-	ImGui::LabelText("Frametime", "%f [ms]", performance.measurements["Frametime"].mean);
+	ImGui::LabelText("Frametime", "%f / %f / %f / %f [ms]", performance.measurements["Frametime"].last, performance.measurements["Frametime"].mean, performance.measurements["Frametime"].minimum, performance.measurements["Frametime"].maximum);
 
 	if (ImGui::TreeNode("Performance")) {
 		onec::World& world{onec::getWorld()};
@@ -77,35 +77,98 @@ void UI::updatePerformance() {
 		float endSupport = performance.measurements["End Support Check"].mean;
 		float stepSupport = performance.measurements["Step Support Check"].mean;
 		float startSupport = performance.measurements["Start Support Check"].mean;
-		float support = performance.measureIndividualKernels ? (float(simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationSteps) * (startSupport + endSupport) + stepSupport : performance.measurements["Support"].mean;
+		float support = performance.measureIndividualKernels ? (float(terrain.gridScale * 2.f * simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationDistance) * (startSupport + endSupport) + stepSupport : performance.measurements["Support"].mean;
 
 		float totalSim = (performance.measureParts || performance.measureIndividualKernels) ? rain + transport + erosion + support : performance.measurements["Global Simulation"].mean;
 
-		ImGui::LabelText("Total Simulation", "%f [ms]", totalSim);
+
+		float rainMin = performance.measurements["Rain"].minimum;
+
+		float setupPipesMin = performance.measurements["Setup Pipes"].minimum;
+		float resolvePipesMin = performance.measurements["Resolve Pipes"].minimum;
+		float transportMin = performance.measureIndividualKernels ? setupPipesMin + resolvePipesMin : performance.measurements["Transport"].minimum;
+
+		float horizontalErosionMin = performance.measurements["Horizontal Erosion"].minimum;
+		float splitKernelMin = performance.measurements["Split Kernel"].minimum;
+		float verticalErosionMin = performance.measurements["Vertical Erosion"].minimum;
+		float erosionMin = performance.measureIndividualKernels ? horizontalErosionMin + splitKernelMin + verticalErosionMin : performance.measurements["Erosion"].minimum;
+
+		float endSupportMin = performance.measurements["End Support Check"].minimum;
+		float stepSupportMin = performance.measurements["Step Support Check"].minimum;
+		float startSupportMin = performance.measurements["Start Support Check"].minimum;
+		float supportMin = performance.measureIndividualKernels ? (float(terrain.gridScale * 2.f * simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationDistance) * (startSupportMin + endSupportMin) + stepSupportMin : performance.measurements["Support"].minimum;
+
+		float totalSimMin = (performance.measureParts || performance.measureIndividualKernels) ? rainMin + transportMin + erosionMin + supportMin : performance.measurements["Global Simulation"].minimum;
+		
+		
+		float rainMax = performance.measurements["Rain"].maximum;
+
+		float setupPipesMax = performance.measurements["Setup Pipes"].maximum;
+		float resolvePipesMax = performance.measurements["Resolve Pipes"].maximum;
+		float transportMax = performance.measureIndividualKernels ? setupPipesMax + resolvePipesMax : performance.measurements["Transport"].maximum;
+
+		float horizontalErosionMax = performance.measurements["Horizontal Erosion"].maximum;
+		float splitKernelMax = performance.measurements["Split Kernel"].maximum;
+		float verticalErosionMax = performance.measurements["Vertical Erosion"].maximum;
+		float erosionMax = performance.measureIndividualKernels ? horizontalErosionMax + splitKernelMax + verticalErosionMax : performance.measurements["Erosion"].maximum;
+
+		float endSupportMax = performance.measurements["End Support Check"].maximum;
+		float stepSupportMax = performance.measurements["Step Support Check"].maximum;
+		float startSupportMax = performance.measurements["Start Support Check"].maximum;
+		float supportMax = performance.measureIndividualKernels ? (float(terrain.gridScale * 2.f * simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationDistance) * (startSupportMax + endSupportMax) + stepSupportMax : performance.measurements["Support"].maximum;
+
+		float totalSimMax = (performance.measureParts || performance.measureIndividualKernels) ? rainMax + transportMax + erosionMax + supportMax : performance.measurements["Global Simulation"].maximum;
+		
+
+		float rainLast = performance.measurements["Rain"].last;
+
+		float setupPipesLast = performance.measurements["Setup Pipes"].last;
+		float resolvePipesLast = performance.measurements["Resolve Pipes"].last;
+		float transportLast = performance.measureIndividualKernels ? setupPipesLast + resolvePipesLast : performance.measurements["Transport"].last;
+
+		float horizontalErosionLast = performance.measurements["Horizontal Erosion"].last;
+		float splitKernelLast = performance.measurements["Split Kernel"].last;
+		float verticalErosionLast = performance.measurements["Vertical Erosion"].last;
+		float erosionLast = performance.measureIndividualKernels ? horizontalErosionLast + splitKernelLast + verticalErosionLast : performance.measurements["Erosion"].last;
+
+		float endSupportLast = performance.measurements["End Support Check"].last;
+		float stepSupportLast = performance.measurements["Step Support Check"].last;
+		float startSupportLast = performance.measurements["Start Support Check"].last;
+		float supportLast = performance.measureIndividualKernels ? (float(terrain.gridScale * 2.f * simulation.stabilityPropagationStepsPerIteration) / simulation.maxStabilityPropagationDistance) * (startSupportLast + endSupportLast) + stepSupportLast : performance.measurements["Support"].last;
+
+		float totalSimLast = (performance.measureParts || performance.measureIndividualKernels) ? rainLast + transportLast + erosionLast + supportLast : performance.measurements["Global Simulation"].last;
+		
+		
+		ImGui::LabelText("Total Simulation", "%f / %f / %f / %f [ms]", totalSimLast, totalSim, totalSimMin, totalSimMax);
 		if (ImGui::TreeNode("Simulation Details")) {
-			ImGui::LabelText("Rain", "%f [ms]", rain);
-			ImGui::LabelText("Transport", "%f [ms]", transport);
+			ImGui::LabelText("Rain", "%f / %f / %f / %f [ms]", rainLast, rain, rainMin, rainMax);
+			ImGui::LabelText("Transport", "%f / %f / %f / %f [ms]", transportLast, transport, transportMin, transportMax);
 			if (ImGui::TreeNode("Transport Details")) {
-				ImGui::LabelText("Setup Pipes", "%f [ms]", setupPipes);
-				ImGui::LabelText("Resolve Pipes", "%f [ms]", resolvePipes);
+				ImGui::LabelText("Setup Pipes", "%f / %f / %f / %f [ms]", setupPipesLast, setupPipes, setupPipesMin, setupPipesMax);
+				ImGui::LabelText("Resolve Pipes", "%f / %f / %f / %f [ms]", resolvePipesLast, resolvePipes, resolvePipesMin, resolvePipesMax);
 			
 				ImGui::TreePop();
 			}
 
-			ImGui::LabelText("Erosion", "%f [ms]", erosion);
+			ImGui::LabelText("Erosion", "%f / %f / %f / %f [ms]", erosionLast, erosion, erosionMin, erosionMax);
 			if (ImGui::TreeNode("Erosion Details")) {
-				ImGui::LabelText("Horizontal Erosion", "%f [ms]", horizontalErosion);
-				ImGui::LabelText("Split Kernel", "%f [ms]", splitKernel);
-				ImGui::LabelText("Vertical Erosion", "%f [ms]", verticalErosion);
+				ImGui::LabelText("Horizontal Erosion", "%f / %f / %f / %f [ms]", horizontalErosionLast, horizontalErosion, horizontalErosionMin, horizontalErosionMax);
+				ImGui::LabelText("Split Kernel", "%f / %f / %f / %f [ms]", splitKernelLast, splitKernel, splitKernelMin, splitKernelMax);
+				ImGui::LabelText("Vertical Erosion", "%f / %f / %f / %f [ms]", verticalErosionLast, verticalErosion, verticalErosionMin, verticalErosionMax);
 			
 				ImGui::TreePop();
 			}
 
-			ImGui::LabelText("Support", "%f [ms]", support);
+			ImGui::LabelText("Support", "%f / %f / %f / %f [ms]", supportLast, support, supportMin, supportMax);
 			if (ImGui::TreeNode("Support Details")) {
-				ImGui::LabelText("Start Support Check", "%f [ms]", startSupport);
-				ImGui::LabelText("Step Support Check", "%f [ms]", stepSupport / simulation.stabilityPropagationStepsPerIteration);
-				ImGui::LabelText("End Support Check", "%f [ms]", endSupport);
+				ImGui::LabelText("Start Support Check", "%f / %f / %f / %f [ms]", startSupportLast, startSupport, startSupportMin, startSupportMax);
+				ImGui::LabelText("Step Support Check", "%f / %f / %f / %f [ms]", 
+					stepSupportLast / simulation.stabilityPropagationStepsPerIteration,
+					stepSupport / simulation.stabilityPropagationStepsPerIteration,
+					stepSupportMin / simulation.stabilityPropagationStepsPerIteration,
+					stepSupportMax / simulation.stabilityPropagationStepsPerIteration
+				);
+				ImGui::LabelText("End Support Check", "%f / %f / %f / %f [ms]", endSupportLast, endSupport, endSupportMin, endSupportMax);
 			
 				ImGui::TreePop();
 			}
@@ -113,10 +176,25 @@ void UI::updatePerformance() {
 			ImGui::TreePop();
 		}
 
-		ImGui::LabelText("Total Rendering", "%f [ms]", performance.measurements["Rendering"].mean + performance.measurements["Build Draw List"].mean);
+		ImGui::LabelText("Total Rendering", "%f / %f / %f / %f [ms]", 
+			performance.measurements["Rendering"].last + performance.measurements["Build Draw List"].last,
+			performance.measurements["Rendering"].mean + performance.measurements["Build Draw List"].mean,
+			performance.measurements["Rendering"].minimum + performance.measurements["Build Draw List"].minimum,
+			performance.measurements["Rendering"].maximum + performance.measurements["Build Draw List"].maximum
+		);
 		if (ImGui::TreeNode("Rendering Details")) {
-			ImGui::LabelText("Draw Call", "%f [ms]", performance.measurements["Rendering"].mean);
-			ImGui::LabelText("Build Draw List", "%f [ms]", performance.measurements["Build Draw List"].mean);
+			ImGui::LabelText("Draw Call", "%f / %f / %f / %f [ms]", 
+				performance.measurements["Rendering"].last,
+				performance.measurements["Rendering"].mean,
+				performance.measurements["Rendering"].minimum,
+				performance.measurements["Rendering"].maximum
+			);
+			ImGui::LabelText("Build Draw List", "%f / %f / %f / %f [ms]", 
+				performance.measurements["Build Draw List"].last,
+				performance.measurements["Build Draw List"].mean,
+				performance.measurements["Build Draw List"].minimum,
+				performance.measurements["Build Draw List"].maximum
+			);
 
 			ImGui::TreePop();
 		}
@@ -382,7 +460,7 @@ void UI::updateSimulation()
 			ImGui::DragFloat("Bedrock support", &simulation.bedrockSupport);
 			ImGui::DragFloat("Border support", &simulation.borderSupport);
 			ImGui::DragFloat("Min. Bedrock Thickness", &simulation.minBedrockThickness);
-			ImGui::DragInt("Max. stability propagation steps", &simulation.maxStabilityPropagationSteps);
+			ImGui::DragFloat("Max. stability propagation distance", &simulation.maxStabilityPropagationDistance);
 			ImGui::DragInt("Stability propagation steps per iteration", &simulation.stabilityPropagationStepsPerIteration);
 
 			ImGui::TreePop();

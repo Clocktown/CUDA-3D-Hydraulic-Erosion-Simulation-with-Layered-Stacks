@@ -32,7 +32,7 @@ struct Simulation
 	float sandThreshold{ 0.01f };
 
 	float dryTalusAngle{ glm::radians(30.0f) }; // [rad]
-	float wetTalusAngle{ glm::radians(5.0f) }; // [rad]
+	float wetTalusAngle{ glm::radians(0.0f) }; // [rad]
 	float slippageInterpolationRange{ 1.f };
 	float verticalErosionSlopeFadeStart{ 0.6f }; // sin(alpha)
 	float topErosionWaterScale{ 2.f };
@@ -48,11 +48,11 @@ struct Simulation
 	float sandDensity{ 1600.f }; // [kg/m³]
 	float waterDensity{ 1000.f }; // [kg/m³]
 	// Water weight will be ignored since water level is constantly changing
-	float bedrockSupport{ 4000.f }; // [kg/m²] - how much weight a given surface of bedrock can support
-	float borderSupport{ 4000.f }; // [kg/m²]
+	float bedrockSupport{ 60000.f }; // [kg/m²] - how much weight a given surface of bedrock can support
+	float borderSupport{ 60000.f }; // [kg/m²]
 	float minBedrockThickness{ 1.f };
-	int maxStabilityPropagationSteps{ 100 };
-	int stabilityPropagationStepsPerIteration{ 10 };
+	float maxStabilityPropagationDistance{ 100.f }; // m
+	int stabilityPropagationStepsPerIteration{ 5 };
 	int currentStabilityStep{ 0 };
 	int currentSimulationStep{ 0 };
 

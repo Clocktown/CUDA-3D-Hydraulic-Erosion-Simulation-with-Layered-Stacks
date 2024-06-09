@@ -135,7 +135,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			}
 			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Support"].start();
 			if (terrain.simulation.supportCheckEnabled) {
-				if (terrain.simulation.currentStabilityStep >= terrain.simulation.maxStabilityPropagationSteps)
+				if (2.f * terrain.simulation.currentStabilityStep >= (terrain.simulation.maxStabilityPropagationDistance * simulation.rGridScale))
 				{
 					if (perf.measureIndividualKernels) perf.measurements["End Support Check"].start();
 					device::endSupportCheck(launch);

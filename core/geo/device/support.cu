@@ -125,7 +125,7 @@ namespace geo
 		}
 
 		template<bool UseWeight>
-		__global__ void stepSupportCheckKernel()//int i)
+		__global__ void stepSupportCheckKernel(int i)
 		{
 			const glm::ivec2 index{ getLaunchIndex() };
 
@@ -134,9 +134,9 @@ namespace geo
 				return;
 			}
 
-			//if ((index.x + ((index.y + i) % 2)) % 2 == 0) {
-			//	return; // Checkerboard update to avoid race conditions (evil hack)
-			//}
+			if ((index.x + ((index.y + i) % 2)) % 2 == 0) {
+				return; // Checkerboard update to avoid race conditions (evil hack)
+			}
 
 			int flatIndex{ flattenIndex(index, simulation.gridSize) };
 			const int layerCount{ simulation.layerCounts[flatIndex] };
@@ -152,11 +152,15 @@ namespace geo
 				oldStability = (oldStability == FLT_MAX) ? 0.f : oldStability; // If layer 0 is split in horizontal Erosion, layer 1 can have FLT_MAX as stability. Check might not really be necessary though
 				float stability = 0.f;
 
-				float weight = fmaxf((bedrockMax - bedrockMin) * simulation.bedrockDensity +
+
+				const float thickness = (bedrockMax - bedrockMin);
+				const float iThickness = thickness > glm::epsilon<float>() ? 1.f / thickness : 0.f;
+				float weight = fmaxf(thickness * simulation.bedrockDensity +
 									heights[SAND] * simulation.sandDensity +
 									heights[WATER] * simulation.waterDensity
 					, 0.f);
 				weight *= simulation.gridScale * simulation.gridScale;
+				
 
 				struct
 				{
@@ -168,6 +172,8 @@ namespace geo
 					float bedrockMax;
 					float stability;
 				} neighbor;
+
+				float support = 0.f;
 
 				for (int i{ 0 }; i < 4; ++i)
 				{
@@ -184,6 +190,8 @@ namespace geo
 
 					neighbor.bedrockMin = -FLT_MAX;
 
+
+
 					for (neighbor.layer = 0; neighbor.layer < neighbor.layerCount; ++neighbor.layer, neighbor.flatIndex += simulation.layerStride)
 					{
 						auto heights = glm::cuda_cast(simulation.heights[neighbor.flatIndex]);
@@ -191,9 +199,9 @@ namespace geo
 						neighbor.bedrockMax = ((float*)(simulation.heights + neighbor.flatIndex))[BEDROCK];
 
 						float overlap = fminf(neighbor.bedrockMax, bedrockMax) - fmaxf(neighbor.bedrockMin, bedrockMin);
-						if (overlap > 0.f && neighbor.stability > oldStability) {
-							float support = simulation.gridScale * overlap * simulation.bedrockSupport;
-							stability += fminf(support, neighbor.stability);
+						if (overlap > 0.f) {
+							float oSupport = simulation.gridScale * overlap * overlap * iThickness * simulation.bedrockSupport;
+							support = fmaxf(fminf(oSupport, neighbor.stability), support);
 						}
 
 						neighbor.bedrockMin = ((float*)(simulation.heights + neighbor.flatIndex))[CEILING];
@@ -201,10 +209,10 @@ namespace geo
 				}
 
 				if constexpr (UseWeight) {
-					stability = fmaxf(stability - weight, oldStability);
+					stability = fmaxf(support - weight, oldStability);
 				}
 				else {
-					stability = fmaxf(stability, oldStability);
+					stability = fmaxf(support, oldStability);
 					stability = stability > 0.f ? 1.f : 0.f;
 				}
 
@@ -223,14 +231,14 @@ namespace geo
 
 		void stepSupportCheck(const Launch& launch, bool use_weight) {
 			if (use_weight) {
-				CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > ());
-				//CU_CHECK_KERNEL(stepSupportCheckKernel <true> << <launch.gridSize, launch.blockSize >> > (0));
-				//CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > (1));
+				//CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > ());
+				CU_CHECK_KERNEL(stepSupportCheckKernel <true> << <launch.gridSize, launch.blockSize >> > (0));
+				CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > (1));
 			}
 			else {
-				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > ());
-				//CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (0));
-				//CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (1));
+				//CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > ());
+				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (0));
+				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (1));
 			}
 		}
 	}

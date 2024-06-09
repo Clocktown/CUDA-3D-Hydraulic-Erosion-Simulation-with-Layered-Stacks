@@ -25,7 +25,7 @@ vec4 getAbsoluteHeight(const in int flatIndex, int layerStride, int z) {
     vec4 absoluteHeights = heights[flatIndex];
     absoluteHeights[SAND] = renderSand ? absoluteHeights[SAND] : 0.f;
     absoluteHeights[WATER] = renderWater ? absoluteHeights[WATER] : 0.f;
-    absoluteHeights[FLOOR] = z > 0 ? heights[flatIndex - layerStride][CEILING] : min(absoluteHeights[BEDROCK] - 50.f, 0.0f);
+    absoluteHeights[FLOOR] = z > 0 ? heights[flatIndex - layerStride][CEILING] : min(absoluteHeights[BEDROCK] - 80.f, 0.0f);
     absoluteHeights[SAND] += absoluteHeights[BEDROCK];
     absoluteHeights[WATER] += absoluteHeights[SAND];
     return absoluteHeights;

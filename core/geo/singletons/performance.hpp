@@ -19,11 +19,14 @@ namespace geo {
 		}
 
 		float mean{ 0.f };
+		float minimum{ FLT_MAX };
+		float maximum{ 0.f };
+		float last{ 0.f };
 		int count{ 0 };
 		cudaEvent_t startE = nullptr, stopE = nullptr;
 		bool wasMeasured{ false };
-		void reset() { mean = 0.f; count = 0.f; wasMeasured = false; }
-		void update(float duration) { mean = (duration + mean * count) / (count + 1); count++; }
+		void reset() { mean = 0.f; count = 0.f; minimum = FLT_MAX; maximum = 0.f; last = 0.f; wasMeasured = false; }
+		void update(float duration) { last = duration; mean = (duration + mean * count) / (count + 1); minimum = glm::min(duration, minimum); maximum = glm::max(duration, maximum); count++; }
 		void measure();
 		void start();
 		void stop();

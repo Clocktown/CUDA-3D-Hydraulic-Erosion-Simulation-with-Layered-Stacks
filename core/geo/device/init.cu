@@ -36,13 +36,34 @@ __global__ void initKernel()
 	int flatIndex{ flattenIndex(index, simulation.gridSize) };
 
 
-	/*float bedrockHeight = 0.f;
-	if (index.x > (64.f/256.f) * simulation.gridSize.x) {
+	float bedrockHeight = -30.f;
+	float ceiling = FLT_MAX;
+	simulation.layerCounts[flatIndex] = 1;
+
+	/*if (index.x > (64.f / 256.f) * simulation.gridSize.x) {
 		bedrockHeight = 50.f;
+	}*/
+
+	/*if (index.x <= (64.f / 256.f) * simulation.gridSize.x) {
+		bedrockHeight = 0.f;
 	}
 
+	if (index.x > (200.f/256.f) * simulation.gridSize.x && index.y > (120.f/256.f) * simulation.gridSize.y && index.y < (136.f/256.f) * simulation.gridSize.y && index.x < (240.f/256.f) * simulation.gridSize.x) {
+		bedrockHeight -= 25.f * (1.f - ((index.x - (200.f/256.f) * simulation.gridSize.x) / ((40.f/256.f) * simulation.gridSize.x) ));
+	}
 
-	if (index.x > (64.f/256.f) * simulation.gridSize.x && index.y > (120.f/256.f) * simulation.gridSize.y && index.y < (136.f/256.f) * simulation.gridSize.y && index.x < (240.f/256.f) * simulation.gridSize.x) {
+	if ((index.x <= (200.f / 256.f) * simulation.gridSize.x && index.y > (126.f / 256.f) * simulation.gridSize.y && index.y < (130.f / 256.f) * simulation.gridSize.y && index.x >(64.f / 256.f) * simulation.gridSize.x)) {
+		bedrockHeight = 25.f * (((index.x - (64.f/256.f) * simulation.gridSize.x) / (simulation.gridSize.x * (200.f - 64.f) / 256.f)));
+		ceiling = bedrockHeight + 3.f;
+		simulation.layerCounts[flatIndex] = 2;
+
+		simulation.heights[flatIndex + simulation.layerStride] = float4{ 50.f, 0.0f, 0.0f, FLT_MAX};
+		simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
+		simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+		simulation.damages[flatIndex + simulation.layerStride] = 0.0f;
+	}*/
+
+	/*if (index.x >(64.f / 256.f) * simulation.gridSize.x && index.y >(120.f / 256.f) * simulation.gridSize.y && index.y < (136.f / 256.f) * simulation.gridSize.y && index.x < (240.f / 256.f) * simulation.gridSize.x) {
 		bedrockHeight = 25.f;
 		bedrockHeight = 30.f;
 	}
@@ -61,14 +82,68 @@ __global__ void initKernel()
 
 	if (index.y > (117.f/256.f) * simulation.gridSize.y && index.y < (139.f/256.f) * simulation.gridSize.y && index.x > (117.f/256.f) * simulation.gridSize.x  && index.x < (139.f/256.f) * simulation.gridSize.x) {
 		bedrockHeight = 50.f;
+	}*/
+
+	//simulation.layerCounts[flatIndex] = 1;
+
+	float scale = simulation.gridSize.x / 256.f;
+
+	if ((index.x > 10 * scale) && (index.x < 246 * scale)) {
+		if (index.y > 100 * scale && index.y < 110 * scale) {
+			bedrockHeight = 20.f;
+			if (index.x > 20 * scale && index.x < 236 * scale) {
+				simulation.layerCounts[flatIndex] = 2;
+
+				simulation.heights[flatIndex + simulation.layerStride] = float4{ bedrockHeight , 0.0f, 0.0f, FLT_MAX };
+				simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
+				simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+				simulation.damages[flatIndex + simulation.layerStride] = 0.0f;
+
+				bedrockHeight = -30.f;
+				ceiling = bedrockHeight + 40.f;
+			}
+		}
 	}
 
-	simulation.layerCounts[flatIndex] = 1;
-	simulation.heights[flatIndex] = float4{ bedrockHeight, 0.0f, 0.0f, FLT_MAX};
+	if ((index.x > 10 * scale) && (index.x < 246 * scale)) {
+		if (index.y > 50 * scale && index.y < 60 * scale) {
+			bedrockHeight = 30.f;
+			if (index.x > 20 * scale && index.x < 236 * scale) {
+				simulation.layerCounts[flatIndex] = 2;
+
+				simulation.heights[flatIndex + simulation.layerStride] = float4{ bedrockHeight , 0.0f, 0.0f, FLT_MAX};
+				simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
+				simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+				simulation.damages[flatIndex + simulation.layerStride] = 0.0f;
+
+				bedrockHeight = -30.f;
+				ceiling = bedrockHeight + 50.f + 8.f * pow(1.f - fabsf(index.x - 128.f * scale) / (108.f * scale), 0.25f);
+			}
+		}
+	}
+
+	if ((index.x > 10 * scale) && (index.x < 246 * scale)) {
+		if (index.y > 150 * scale && index.y < 160 * scale) {
+			bedrockHeight = 10.f;
+			if (index.x > 20 * scale && index.x < 236 * scale) {
+				simulation.layerCounts[flatIndex] = 2;
+
+				simulation.heights[flatIndex + simulation.layerStride] = float4{ bedrockHeight , 0.0f, 0.0f, FLT_MAX};
+				simulation.sediments[flatIndex + simulation.layerStride] = 0.0f;
+				simulation.fluxes[flatIndex + simulation.layerStride] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+				simulation.damages[flatIndex + simulation.layerStride] = 0.0f;
+
+				bedrockHeight = -30.f;
+				ceiling = bedrockHeight + 30.f + 8.f * pow(fabsf(index.x - 128.f * scale) / (108.f * scale), 4.f);
+			}
+		}
+	}
+
+	simulation.heights[flatIndex] = float4{ bedrockHeight, 0.0f, 0.0f, ceiling};
 	simulation.sediments[flatIndex] = 0.0f;
 	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 	simulation.damages[flatIndex] = 0.0f;
-	*/
+	
 
 	/*float bedrockHeight = 0.f;
 	if (index.x > (64.f/256.f) * simulation.gridSize.x) {
@@ -125,7 +200,7 @@ __global__ void initKernel()
 	// generate pre-made arches to test support check
 	// scene with a lot of sand to demonstrate fake "regolith"
 
-	const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
+	/*const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
 	const float noiseVal2 = 40.f * (1.f + fbm(index, 8, 0.005f * simulation.gridScale, 69));
 
 
@@ -133,7 +208,7 @@ __global__ void initKernel()
 	simulation.heights[flatIndex] = float4{ noiseVal2, 20.f, 0.0f, FLT_MAX};
 	simulation.sediments[flatIndex] = 0.0f;
 	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	simulation.damages[flatIndex] = 0.0f;
+	simulation.damages[flatIndex] = 0.0f;*/
 
 }
 
