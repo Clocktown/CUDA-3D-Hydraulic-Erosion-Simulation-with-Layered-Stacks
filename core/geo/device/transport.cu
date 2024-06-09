@@ -5,7 +5,7 @@ namespace geo
 namespace device
 {
 
-template <bool outflowBorders>
+template <bool outflowBorders, bool slippageOutflowBorders>
 __global__ void pipeKernel()
 {
 	const glm::ivec2 index{ getLaunchIndex() };
@@ -55,7 +55,8 @@ __global__ void pipeKernel()
 					const float crossSectionalArea{ simulation.gridScale * simulation.gridScale }; 
 
 					flux[i] = glm::max(((1.f - 0.01f * simulation.deltaTime) * flux[i]) - simulation.deltaTime * crossSectionalArea * simulation.gravity * deltaHeight * simulation.rGridScale, 0.0f);
-
+				}
+				if constexpr (slippageOutflowBorders) {
 					const float avgWater{ 0.5f * height[WATER] };
 					const float talusSlope{ glm::mix(simulation.dryTalusSlope, simulation.wetTalusSlope, glm::min(avgWater * simulation.iSlippageInterpolationRange, 1.0f)) };
 
@@ -225,14 +226,26 @@ __global__ void transportKernel()
 	}
 }
 
-void transport(const Launch& launch, bool enable_slippage, bool use_outflow_borders, geo::performance& perf)
+void transport(const Launch& launch, bool enable_slippage, bool use_outflow_borders, bool use_slippage_outflow_borders, geo::performance& perf)
 {
 	if (perf.measureIndividualKernels) perf.measurements["Setup Pipes"].start();
 	if (use_outflow_borders) {
-		CU_CHECK_KERNEL(pipeKernel<true><<<launch.gridSize, launch.blockSize>>>());
+		if (use_slippage_outflow_borders) {
+			CU_CHECK_KERNEL(pipeKernel<true, true><<<launch.gridSize, launch.blockSize>>>());
+
+		}
+		else {
+			CU_CHECK_KERNEL(pipeKernel<true,false><<<launch.gridSize, launch.blockSize>>>());
+		}
 	}
 	else {
-		CU_CHECK_KERNEL(pipeKernel<false><<<launch.gridSize, launch.blockSize>>>());
+		if (use_slippage_outflow_borders) {
+			CU_CHECK_KERNEL(pipeKernel<false, true><<<launch.gridSize, launch.blockSize>>>());
+
+		}
+		else {
+			CU_CHECK_KERNEL(pipeKernel<false,false><<<launch.gridSize, launch.blockSize>>>());
+		}
 	}
 	if (perf.measureIndividualKernels) perf.measurements["Setup Pipes"].stop();
 

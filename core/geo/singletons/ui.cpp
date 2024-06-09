@@ -277,6 +277,7 @@ void UI::updateSimulation()
 		if (ImGui::TreeNode("General")) {
 			
 			ImGui::Checkbox("Use Outflow Borders", &simulation.useOutflowBorders);
+			ImGui::Checkbox("Use Slippage Outflow Borders", &simulation.useSlippageOutflowBorders);
 			ImGui::DragFloat("Delta Time [s]", &simulation.deltaTime, 0.01f, 0.0f, std::numeric_limits<float>::max());
 			ImGui::DragFloat("Gravity [m/s^2]", &simulation.gravity, 0.1f);
 			ImGui::DragFloat("Rain [m/s]", &simulation.rain, 0.001f, 0.0f, std::numeric_limits<float>::max(), "%.4f");
@@ -293,6 +294,7 @@ void UI::updateSimulation()
 					ImGui::DragFloat("Strength", &simulation.sourceStrengths[i], 0.01f, 0.0f, std::numeric_limits<float>::max());
 					ImGui::DragFloat("Radius", &simulation.sourceSize[i], 0.01f, 0.0f, 1000.f);
 					ImGui::DragFloat2("Location", &simulation.sourceLocations[i].x, 0.1f, 0.f, terrain.gridScale * glm::max(terrain.gridSize.x, terrain.gridSize.y));
+					ImGui::DragFloat4("Flux", &simulation.sourceFlux[i].x, 0.01f, -100.f, 100.f);
 
 					ImGui::TreePop();
 				}
@@ -526,6 +528,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Terrain/UsedLayerCount"] = usedLayerCount;
 
 	json["Simulation/UseOutflowBorders"] = simulation.useOutflowBorders;
+	json["Simulation/UseSlippageOutflowBorders"] = simulation.useSlippageOutflowBorders;
 	json["Simulation/DeltaTime"] = simulation.deltaTime;
 	json["Simulation/Gravity"] = simulation.gravity;
 	json["Simulation/Rain"] = simulation.rain;
@@ -566,6 +569,13 @@ void UI::saveToFile(const std::filesystem::path& file)
 		{ simulation.sourceLocations[1].x, simulation.sourceLocations[1].y }, 
 		{ simulation.sourceLocations[2].x, simulation.sourceLocations[2].y }, 
 		{ simulation.sourceLocations[3].x, simulation.sourceLocations[3].y }
+	};
+
+	json["Simulation/SourceFlux"] = { 
+		{ simulation.sourceFlux[0].x, simulation.sourceFlux[0].y, simulation.sourceFlux[0].z, simulation.sourceFlux[0].w }, 
+		{ simulation.sourceFlux[1].x, simulation.sourceFlux[1].y, simulation.sourceFlux[1].z, simulation.sourceFlux[1].w }, 
+		{ simulation.sourceFlux[2].x, simulation.sourceFlux[2].y, simulation.sourceFlux[2].z, simulation.sourceFlux[2].w }, 
+		{ simulation.sourceFlux[3].x, simulation.sourceFlux[3].y, simulation.sourceFlux[3].z, simulation.sourceFlux[3].w }
 	};
 
 
@@ -645,6 +655,12 @@ void UI::loadFromFile(const std::filesystem::path& file)
 
 	Simulation& simulation{ terrain.simulation };
 	simulation.useOutflowBorders = json["Simulation/UseOutflowBorders"];
+	if (json.contains("Simulation/UseSlippageOutflowBorders")) {
+		simulation.useSlippageOutflowBorders = json["Simulation/UseSlippageOutflowBorders"];
+	}
+	else {
+		simulation.useSlippageOutflowBorders = simulation.useOutflowBorders;
+	}
 	simulation.deltaTime = json["Simulation/DeltaTime"];
 	simulation.gravity = json["Simulation/Gravity"];
 	simulation.rain = json["Simulation/Rain"];
@@ -695,6 +711,22 @@ void UI::loadFromFile(const std::filesystem::path& file)
 			json["Simulation/SourceLocations"][i][0],
 			json["Simulation/SourceLocations"][i][1]
 		};
+	}
+
+	if (json.contains("Simulation/SourceFlux")) {
+		for (int i = 0; i < 4; ++i) {
+			simulation.sourceFlux[i] = glm::vec4{
+				json["Simulation/SourceFlux"][i][0],
+				json["Simulation/SourceFlux"][i][1],
+				json["Simulation/SourceFlux"][i][2],
+				json["Simulation/SourceFlux"][i][3]
+			};
+		}
+	}
+	else {
+		for (int i = 0; i < 4; ++i) {
+			simulation.sourceFlux[i] = glm::vec4{ 0.f };
+		}
 	}
 
 	simulation.init = false;

@@ -26,18 +26,25 @@ __global__ void rainKernel()
 
 	float water = simulation.heights[flatIndex].z;
 
+	glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
+
 	for (int i = 0; i < 4; ++i) {
 		const glm::vec2 dVec = simulation.sourceLocations[i] - glm::vec2(index) * simulation.gridScale;
 		const float d2 = glm::dot(dVec, dVec);
 		const float r2 = simulation.sourceSize[i] * simulation.sourceSize[i];
 		if (d2 <= r2 && r2 > 0.f) {
 			water += 2.f * noiseVal * simulation.sourceStrengths[i]  * simulation.deltaTime;
+			flux += simulation.sourceFlux[i] * simulation.deltaTime;
 		}
 	}
 
 	water += 2.f * noiseVal * simulation.rain * simulation.deltaTime;
 
 	simulation.heights[flatIndex].z = water;
+
+	//if (glm::dot(flux, flux) > 0.f) {
+		simulation.fluxes[flatIndex] = glm::cuda_cast(flux);
+	//}
 }
 
 void rain(const Launch& launch)

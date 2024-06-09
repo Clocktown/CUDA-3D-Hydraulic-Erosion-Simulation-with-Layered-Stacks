@@ -15,6 +15,11 @@ struct Simulation
 
 	glm::vec4 sourceStrengths{ 0.f }; // [m/s]
 	glm::vec2 sourceLocations[4]{ {0,0},{0,0},{0,0},{0,0} }; // index
+	glm::vec4 sourceFlux[4]{ 
+		{0.f, 0.f, 0.f, 0.f}, 
+		{0.f, 0.f, 0.f, 0.f}, 
+		{0.f, 0.f, 0.f, 0.f}, 
+		{0.f, 0.f, 0.f, 0.f} };
 	glm::vec4 sourceSize; // m, radius
 
 	float sedimentCapacityConstant{ 0.1f };
@@ -60,6 +65,7 @@ struct Simulation
 	bool slippageEnabled{ true };
 	bool useWeightInSupportCheck{ true };
 	bool useOutflowBorders{ false };
+	bool useSlippageOutflowBorders{ false };
 };
 
 struct Terrain

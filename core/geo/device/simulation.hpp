@@ -48,6 +48,7 @@ struct Simulation
 	float petrification; // [m/s]           
 	glm::vec4 sourceStrengths; // [m/s]
 	glm::vec2 sourceLocations[4]; // index
+	glm::vec4 sourceFlux[4];
 	glm::vec4 sourceSize; // m, radius
 
 	float sedimentCapacityConstant;
@@ -112,7 +113,7 @@ char getMaxLayerCount(const char* layerCounts, std::ptrdiff_t count);
 
 void init(const Launch& launch);
 void rain(const Launch& launch);
-void transport(const Launch& launch, bool enable_slippage, bool use_outflow_borders, geo::performance& perf);
+void transport(const Launch& launch, bool enable_slippage, bool use_outflow_borders, bool use_slippage_outflow_borders, geo::performance& perf);
 void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal, geo::performance& perf);
 
 void stepSupportCheck(const Launch&, bool use_weight);

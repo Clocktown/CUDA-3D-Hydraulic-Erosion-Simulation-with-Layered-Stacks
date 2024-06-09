@@ -168,7 +168,7 @@ __global__ void sedimentKernel()
 		
 		if constexpr (enableVertical) {
 			const float bedrockTop = ((layer + 1) < layerCount) ? ((float*)(simulation.heights + flatIndex + simulation.layerStride))[BEDROCK] : height[CEILING];
-			const float deltaBedrockTop{ glm::min(topBedrockScale * simulation.deltaTime, glm::max(bedrockTop - height[CEILING], 0.f)) };
+			const float deltaBedrockTop { glm::min(topBedrockScale * simulation.deltaTime, glm::max(bedrockTop - height[CEILING], 0.f)) };
 			const float deltaBedrock{ glm::min(bedrockScale * simulation.deltaTime, glm::max(height[BEDROCK] - floor, 0.f)) };
 
 			height[CEILING] += deltaBedrockTop;
@@ -179,7 +179,7 @@ __global__ void sedimentKernel()
 		if ((sedimentCapacity > sediment))
 		{
 			if constexpr (enableVertical) {
-				const float deltaSand{ glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]) };
+				const float deltaSand{ glm::max(glm::min(simulation.sandDissolvingConstant * (sedimentCapacity - sediment) * simulation.deltaTime, height[SAND]), 0.f) };
 
 				height[SAND] -= deltaSand;
 				sediment += deltaSand;
@@ -187,7 +187,7 @@ __global__ void sedimentKernel()
 		}
 		else
 		{
-			float deltaSediment{ glm::min(simulation.sedimentDepositionConstant * (sediment - sedimentCapacity) * simulation.deltaTime,  height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]) };
+			float deltaSediment{ glm::max(glm::min(simulation.sedimentDepositionConstant * (sediment - sedimentCapacity) * simulation.deltaTime,  height[CEILING] - height[BEDROCK] - height[SAND] - height[WATER]), 0.f) };
 			deltaSediment = glm::min(deltaSediment, (sediment - sedimentCapacity));
 			sediment -= deltaSediment;
 			height[SAND] += deltaSediment;

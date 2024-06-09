@@ -44,6 +44,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.sourceSize = terrain.simulation.sourceSize;
 		for (int i = 0; i < 4; ++i) {
 			simulation.sourceLocations[i] = terrain.simulation.sourceLocations[i];
+			simulation.sourceFlux[i] = terrain.simulation.sourceFlux[i];
 		}
 
 		simulation.sedimentCapacityConstant = terrain.simulation.sedimentCapacityConstant;
@@ -120,7 +121,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if(perf.measureParts || perf.measureIndividualKernels) perf.measurements["Rain"].stop();
 
 			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Transport"].start();
-			device::transport(launch, terrain.simulation.slippageEnabled, terrain.simulation.useOutflowBorders, perf);
+			device::transport(launch, terrain.simulation.slippageEnabled, terrain.simulation.useOutflowBorders, terrain.simulation.useSlippageOutflowBorders, perf);
 			if(perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Transport"].stop();
 
 			if (perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Erosion"].start();
