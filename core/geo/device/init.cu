@@ -86,7 +86,7 @@ __global__ void initKernel()
 
 	//simulation.layerCounts[flatIndex] = 1;
 
-	float scale = simulation.gridSize.x / 256.f;
+	/*float scale = simulation.gridSize.x / 256.f;
 
 	if ((index.x > 10 * scale) && (index.x < 246 * scale)) {
 		if (index.y > 100 * scale && index.y < 110 * scale) {
@@ -142,7 +142,7 @@ __global__ void initKernel()
 	simulation.heights[flatIndex] = float4{ bedrockHeight, 0.0f, 0.0f, ceiling};
 	simulation.sediments[flatIndex] = 0.0f;
 	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	simulation.damages[flatIndex] = 0.0f;
+	simulation.damages[flatIndex] = 0.0f;*/
 	
 
 	/*float bedrockHeight = 0.f;
@@ -186,7 +186,7 @@ __global__ void initKernel()
 		simulation.damages[flatIndex] = 0.0f;
 	}*/
 
-	/*const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
+	const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
 	const float noiseVal2 = 10.f * (1.f + fbm(index, 8, 0.05f * simulation.gridScale, 69));
 
 
@@ -194,11 +194,8 @@ __global__ void initKernel()
 	simulation.heights[flatIndex] = float4{ noiseVal2 + 16.f * (simulation.gridSize.x - index.x) / simulation.gridSize.x, 1.f, 0.0f, FLT_MAX};
 	simulation.sediments[flatIndex] = 0.0f;
 	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	simulation.damages[flatIndex] = 0.0f;*/
+	simulation.damages[flatIndex] = 0.0f;
 
-
-	// generate pre-made arches to test support check
-	// scene with a lot of sand to demonstrate fake "regolith"
 
 	/*const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);
 	const float noiseVal2 = 40.f * (1.f + fbm(index, 8, 0.005f * simulation.gridScale, 69));
