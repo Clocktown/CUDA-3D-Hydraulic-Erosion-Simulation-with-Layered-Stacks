@@ -214,7 +214,8 @@ void UI::updateFile()
 
 			if (input != nullptr)
 			{
-				loadFromFile(input);
+				auto path = std::filesystem::absolute(std::filesystem::path(input));
+				loadFromFile(path);
 			}
 		}
 
@@ -225,7 +226,8 @@ void UI::updateFile()
 
 			if (output != nullptr)
 			{
-				saveToFile(output);
+				auto path = std::filesystem::absolute(std::filesystem::path(output));
+				saveToFile(path);
 			}
 		}
 
@@ -669,7 +671,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/RenderWater"] = rendering.renderWater;
 
 	onec::writeFile(file, json.dump(1));
-	onec::writeFile(file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
+	onec::writeFile(file.parent_path() / file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
 }
 
 void UI::loadFromFile(const std::filesystem::path& file)
@@ -698,7 +700,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	this->terrain.maxLayerCount = json["Terrain/MaxLayerCount"];
 
 	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
-	std::string compressed{ onec::readFile(file.stem().concat(".dat")) };
+	std::string compressed{ onec::readFile(file.parent_path() / file.stem().concat(".dat"))};
 
 	const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
 	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
