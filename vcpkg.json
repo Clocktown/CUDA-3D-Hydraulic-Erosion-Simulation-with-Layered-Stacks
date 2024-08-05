@@ -1,0 +1,25 @@
+{
+  "dependencies": [
+    "assimp",
+    "entt",
+    "stb",
+    "glm",
+    "glfw3",
+	{
+		"name": "glad",
+		"features": [
+			"extensions"
+		]
+	},
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "opengl3-binding"
+      ]
+    },
+    "tinyfiledialogs",
+    "nlohmann-json"
+  ],
+  "builtin-baseline": "8d3649ba34aab36914ddd897958599aa0a91b08e"
+}

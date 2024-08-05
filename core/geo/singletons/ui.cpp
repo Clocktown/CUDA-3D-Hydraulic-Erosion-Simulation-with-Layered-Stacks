@@ -6,7 +6,7 @@
 #include "../device/simulation.hpp"
 #include <onec/onec.hpp>
 #include <tinyfiledialogs/tinyfiledialogs.h>
-#include <tinyexr.h>
+//#include <tinyexr.h>
 #include <nlohmann/json.hpp>
 #include <zlib.h>
 #include <fstream>
