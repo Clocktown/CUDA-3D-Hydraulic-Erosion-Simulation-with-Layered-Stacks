@@ -53,19 +53,20 @@ CU_INLINE CU_HOST_DEVICE CU_IF_HOST(constexpr) glm::ivec3 unflattenIndex(int ind
 	return glm::ivec3{ index, y, z };
 }
 
-CU_INLINE CU_HOST_DEVICE constexpr int wrapIndex(const int index, const int size, const int shift)
+CU_INLINE CU_HOST_DEVICE constexpr int wrapIndex(const int index, const int size)
 {
-	return mod(index, size, shift);
+	const int sign = (int)(index < 0) - (int)(index >= size);
+	return index + sign * size;
 }
 
-CU_INLINE CU_HOST_DEVICE CU_IF_HOST(constexpr) glm::ivec2 wrapIndex(const glm::ivec2 index, const glm::ivec2 size, const int shift)
+CU_INLINE CU_HOST_DEVICE CU_IF_HOST(constexpr) glm::ivec2 wrapIndex(const glm::ivec2 index, const glm::ivec2 size)
 {
-	return glm::ivec2{ mod(index.x, size.x, shift), mod(index.y, size.y, shift) };
+	return glm::ivec2{ wrapIndex(index.x, size.x), wrapIndex(index.y, size.y) };
 }
 
-CU_INLINE CU_HOST_DEVICE CU_IF_HOST(constexpr) glm::ivec3 wrapIndex(const glm::ivec3 index, const glm::ivec3 size, const int shift)
+CU_INLINE CU_HOST_DEVICE CU_IF_HOST(constexpr) glm::ivec3 wrapIndex(const glm::ivec3 index, const glm::ivec3 size)
 {
-	return glm::ivec3{ mod(index.x, size.x, shift), mod(index.y, size.y, shift), mod(index.z, size.z, shift) };
+	return glm::ivec3{ wrapIndex(index.x, size.x), wrapIndex(index.y, size.y), wrapIndex(index.z, size.z) };
 }
 
 CU_INLINE CU_HOST_DEVICE constexpr bool isInside(int index, int size)
