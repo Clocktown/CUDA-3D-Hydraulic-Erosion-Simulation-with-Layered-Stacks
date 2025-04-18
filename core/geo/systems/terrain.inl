@@ -4,6 +4,7 @@
 #include "../components/point_renderer.hpp"
 #include "../singletons/ui.hpp"
 #include <onec/resources/array.hpp>
+#include <onec/components/camera.hpp>
 
 namespace geo
 {
@@ -13,7 +14,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 {
 	onec::World& world{ onec::getWorld() };
 
-	const auto view{ world.getView<Terrain, PointRenderer, Includes...>(excludes) };
+	const auto view{ world.getView<Terrain, PointRenderer, onec::LocalToWorld, Includes...>(excludes) };
+	const auto view2{ world.getView<onec::WorldToView, onec::ViewToClip, onec::Position, Includes...>(excludes) };
 
 	auto ui = world.getSingleton<geo::UI>();
 	
@@ -103,6 +105,22 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
 
+		onec::ViewToClip pMatrix{ view2.get<onec::ViewToClip>(ui->camera.entity) };
+		onec::WorldToView vMatrix{ view2.get<onec::WorldToView>(ui->camera.entity) };
+		onec::LocalToWorld mMatrix { view.get<onec::LocalToWorld>(entity) };
+
+		glm::mat4 iPV = glm::inverse(pMatrix.viewToClip * vMatrix.worldToView);
+		glm::vec4 ll = iPV * glm::vec4(-1, -1, 1, 1);
+		ll /= ll.w;
+		glm::vec4 ul = iPV * glm::vec4(-1, 1, 1, 1);
+		ul /= ul.w;
+		glm::vec4 lr = iPV * glm::vec4(1, -1, 1, 1);
+		lr /= lr.w;
+
+		simulation.camPos = view2.get<onec::Position>(ui->camera.entity).position;
+		simulation.lowerLeft = glm::vec3(ll);
+		simulation.rightVec = glm::vec3(lr - ll) / float(terrain.windowSize.x);
+		simulation.upVec = glm::vec3(ul - ll) / float(terrain.windowSize.y);
 		simulation.windowSize = terrain.windowSize;
 		simulation.screenSurface = screenArray.getSurfaceObject();
 

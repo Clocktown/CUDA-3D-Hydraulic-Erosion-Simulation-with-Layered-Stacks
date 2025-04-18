@@ -102,6 +102,10 @@ struct Simulation
 
 	float* sedimentFluxScale;
 	glm::ivec2 windowSize;
+	glm::vec3 lowerLeft;
+	glm::vec3 rightVec;
+	glm::vec3 upVec;
+	glm::vec3 camPos;
 	cudaSurfaceObject_t screenSurface;
 };
 
