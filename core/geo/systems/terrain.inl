@@ -3,6 +3,7 @@
 #include "../device/simulation.hpp"
 #include "../components/point_renderer.hpp"
 #include "../singletons/ui.hpp"
+#include <onec/resources/array.hpp>
 
 namespace geo
 {
@@ -24,6 +25,17 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		onec::Buffer sedimentBuffer{ terrain.sedimentBuffer };
 		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
 		onec::Buffer indicesBuffer{ terrain.indicesBuffer };
+
+		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
+			glm::ivec2 windowSize = onec::getWindow().getSize();
+			if (windowSize != terrain.windowSize) {
+				terrain.screenTexture.release();
+				terrain.screenTexture.initialize(GL_TEXTURE_2D, glm::ivec3(windowSize.x, windowSize.y, 1), GL_RGBA8, 1, onec::SamplerState{}, true);
+				terrain.windowSize = windowSize;
+			}
+		}
+
+		onec::Array screenArray{ terrain.screenTexture };
 
 		device::Launch launch;
 		device::Simulation simulation;
@@ -90,6 +102,9 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.minBedrockThickness = terrain.simulation.minBedrockThickness;
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
+
+		simulation.windowSize = terrain.windowSize;
+		simulation.screenSurface = screenArray.getSurfaceObject();
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -164,7 +179,17 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if(perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].stop();
 	    }
 
-		if (ui->rendering.renderScene) {
+		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
+			glm::ivec2 windowSize = onec::getWindow().getSize();
+			device::Launch screenLaunch;
+			screenLaunch.blockSize = dim3{ 16, 16, 1 };
+			screenLaunch.gridSize.x = (windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
+			screenLaunch.gridSize.y = (windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
+			screenLaunch.gridSize.z = 1;
+			device::raymarchTerrain(screenLaunch);
+		}
+
+		if (ui->rendering.renderScene && !ui->rendering.useRaymarching) {
 			if (perf.measureRendering) perf.measurements["Build Draw List"].start();
 			terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
 			if (perf.measureRendering) perf.measurements["Build Draw List"].stop();

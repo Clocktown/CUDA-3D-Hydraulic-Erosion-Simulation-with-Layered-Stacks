@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="geo\components\point_renderer.hpp" />
+    <ClInclude Include="geo\components\screen_texture_renderer.hpp" />
     <ClInclude Include="geo\device\cuda_noise.cuh" />
     <ClInclude Include="geo\device\simulation.hpp" />
     <ClInclude Include="geo\geo.hpp" />
@@ -30,6 +31,7 @@
     <ClInclude Include="geo\resources\simple_material.hpp" />
     <ClInclude Include="geo\singletons\performance.hpp" />
     <ClInclude Include="geo\singletons\point_render_pipeline.hpp" />
+    <ClInclude Include="geo\singletons\screen_texture_render_pipeline.hpp" />
     <ClInclude Include="geo\singletons\ui.hpp" />
     <ClInclude Include="geo\systems\terrain.hpp" />
   </ItemGroup>
@@ -49,6 +51,9 @@
     <None Include="assets\shaders\render_pipeline\maths.glsl" />
     <None Include="assets\shaders\render_pipeline\phong_brdf.glsl" />
     <None Include="assets\shaders\render_pipeline\render_pipeline.glsl" />
+    <None Include="assets\shaders\screen_texture\screen_texture.frag" />
+    <None Include="assets\shaders\screen_texture\screen_texture.vert" />
+    <None Include="assets\shaders\screen_texture_render_pipeline\screen_texture_render_pipeline.glsl" />
     <None Include="assets\shaders\simple_terrain\geometry_to_fragment.glsl" />
     <None Include="assets\shaders\simple_terrain\grid.glsl" />
     <None Include="assets\shaders\simple_terrain\simple_material.glsl" />
@@ -57,11 +62,13 @@
     <None Include="assets\shaders\simple_terrain\simple_terrain.vert" />
     <None Include="assets\shaders\simple_terrain\vertex_to_geometry.glsl" />
     <None Include="geo\singletons\point_render_pipeline.inl" />
+    <None Include="geo\singletons\screen_texture_render_pipeline.inl" />
     <None Include="geo\systems\terrain.inl" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="geo\device\fill_indices.cu" />
     <CudaCompile Include="geo\device\erosion.cu" />
+    <CudaCompile Include="geo\device\raymarch.cu" />
     <CudaCompile Include="geo\device\transport.cu" />
     <CudaCompile Include="geo\device\init.cu" />
     <CudaCompile Include="geo\device\rain.cu" />

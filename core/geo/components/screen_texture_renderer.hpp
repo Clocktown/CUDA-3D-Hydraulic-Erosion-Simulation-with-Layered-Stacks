@@ -8,11 +8,9 @@
 namespace geo
 {
 
-struct PointRenderer
+struct ScreenTextureRenderer
 {
 	std::shared_ptr<onec::Material> material;
-	int first;
-	int count;
 	bool enabled;
 };
 

@@ -101,6 +101,8 @@ struct Simulation
 	float* damages;
 
 	float* sedimentFluxScale;
+	glm::ivec2 windowSize;
+	cudaSurfaceObject_t screenSurface;
 };
 
 extern __constant__ Simulation simulation;
@@ -119,6 +121,8 @@ void erosion(const Launch& launch, bool enable_vertical, bool enable_horizontal,
 void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
+
+void raymarchTerrain(const Launch& launch);
 
 }
 }

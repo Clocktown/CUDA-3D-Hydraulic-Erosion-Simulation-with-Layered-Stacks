@@ -17,6 +17,8 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 	const int columnCount{ gridSize.x * gridSize.y * maxLayerCount };
 	numValidColumns = columnCount;
 
+	windowSize = glm::ivec2(1,1);
+	screenTexture.initialize(GL_TEXTURE_2D, glm::ivec3(windowSize.x, windowSize.y, 1), GL_RGBA8, 1, onec::SamplerState{}, true);
 	layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)), true);
 	heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)), true);
 	sedimentBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)), true);

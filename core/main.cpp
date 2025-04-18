@@ -2,6 +2,7 @@
 #include <onec/onec.hpp>
 
 #include "geo/singletons/point_render_pipeline.hpp"
+#include "geo/singletons/screen_texture_render_pipeline.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -14,6 +15,7 @@ void start()
 {
 	onec::Application& application{ onec::getApplication() };
 	onec::World& world{ onec::getWorld() };
+	
 
 	glGenQueries(1, &oglQuery);
 
@@ -22,6 +24,7 @@ void start()
 	world.addSingleton<onec::AmbientLight>(backgroundColor, 37000.f);
 	world.addSingleton<onec::RenderPipeline>();
 	world.addSingleton<geo::PointRenderPipeline>();
+	world.addSingleton<geo::ScreenTextureRenderPipeline>();
 
 	geo::UI& ui{ world.addSingleton<geo::UI>() };
 	const glm::ivec2 gridSize{ ui.terrain.gridSize };
@@ -100,10 +103,23 @@ void start()
 		material->renderState = std::make_shared<onec::RenderState>();
 		material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
 
+		const auto screenMaterial{ std::make_shared<onec::Material>() };
+		const std::array<std::filesystem::path, 2> screenShaders{ assets / "shaders/screen_texture/screen_texture.vert",
+															assets / "shaders/screen_texture/screen_texture.frag" };
+
+		screenMaterial->program = std::make_shared<onec::Program>(screenShaders);
+		screenMaterial->renderState = std::make_shared<onec::RenderState>();
+		screenMaterial->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
+
 		geo::PointRenderer& pointRenderer{ world.addComponent<geo::PointRenderer>(entity) };
 		pointRenderer.material = material;
 		pointRenderer.first = 0;
 		pointRenderer.count = terrain.numValidColumns;
+		pointRenderer.enabled = true;
+
+		geo::ScreenTextureRenderer& screenTextureRenderer{ world.addComponent<geo::ScreenTextureRenderer>(entity) };
+		screenTextureRenderer.material = screenMaterial;
+		screenTextureRenderer.enabled = false;
 
 		ui.terrain.entity = entity;
 	}
@@ -170,6 +186,8 @@ void render()
 	onec::World& world{ onec::getWorld() };
 	geo::PointRenderPipeline& pointRenderPipeline{ *world.getSingleton<geo::PointRenderPipeline>() };
 	pointRenderPipeline.render();
+	geo::ScreenTextureRenderPipeline& screenTextureRenderPipeline{ *world.getSingleton<geo::ScreenTextureRenderPipeline>() };
+	screenTextureRenderPipeline.render();
 }
 
 int main()

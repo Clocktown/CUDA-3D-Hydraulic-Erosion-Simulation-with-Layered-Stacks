@@ -77,6 +77,8 @@ struct Terrain
 	glm::ivec2 gridSize;
 	float gridScale;
 	char maxLayerCount;
+	glm::ivec2 windowSize;
+	onec::Texture screenTexture;
 	onec::GraphicsBuffer layerCountBuffer;
 	onec::GraphicsBuffer heightBuffer;
 	onec::GraphicsBuffer sedimentBuffer;

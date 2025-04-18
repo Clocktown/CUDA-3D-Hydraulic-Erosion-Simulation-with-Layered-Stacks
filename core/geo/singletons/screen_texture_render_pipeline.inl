@@ -1,5 +1,6 @@
-#include "point_render_pipeline.hpp"
-#include "../components/point_renderer.hpp"
+#include "screen_texture_render_pipeline.hpp"
+#include "../components/screen_texture_renderer.hpp"
+#include "../components/terrain.hpp"
 #include <onec/config/config.hpp>
 #include <onec/config/gl.hpp>
 #include <onec/core/world.hpp>
@@ -9,6 +10,7 @@
 #include <onec/resources/vertex_array.hpp>
 #include <onec/resources/graphics_buffer.hpp>
 #include <onec/resources/material.hpp>
+#include <onec/resources/texture.hpp>
 #include <entt/entt.hpp>
 #include <vector>
 
@@ -16,7 +18,7 @@ namespace geo
 {
 	using namespace onec;
 template<typename ...Includes, typename ...Excludes>
-inline void PointRenderPipeline::render(const entt::exclude_t<Excludes...> excludes)
+inline void ScreenTextureRenderPipeline::render(const entt::exclude_t<Excludes...> excludes)
 {
 	World& world{ getWorld() };
 
@@ -27,23 +29,22 @@ inline void PointRenderPipeline::render(const entt::exclude_t<Excludes...> exclu
 	Program* activeProgram{ nullptr };
 	RenderState* activeRenderState{ nullptr };
 
-	const auto view{ world.getView<LocalToWorld, PointRenderer, Includes...>(excludes) };
+	const auto view{ world.getView<LocalToWorld, ScreenTextureRenderer, Terrain, Includes...>(excludes) };
 
 	for (const entt::entity entity : view)
 	{
-		const PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
+		const ScreenTextureRenderer& screenTextureRenderer{ view.get<ScreenTextureRenderer>(entity) };
+		Terrain& terrain{ view.get<Terrain>(entity) };
 
-		if (pointRenderer.count == 0 || !pointRenderer.enabled)
+		if (!screenTextureRenderer.enabled)
 		{
 			continue;
 		}
 
-		PointRenderPipelineUniforms uniforms;
-		uniforms.localToWorld = view.get<LocalToWorld>(entity).localToWorld;
-		uniforms.worldToLocal = glm::inverse(uniforms.localToWorld);
+		ScreenTextureRenderPipelineUniforms uniforms{};
 		uniformBuffer.upload(asBytes(&uniforms, 1));
 
-		const std::shared_ptr<Material>& smaterial{ pointRenderer.material };
+		const std::shared_ptr<Material>& smaterial{ screenTextureRenderer.material };
 
 		ONEC_ASSERT(smaterial != nullptr, "Material cannot be equal to nullptr");
 
@@ -73,7 +74,8 @@ inline void PointRenderPipeline::render(const entt::exclude_t<Excludes...> exclu
 				activeRenderState->use();
 			}
 		}
-		GL_CHECK_ERROR(glDrawArrays(GL_POINTS, pointRenderer.first, pointRenderer.count));
+		glBindTextureUnit(screenTextureBinding, terrain.screenTexture.getHandle());
+		GL_CHECK_ERROR(glDrawArrays(GL_TRIANGLES, 0, 3));
 	}
 }
 

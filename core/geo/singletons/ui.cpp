@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include "../components/terrain.hpp"
 #include "../components/point_renderer.hpp"
+#include "../components/screen_texture_renderer.hpp"
 #include "../resources/simple_material.hpp"
 #include "../device/simulation.hpp"
 #include <onec/onec.hpp>
@@ -493,7 +494,8 @@ void UI::updateRendering()
 		Terrain& terrain{ *world.getComponent<Terrain>(entity) };
 		float& scale{ world.getComponent<onec::Scale>(entity)->scale };
 		PointRenderer& pointRenderer{ *world.getComponent<PointRenderer>(entity) };
-		
+		ScreenTextureRenderer& screenTextureRenderer{ *world.getComponent<ScreenTextureRenderer>(entity) };
+
 		if (ImGui::DragFloat("Visual Scale", &scale, 0.1f, 0.001f, std::numeric_limits<float>::max()))
 		{
 			world.setComponent<onec::Position>(entity, -0.5f * terrain.gridScale * scale * glm::vec3{ terrain.gridSize.x, 0.0f, terrain.gridSize.y });
@@ -536,6 +538,11 @@ void UI::updateRendering()
 		if (ImGui::Checkbox("Render Water", &renderWater)) {
 			rendering.renderWater = int(renderWater);
 			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.renderWater, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, renderWater)), sizeof(int));
+		}
+
+		if (ImGui::Checkbox("Use Raymarching", &rendering.useRaymarching)) {
+			pointRenderer.enabled = !rendering.useRaymarching;
+			screenTextureRenderer.enabled = rendering.useRaymarching;
 		}
 
 		ImGui::TreePop();
@@ -669,6 +676,7 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
 	json["Rendering/RenderSand"] = rendering.renderSand;
 	json["Rendering/RenderWater"] = rendering.renderWater;
+	json["Rendering/UseRaymarching"] = rendering.useRaymarching;
 
 	onec::writeFile(file, json.dump(1));
 	onec::writeFile(file.parent_path() / file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
@@ -821,8 +829,15 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	rendering.useInterpolation = json["Rendering/UseInterpolation"];
 	rendering.renderSand = json["Rendering/RenderSand"];
 	rendering.renderWater = json["Rendering/RenderWater"];
+	if (json.contains("Rendering/UseRaymarching")) {
+		rendering.useRaymarching = json["Rendering/UseRaymarching"];
+	}
+	else {
+		rendering.useRaymarching = false;
+	}
 
     PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(this->terrain.entity) };
+	ScreenTextureRenderer& screenTextureRenderer{ *onec::getWorld().getComponent<ScreenTextureRenderer>(this->terrain.entity) };
 	geo::SimpleMaterialUniforms uniforms;
 	uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
 	uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
@@ -838,6 +853,8 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
 	uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
 	pointRenderer.material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
+	pointRenderer.enabled = !rendering.useRaymarching;
+	screenTextureRenderer.enabled = rendering.useRaymarching;
 }
 
 }

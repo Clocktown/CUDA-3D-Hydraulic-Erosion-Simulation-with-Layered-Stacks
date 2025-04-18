@@ -33,6 +33,7 @@ struct UI
 		int renderSand{ true };
 		int renderWater{ true };
 		bool renderScene{ true };
+		bool useRaymarching{ false };
 	} rendering;
 
 	performance performance{};
