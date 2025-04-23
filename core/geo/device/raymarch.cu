@@ -1,5 +1,7 @@
 #include "simulation.hpp"
 
+#include <numbers>
+
 namespace geo {
 	namespace device {
 
@@ -184,10 +186,22 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 // Worst case, all the "old" volume was previously empty and all new volume is filled.
 // The new volume gained is calculated as new_volume = s^3 - (s - distance/sqrt(3))^3.
 // Solving for distance we get distance = 2*s*sqrt(3) - sqrt(3) (s + (s^3 - new_volume)^(1/3))
+// However, for distances closer to s, the worst case changes to new_volume =  s^3 - (s - distance) * s * s 
+// in which case distance = new_volume / (s * s)
 // Using the necessary volume change from above as new_volume, we can calculate the safe distance.
 // since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
-// then the required volume Y is 0.5s^3, so the new volume gained is simply X - (0.5s^3)
-__global__ void raymarchSmoothKernel() {
+// then the required volume Y is 0.5s^3, so the new volume gained is simply |X - (0.5s^3)|
+__device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize) {
+	const float requiredVolumeGain = glm::abs(volume - targetVolume);
+	const float boxSize2 = boxSize * boxSize;
+	const float boxSize3 = boxSize2 * boxSize;
+	const float d1 = requiredVolumeGain / boxSize2;
+	constexpr float sqrt3 = std::numbers::sqrt3_v<float>;
+	const float d2 = 2.f * boxSize * sqrt3 - sqrt3 * (boxSize + pow(boxSize3 - requiredVolumeGain, 1.f / 3.f));
+	return glm::max(d1, d2);
+}
+
+__global__ void raymarchSmoothKernel(float volumePercentage, float radiusG, float normalSmoothingFactor) {
 		const glm::ivec2 index{ getLaunchIndex() };
 
 		if (isOutside(index, simulation.windowSize))
@@ -217,42 +231,36 @@ __global__ void raymarchSmoothKernel() {
 		bool hit = false;
 		glm::vec3 p = glm::vec3(0);
 		glm::vec3 n = glm::vec3(0);
-		float step = simulation.gridScale;
+
 		if (intersect) {
 			// prep
 			const glm::vec3 roGrid = glm::vec3(ro.x - bmin.x, ro.y, ro.z - bmin.z);
 
-			const float radius = 1.f * simulation.gridScale;
-			const float radiusG = simulation.rGridScale * radius;
+			const float radius = simulation.gridScale * radiusG;
+			const float targetVolume = volumePercentage * 8.f * radius * radius * radius;
 
 			// raymarching with box-filter for implicit surface
 			while (t.x <= t.y) {
+				steps++;
 				p = roGrid + t.x * r_dir;
 				const float volume = getVolume(p, radius, radiusG);
 
-
-				// TODO: Step optimization using the algorithm outlined in a large comment above
-				if (volume > 0.f) {
-					step = 0.1f * simulation.gridScale;
-				}
-				else {
-					step = simulation.gridScale;
-				}
-
-				if (volume > 4.f * radius * radius * radius) {
+				if (volume > 0.99f * targetVolume) {
 					hit = true;
-					// Normal
-					const float e = radius;
+					// TODO: keep normal using smoother terrain?
+					const float e = normalSmoothingFactor * radius;
+					const float eG = normalSmoothingFactor * radiusG;
+					const float volumeN = normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
 					n = glm::normalize(glm::vec3(
-						getVolume(p + glm::vec3(e,0.f,0.f), radius, radiusG) - volume,
-						getVolume(p + glm::vec3(0.f,e,0.f), radius, radiusG) - volume,
-						getVolume(p + glm::vec3(0.f,0.f,e), radius, radiusG) - volume
+						getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG) - volumeN,
+						getVolume(p + glm::vec3(0.f, e, 0.f), e, eG) - volumeN,
+						getVolume(p + glm::vec3(0.f, 0.f, e), e, eG) - volumeN
 					));
 					break;
 				}
 
 
-
+				const float step = calculateSafeStep(volume, targetVolume, 2.f * radius);
 				t.x += step;
 			}
 		}
@@ -270,8 +278,13 @@ __global__ void raymarchSmoothKernel() {
 		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
-void raymarchTerrain(const Launch& launch) {
-	CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > ());
+void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor) {
+	if (useInterpolation) {
+		CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > (volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+	}
+	else {
+		CU_CHECK_KERNEL(raymarchDDAKernel << <launch.gridSize, launch.blockSize >> > ());
+	}
 }
 }
 }

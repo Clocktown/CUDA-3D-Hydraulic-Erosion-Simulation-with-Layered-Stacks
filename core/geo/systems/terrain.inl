@@ -202,7 +202,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
 			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
-			device::raymarchTerrain(screenLaunch);
+			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor);
 		}
 
 		if (ui->rendering.renderScene && !ui->rendering.useRaymarching) {

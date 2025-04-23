@@ -545,6 +545,10 @@ void UI::updateRendering()
 			screenTextureRenderer.enabled = rendering.useRaymarching;
 		}
 
+		ImGui::DragFloat("Volume Percentage", &rendering.surfaceVolumePercentage, 0.01f, 0.5f, 1.f);
+		ImGui::DragFloat("Smoothing Radius [cells]", &rendering.smoothingRadiusInCells, 0.01f, 0.f, 2.f);
+		ImGui::DragFloat("Normal Smoothing Factor", &rendering.normalSmoothingFactor, 0.01f, 1.f, 4.f);
+
 		ImGui::TreePop();
 	}
 }
@@ -677,6 +681,9 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/RenderSand"] = rendering.renderSand;
 	json["Rendering/RenderWater"] = rendering.renderWater;
 	json["Rendering/UseRaymarching"] = rendering.useRaymarching;
+	json["Rendering/SurfaceVolumePercentage"] = rendering.surfaceVolumePercentage;
+	json["Rendering/SmoothingRadiusInCells"] = rendering.smoothingRadiusInCells;
+	json["Rendering/NormalSmoothingFactor"] = rendering.normalSmoothingFactor;
 
 	onec::writeFile(file, json.dump(1));
 	onec::writeFile(file.parent_path() / file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
@@ -834,6 +841,17 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	}
 	else {
 		rendering.useRaymarching = false;
+	}
+
+	if (json.contains("Rendering/SurfaceVolumePercentage")) {
+		rendering.surfaceVolumePercentage = json["Rendering/SurfaceVolumePercentage"];
+		rendering.smoothingRadiusInCells = json["Rendering/SmoothingRadiusInCells"];
+		rendering.normalSmoothingFactor = json["Rendering/NormalSmoothingFactor"];
+	}
+	else {
+		rendering.surfaceVolumePercentage = 0.5f;
+		rendering.smoothingRadiusInCells = 1.f;
+		rendering.normalSmoothingFactor = 1.f;
 	}
 
     PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(this->terrain.entity) };
