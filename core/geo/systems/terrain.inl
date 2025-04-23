@@ -29,9 +29,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		onec::Buffer indicesBuffer{ terrain.indicesBuffer };
 
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
-			glm::ivec2 windowSize = onec::getWindow().getSize();
+			glm::ivec2 windowSize = onec::getWindow().getFramebufferSize();
 			if (windowSize != terrain.windowSize) {
-				terrain.screenTexture.release();
 				terrain.screenTexture.initialize(GL_TEXTURE_2D, glm::ivec3(windowSize.x, windowSize.y, 1), GL_RGBA8, 1, onec::SamplerState{}, true);
 				terrain.windowSize = windowSize;
 			}
@@ -198,11 +197,10 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 	    }
 
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
-			glm::ivec2 windowSize = onec::getWindow().getSize();
 			device::Launch screenLaunch;
 			screenLaunch.blockSize = dim3{ 16, 16, 1 };
-			screenLaunch.gridSize.x = (windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
-			screenLaunch.gridSize.y = (windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
+			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
+			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
 			device::raymarchTerrain(screenLaunch);
 		}
