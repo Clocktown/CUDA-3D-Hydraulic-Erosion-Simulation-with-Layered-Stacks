@@ -16,7 +16,15 @@ __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::
 	return t.y >= t.x && t.y >= 0;
 }
 
-__global__ void raymarchKernel() {
+__device__ __forceinline__ float intersectionVolume(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
+	const glm::vec3 b_min = glm::max(b_min0, b_min1);
+	const glm::vec3 b_max = glm::min(b_max0, b_max1);
+	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
+
+	return d.x * d.y * d.z;
+}
+
+__global__ void raymarchDDAKernel() {
 		const glm::ivec2 index{ getLaunchIndex() };
 
 		if (isOutside(index, simulation.windowSize))
@@ -35,8 +43,8 @@ __global__ void raymarchKernel() {
 			inf_mask.z ? 0.f : inv_r_dir.z
 		);
 
-		const glm::vec3 bmin = glm::vec3(-0.5f * simulation.gridScale * float(simulation.gridSize.x), -1000.f, -0.5f * simulation.gridScale * float(simulation.gridSize.y));
-		const glm::vec3 bmax = glm::vec3(0.5f * simulation.gridScale * float(simulation.gridSize.x), 1000.f, 0.5f * simulation.gridScale * float(simulation.gridSize.y));
+		const glm::vec3 bmin = glm::vec3(-0.5f * simulation.gridScale * float(simulation.gridSize.x), -FLT_MAX, -0.5f * simulation.gridScale * float(simulation.gridSize.y));
+		const glm::vec3 bmax = glm::vec3(0.5f * simulation.gridScale * float(simulation.gridSize.x), FLT_MAX, 0.5f * simulation.gridScale * float(simulation.gridSize.y));
 		glm::vec2 t;
 		bool intersect = intersection(bmin, bmax, ro, i_r_dir, t);
 		t.x = glm::max(t.x, 0.f);
@@ -74,6 +82,7 @@ __global__ void raymarchKernel() {
 					const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
 
 					glm::vec2 tempT;
+					// TODO: Test if a prior check improves performance (i.e. height-based)
 					bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), rayOriginGrid, i_r_dir, tempT);
 					if (intersect && tempT.x < closest) {
 						hit = true;
@@ -123,8 +132,146 @@ __global__ void raymarchKernel() {
 		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
+__device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	float volume = 0.f;
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+						
+			float floor = -FLT_MAX;
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor = terrainHeights[CEILING];
+					continue;
+				}
+
+				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+
+				floor = terrainHeights[CEILING];
+				if (floor >= boxBmax.y) break;
+			}
+		}
+	}
+	return volume;
+}
+
+// How far can we step when computing the volume overlap of columns to an AABB of side length s? (see Arches paper definition of the implicit surface)
+// My derivation:
+// based on the last overlap, we calculate the volume change necessary to hit the surface (f(p) = 0)
+// Moving along our ray, we retain part of the previous volume, remove some and add new volume.
+// The fastest change would occur when moving diagonally through the AABB.
+// Worst case, all the "old" volume was previously empty and all new volume is filled.
+// The new volume gained is calculated as new_volume = s^3 - (s - distance/sqrt(3))^3.
+// Solving for distance we get distance = 2*s*sqrt(3) - sqrt(3) (s + (s^3 - new_volume)^(1/3))
+// Using the necessary volume change from above as new_volume, we can calculate the safe distance.
+// since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
+// then the required volume Y is 0.5s^3, so the new volume gained is simply X - (0.5s^3)
+__global__ void raymarchSmoothKernel() {
+		const glm::ivec2 index{ getLaunchIndex() };
+
+		if (isOutside(index, simulation.windowSize))
+		{
+			return;
+		}
+
+		const glm::vec3 ro = simulation.camPos;
+		const glm::vec3 pW = simulation.lowerLeft + (index.x + 0.5f) * simulation.rightVec + (index.y + 0.5f) * simulation.upVec;
+		const glm::vec3 r_dir = glm::normalize(pW - ro);
+		const glm::vec3 inv_r_dir = 1.0f / r_dir;
+		const auto inf_mask = glm::isinf(inv_r_dir);
+		const glm::vec3 i_r_dir = glm::vec3(
+			inf_mask.x ? 0.f : inv_r_dir.x,
+			inf_mask.y ? 0.f : inv_r_dir.y,
+			inf_mask.z ? 0.f : inv_r_dir.z
+		);
+
+		// Danger: potential infinite loop for rays that never leave xz bounds
+		const glm::vec3 bmin = glm::vec3(-0.5f * simulation.gridScale * float(simulation.gridSize.x), -FLT_MAX, -0.5f * simulation.gridScale * float(simulation.gridSize.y));
+		const glm::vec3 bmax = glm::vec3(0.5f * simulation.gridScale * float(simulation.gridSize.x), FLT_MAX, 0.5f * simulation.gridScale * float(simulation.gridSize.y));
+		glm::vec2 t;
+		bool intersect = intersection(bmin, bmax, ro, i_r_dir, t);
+		t.x = glm::max(t.x, 0.f);
+
+		int steps = 0;
+		bool hit = false;
+		glm::vec3 p = glm::vec3(0);
+		glm::vec3 n = glm::vec3(0);
+		float step = simulation.gridScale;
+		if (intersect) {
+			// prep
+			const glm::vec3 roGrid = glm::vec3(ro.x - bmin.x, ro.y, ro.z - bmin.z);
+
+			const float radius = 1.f * simulation.gridScale;
+			const float radiusG = simulation.rGridScale * radius;
+
+			// raymarching with box-filter for implicit surface
+			while (t.x <= t.y) {
+				p = roGrid + t.x * r_dir;
+				const float volume = getVolume(p, radius, radiusG);
+
+
+				// TODO: Step optimization using the algorithm outlined in a large comment above
+				if (volume > 0.f) {
+					step = 0.1f * simulation.gridScale;
+				}
+				else {
+					step = simulation.gridScale;
+				}
+
+				if (volume > 4.f * radius * radius * radius) {
+					hit = true;
+					// Normal
+					const float e = radius;
+					n = glm::normalize(glm::vec3(
+						getVolume(p + glm::vec3(e,0.f,0.f), radius, radiusG) - volume,
+						getVolume(p + glm::vec3(0.f,e,0.f), radius, radiusG) - volume,
+						getVolume(p + glm::vec3(0.f,0.f,e), radius, radiusG) - volume
+					));
+					break;
+				}
+
+
+
+				t.x += step;
+			}
+		}
+
+		//normal = hit ? glm::vec3(1) : glm::vec3(-1);
+
+		const glm::vec3 bgCol = glm::vec3(0);
+		glm::vec3 col = 0.5f + 0.5f * n;
+		col = hit ? col : bgCol;
+
+
+
+		col = glm::clamp(col, 0.f, 1.f);
+		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
+		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+}
+
 void raymarchTerrain(const Launch& launch) {
-	CU_CHECK_KERNEL(raymarchKernel << <launch.gridSize, launch.blockSize >> > ());
+	CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > ());
 }
 }
 }
