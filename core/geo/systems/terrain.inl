@@ -104,6 +104,23 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
 
+		std::vector<geo::device::Launch> treeLaunch(geo::NUM_QUADTREE_LAYERS);
+
+		for (int i = 0; i < geo::NUM_QUADTREE_LAYERS; ++i) {
+			simulation.quadTree[i].gridScale = terrain.quadTree[i].gridScale;
+			simulation.quadTree[i].gridSize = terrain.quadTree[i].gridSize;
+			simulation.quadTree[i].heights = reinterpret_cast<float4*>(terrain.quadTree[i].heightBuffer.getData());
+			simulation.quadTree[i].layerCounts = reinterpret_cast<char*>(terrain.quadTree[i].layerCountBuffer.getData());
+			simulation.quadTree[i].layerStride = terrain.quadTree[i].layerStride;
+			simulation.quadTree[i].maxLayerCount = terrain.quadTree[i].maxLayerCount;
+			simulation.quadTree[i].rGridScale = terrain.quadTree[i].rGridScale;
+
+			treeLaunch[i].blockSize = dim3{8, 8, 1};
+			treeLaunch[i].gridSize.x = (simulation.quadTree[i].gridSize.x + treeLaunch[i].blockSize.x - 1) / treeLaunch[i].blockSize.x;
+			treeLaunch[i].gridSize.y = (simulation.quadTree[i].gridSize.y + treeLaunch[i].blockSize.y - 1) / treeLaunch[i].blockSize.y;
+			treeLaunch[i].gridSize.z = 1;
+		}
+
 		onec::ViewToClip pMatrix{ view2.get<onec::ViewToClip>(ui->camera.entity) };
 		onec::WorldToView vMatrix{ view2.get<onec::WorldToView>(ui->camera.entity) };
 		onec::LocalToWorld mMatrix { view.get<onec::LocalToWorld>(entity) };
@@ -146,6 +163,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		if (!terrain.simulation.paused)
 		{
+			terrain.quadTreeDirty = true;
 			if (perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].start();
 
 			if (perf.measureParts || perf.measureIndividualKernels) perf.measurements["Rain"].start();
@@ -197,12 +215,16 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 	    }
 
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
+			if (terrain.quadTreeDirty) {
+				device::buildQuadTree(treeLaunch);
+				terrain.quadTreeDirty = false;
+			}
 			device::Launch screenLaunch;
 			screenLaunch.blockSize = dim3{ 16, 16, 1 };
 			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
 			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
-			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor);
+			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor, ui->rendering.debugLayer);
 		}
 
 		if (ui->rendering.renderScene && !ui->rendering.useRaymarching) {

@@ -32,6 +32,29 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 	damageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
 	sedimentFluxScaleBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
 	atomicCounter.initialize(static_cast<std::ptrdiff_t>(sizeof(int)));
+
+	// Allocate QuadTree for Raymarching
+	glm::ivec2 currentSize = gridSize;
+	float currentScale = gridScale;
+	int currentMaxLayerCount = maxLayerCount;
+	for (int i = 0; i < NUM_QUADTREE_LAYERS; ++i) {
+		currentSize = glm::ceil(0.5f * glm::vec2(currentSize));
+		currentScale *= 2.f;
+		if ((i % 2) == 0) {
+			currentMaxLayerCount = glm::ceil(0.5f * currentMaxLayerCount);
+		}
+
+		const int cellCount{ currentSize.x * currentSize.y };
+		const int columnCount{ cellCount * currentMaxLayerCount };
+
+		quadTree[i].gridScale = currentScale;
+		quadTree[i].gridSize = currentSize;
+		quadTree[i].maxLayerCount = currentMaxLayerCount;
+		quadTree[i].rGridScale = 1.f / currentScale;
+		quadTree[i].layerStride = cellCount;
+		quadTree[i].layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)));
+		quadTree[i].heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
+	}
 }
 
 }

@@ -2,6 +2,8 @@
 
 #include <onec/onec.hpp>
 
+#include "../config/config.h"
+
 namespace geo
 {
 
@@ -68,6 +70,16 @@ struct Simulation
 	bool useSlippageOutflowBorders{ false };
 };
 
+struct QuadTreeEntry {
+	glm::ivec2 gridSize;
+	float gridScale;
+	float rGridScale;
+	int maxLayerCount;
+	int layerStride;
+	onec::Buffer heightBuffer;
+	onec::Buffer layerCountBuffer;
+};
+
 struct Terrain
 {
 	explicit Terrain() = default;
@@ -77,6 +89,7 @@ struct Terrain
 	glm::ivec2 gridSize;
 	float gridScale;
 	char maxLayerCount;
+	bool quadTreeDirty = true;
 	glm::ivec2 windowSize;
 	onec::Texture screenTexture;
 	onec::GraphicsBuffer layerCountBuffer;
@@ -92,6 +105,7 @@ struct Terrain
 	onec::Buffer velocityBuffer;
 	onec::Buffer damageBuffer;
 	onec::Buffer sedimentFluxScaleBuffer;
+	QuadTreeEntry quadTree[NUM_QUADTREE_LAYERS];
 	Simulation simulation;
 };
 

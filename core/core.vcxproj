@@ -22,6 +22,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="geo\config\config.h" />
     <ClInclude Include="geo\components\point_renderer.hpp" />
     <ClInclude Include="geo\components\screen_texture_renderer.hpp" />
     <ClInclude Include="geo\device\cuda_noise.cuh" />

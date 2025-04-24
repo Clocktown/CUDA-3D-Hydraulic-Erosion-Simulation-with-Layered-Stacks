@@ -8,11 +8,21 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <float.h>
+#include "../config/config.h"
+
+#include <vector>
+
+//#include "../components/terrain.hpp"
 
 #define BEDROCK 0
 #define SAND 1
 #define WATER 2
 #define CEILING 3
+
+#define QFULLHEIGHT 0
+#define QCEILING 1
+#define QSOLIDHEIGHT 2
+#define QAIR 3
 
 #define RIGHT 0
 #define UP 1
@@ -24,12 +34,23 @@ namespace geo
 namespace device
 {
 
+
 using namespace onec;
 
 struct Launch
 {
 	dim3 gridSize;
 	dim3 blockSize;
+};
+
+struct QuadTreeEntry {
+	glm::ivec2 gridSize;
+	float gridScale;
+	float rGridScale;
+	int maxLayerCount;
+	int layerStride;
+	float4* heights; // Different format: 2 floats for Solid + Water, excluding air, 2 floats for Solid + Air, excluding water. All Absolute.
+	char* layerCounts;
 };
 
 struct Simulation
@@ -107,6 +128,8 @@ struct Simulation
 	glm::vec3 upVec;
 	glm::vec3 camPos;
 	cudaSurfaceObject_t screenSurface;
+
+	QuadTreeEntry quadTree[geo::NUM_QUADTREE_LAYERS];
 };
 
 extern __constant__ Simulation simulation;
@@ -126,7 +149,7 @@ void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
 
-void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor);
-
+void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int debugLayer = -1);
+void buildQuadTree(const std::vector<Launch>& launch);
 }
 }
