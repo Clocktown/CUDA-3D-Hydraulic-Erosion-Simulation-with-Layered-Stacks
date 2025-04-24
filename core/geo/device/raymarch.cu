@@ -257,9 +257,9 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 		for (; x < endX; ++x) {
 			glm::ivec2 currentCell = glm::ivec2(x, y);
 
-			if (isOutside(currentCell, simulation.gridSize)) {
-				continue;
-			}
+			//if (isOutside(currentCell, simulation.gridSize)) {
+			//	continue;
+			//}
 
 			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
 			const int layerCount{ simulation.layerCounts[flatIndex] };
@@ -513,7 +513,7 @@ __global__ void buildQuadTreeLayer(int i) {
 			maxOLayers = glm::max(maxOLayers, neighbors[oIndex].layerCount);
 		}
 	}
-	const char layerCount = glm::min(simulation.quadTree[0].maxLayerCount, maxOLayers);
+	const char layerCount = glm::min(simulation.quadTree[i].maxLayerCount, maxOLayers);
 
 	glm::vec4 heights;
 	// Merge layer by layer, bottom to top
