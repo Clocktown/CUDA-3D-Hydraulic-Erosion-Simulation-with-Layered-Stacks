@@ -5,6 +5,36 @@
 namespace geo {
 	namespace device {
 
+constexpr int MAX_QUADTREE_LAYER = geo::NUM_QUADTREE_LAYERS - 1;
+
+struct Ray {
+	glm::vec2 t;
+	glm::vec3 o;
+	glm::vec3 dir;
+	glm::vec3 i_dir;
+	glm::bvec2 orientation;
+};
+
+struct BoxHit {
+	float t{ FLT_MAX };
+	bool hit{ false };
+	glm::vec2 boxHeights{ 0.f };
+	glm::vec3 normal{ 0.f };
+	glm::vec3 pos{ 0.f };
+};
+
+struct DDAState {
+	glm::ivec2 currentCell;
+	glm::ivec2 exit;
+	glm::ivec2 step;
+
+	glm::vec2 deltaT;
+	glm::vec2 T;
+
+	glm::vec2 bmin2D;
+	glm::vec2 bmax2D;
+};
+
 __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::vec3& b_max, const glm::vec3& r_o, const glm::vec3& inv_r_dir, glm::vec2& t) {
     glm::vec3 t1 = (b_min - r_o) * inv_r_dir;
     glm::vec3 t2 = (b_max - r_o) * inv_r_dir;
@@ -24,6 +54,158 @@ __device__ __forceinline__ float intersectionVolume(const glm::vec3& b_min0, con
 	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
 
 	return d.x * d.y * d.z;
+}
+
+__device__ __forceinline__ void updateStateAABB(DDAState& state, float gridScale) {
+	state.bmin2D = glm::vec2(state.currentCell) * gridScale;
+	state.bmax2D = state.bmin2D + gridScale;
+}
+
+__device__ __forceinline__ void updateStateAABB(DDAState& state, int currentLevel) {
+	return updateStateAABB(state, currentLevel < 0 ? simulation.gridScale : simulation.quadTree[currentLevel].gridScale);
+}
+
+__device__ __forceinline__ void calculateDDAState(DDAState& state, const Ray& ray, const glm::ivec2& gridSize, float gridScale, float rGridScale) {
+	const glm::vec3 rayStart = ray.o + ray.t.x * ray.dir;
+
+	state.currentCell = glm::clamp(
+		glm::ivec2(
+			glm::floor(glm::vec2(rayStart.x, rayStart.z) * rGridScale)),
+		glm::ivec2(0),
+		gridSize - glm::ivec2(1)
+	);
+	state.exit = glm::ivec2(
+		ray.orientation.x ? -1 : gridSize.x,
+		ray.orientation.y ? -1 : gridSize.y
+	);
+	state.step = glm::ivec2(
+		ray.orientation.x ? -1 : 1,
+		ray.orientation.y ? -1 : 1
+	);
+
+	state.deltaT = glm::abs(glm::vec2(
+		gridScale * ray.i_dir.x,
+		gridScale * ray.i_dir.z)
+	);
+	state.T = ray.t.x + ((glm::vec2(state.currentCell) + (1.f - glm::vec2(ray.orientation))) * gridScale - glm::vec2(rayStart.x, rayStart.z)) * glm::vec2(ray.i_dir.x, ray.i_dir.z);
+
+	updateStateAABB(state, gridScale);
+}
+
+__device__ __forceinline__ void calculateDDAState(DDAState& state, const Ray& ray, int currentLevel) {
+	if (currentLevel < 0) {
+		return calculateDDAState(state, ray, simulation.gridSize, simulation.gridScale, simulation.rGridScale);
+	}
+	else {
+		return calculateDDAState(state, ray, simulation.quadTree[currentLevel].gridSize, simulation.quadTree[currentLevel].gridScale, simulation.quadTree[currentLevel].rGridScale);
+	}
+}
+
+__device__ __forceinline__ void calculateDDAState(DDAState& state, const Ray& ray) {
+	return calculateDDAState(state, ray, simulation.gridSize, simulation.gridScale, simulation.rGridScale);
+}
+
+__device__ __forceinline__ Ray createRay(const glm::vec3& offset, const glm::ivec2& index) {
+	Ray ray;
+	ray.o = simulation.camPos + offset;
+	const glm::vec3 pW = simulation.lowerLeft + (index.x + 0.5f) * simulation.rightVec + (index.y + 0.5f) * simulation.upVec + offset;
+	ray.dir = glm::normalize(pW - ray.o);
+	ray.orientation = glm::bvec2(ray.dir.x < 0.f, ray.dir.z < 0.f);
+
+	const glm::vec3 inv_r_dir = 1.0f / ray.dir;
+	const auto inf_mask = glm::isinf(inv_r_dir);
+	ray.i_dir = glm::vec3(
+		inf_mask.x ? 0.f : inv_r_dir.x,
+		inf_mask.y ? 0.f : inv_r_dir.y,
+		inf_mask.z ? 0.f : inv_r_dir.z
+	);
+	return ray;
+}
+
+__device__ __forceinline__ void intersectSceneAsBoxes(const DDAState& state, Ray& ray, BoxHit& hit, int currentLevel) {
+	if (currentLevel < 0) {
+		// Terrain column intersection
+		int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
+		const int layerCount{ simulation.layerCounts[flatIndex] };
+					
+		float floor = -FLT_MAX;
+
+		for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+		{
+			const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+			const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
+
+			glm::vec2 tempT;
+			bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, totalTerrainHeight, state.bmax2D.y), ray.o, ray.i_dir, tempT);
+
+			if (intersect && tempT.x < hit.t) {
+				hit.hit = true;
+				hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
+				hit.t = tempT.x;
+			}
+
+			floor = terrainHeights[CEILING];
+		}
+	}
+	else {
+		// QuadTree Column Intersection
+		int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
+		const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
+					
+		float floor = -FLT_MAX;
+
+		const glm::vec2 bmin2D = glm::vec2(state.currentCell) * simulation.quadTree[currentLevel].gridScale;
+		const glm::vec2 bmax2D = bmin2D + simulation.quadTree[currentLevel].gridScale;
+
+		for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
+		{
+			const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
+			const float totalTerrainHeight = terrainHeights[QFULLHEIGHT];
+
+			glm::vec2 tempT;
+			bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), ray.o, ray.i_dir, tempT);
+			if (intersect) {
+				hit.hit = true;
+				// Shorten Ray
+				ray.t.x = tempT.x;
+				break;
+			}
+
+			floor = terrainHeights[QCEILING];
+		}
+	}
+}
+
+__device__ __forceinline__ bool advanceDDA(DDAState& state, Ray& ray, int currentLevel) {
+	// Advance to next cell
+	const bool axis = state.T.x >= state.T.y;
+	if (ray.t.y < state.T[axis]) return true;
+	state.currentCell[axis] += state.step[axis];
+	if (state.currentCell[axis] == state.exit[axis]) return true;
+	state.T[axis] += state.deltaT[axis];
+	// Shorten Ray
+	//ray.t.x = state.T[axis];
+	
+	updateStateAABB(state, currentLevel);
+	return false;
+}
+
+__device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const DDAState& state, const Ray& ray) {
+	hit.pos = ray.o + hit.t * ray.dir;
+	glm::vec3 bmin = glm::vec3(state.bmin2D.x, hit.boxHeights.x, state.bmin2D.y);
+	glm::vec3 bmax = glm::vec3(state.bmax2D.x, hit.boxHeights.y, state.bmax2D.y);
+	glm::vec3 diffMin = glm::abs(hit.pos - bmin);
+	glm::vec3 diffMax = glm::abs(hit.pos - bmax);
+	glm::vec3 distances = glm::min(glm::abs(diffMin), glm::abs(diffMax));
+
+	// Determine the closest face based on the minimum distance
+	if (distances.x <= distances.y && distances.x <= distances.z) {
+		hit.normal.x = (diffMin.x < diffMax.x) ? -1.0f : 1.0f;
+	} else if (distances.y <= distances.x && distances.y <= distances.z) {
+		hit.normal.y = (diffMin.y < diffMax.y) ? -1.0f : 1.0f;
+	} else {
+		hit.normal.z = (diffMin.z < diffMax.z) ? -1.0f : 1.0f;
+	}
 }
 
 __global__ void raymarchDDAKernel() {
@@ -142,149 +324,51 @@ __global__ void raymarchQuadTreeKernel() {
 			return;
 		}
 
-		const glm::vec3 ro = simulation.camPos;
-		const glm::vec3 pW = simulation.lowerLeft + (index.x + 0.5f) * simulation.rightVec + (index.y + 0.5f) * simulation.upVec;
-		const glm::vec3 r_dir = glm::normalize(pW - ro);
-		const glm::vec3 inv_r_dir = 1.0f / r_dir;
-		const auto inf_mask = glm::isinf(inv_r_dir);
-		const glm::vec3 i_r_dir = glm::vec3(
-			inf_mask.x ? 0.f : inv_r_dir.x,
-			inf_mask.y ? 0.f : inv_r_dir.y,
-			inf_mask.z ? 0.f : inv_r_dir.z
-		);
+		const glm::vec3 gridOffset = 0.5f * simulation.gridScale * glm::vec3(simulation.gridSize.x, 0.f, simulation.gridSize.y);
+		Ray ray{ createRay(gridOffset, index) };
 
-		const glm::vec3 bmin = glm::vec3(-0.5f * simulation.gridScale * float(simulation.gridSize.x), -FLT_MAX, -0.5f * simulation.gridScale * float(simulation.gridSize.y));
-		const glm::vec3 bmax = glm::vec3(0.5f * simulation.gridScale * float(simulation.gridSize.x), FLT_MAX, 0.5f * simulation.gridScale * float(simulation.gridSize.y));
-		glm::vec2 t;
-		bool intersect = intersection(bmin, bmax, ro, i_r_dir, t);
-		t.x = glm::max(t.x, 0.f);
+		const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
+		const glm::vec3 bmax = glm::vec3(2.f * gridOffset.x, FLT_MAX, 2.f * gridOffset.z);
 
-		bool hit = false;
-		glm::vec3 normal = glm::vec3(0);
+		bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, ray.t);
+		ray.t.x = glm::max(ray.t.x, 0.f);
 
-		int currentLevel = geo::NUM_QUADTREE_LAYERS - 1;
+		BoxHit hit;
+
+		int currentLevel = MAX_QUADTREE_LAYER;
 		if (intersect) {
 			// DDA prep
-			glm::vec3 rayOriginGrid = glm::vec3(ro.x + t.x * r_dir.x - bmin.x, ro.y + t.x * r_dir.y, ro.z + t.x * r_dir.z - bmin.z);
-
-			glm::ivec2 currentCell = glm::clamp(glm::ivec2(glm::floor(glm::vec2(rayOriginGrid.x, rayOriginGrid.z) * simulation.quadTree[currentLevel].rGridScale)), glm::ivec2(0), simulation.quadTree[currentLevel].gridSize - glm::ivec2(1));
-			glm::ivec2 exit = glm::ivec2(r_dir.x < 0 ? -1 : simulation.quadTree[currentLevel].gridSize.x, r_dir.z < 0 ? -1 : simulation.quadTree[currentLevel].gridSize.y);
-			glm::ivec2 step = glm::ivec2(r_dir.x < 0 ? -1 : 1, r_dir.z < 0 ? -1 : 1);
-
-			glm::vec2 deltaT = glm::abs(glm::vec2(simulation.quadTree[currentLevel].gridScale * i_r_dir.x, simulation.quadTree[currentLevel].gridScale * i_r_dir.z));
-			glm::vec2 T = t.x + ((glm::vec2(currentCell) + glm::clamp(1.f + glm::sign(glm::vec2(r_dir.x, r_dir.z)), 0.f, 1.f)) * simulation.quadTree[currentLevel].gridScale - glm::vec2(rayOriginGrid.x, rayOriginGrid.z)) * glm::vec2(i_r_dir.x, i_r_dir.z);
-
+			DDAState state;
+			calculateDDAState(state, ray, currentLevel);
 			// DDA
 			while (true) {
-				// Test current Cell: TODO
-				glm::vec2 boxHeights;
-				float closest = FLT_MAX;
-				const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
-				const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+				intersectSceneAsBoxes(state, ray, hit, currentLevel);
 
-				if (currentLevel < 0) {
-					// Actual Terrain
-					int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
-					const int layerCount{ simulation.layerCounts[flatIndex] };
-					//int itFlatIndex = flatIndex + (layerCount - 1) * simulation.layerStride;
-					float floor = -FLT_MAX;
-
-					for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
-					{
-						const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
-						const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
-
-						glm::vec2 tempT;
-						// TODO: Test if a prior check improves performance (i.e. height-based)
-						bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), rayOriginGrid, i_r_dir, tempT);
-						if (intersect && tempT.x < closest) {
-							hit = true;
-							boxHeights = glm::vec2(floor, totalTerrainHeight);
-							closest = tempT.x;
-						}
-
-						floor = terrainHeights[CEILING];
-					}
-				}
-				else {
-					// QuadTree
-					int flatIndex{ flattenIndex(currentCell, simulation.quadTree[currentLevel].gridSize) };
-					const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
-					//int itFlatIndex = flatIndex + (layerCount - 1) * simulation.layerStride;
-					float floor = -FLT_MAX;
-
-					const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.quadTree[currentLevel].gridScale;
-					const glm::vec2 bmax2D = bmin2D + simulation.quadTree[currentLevel].gridScale;
-
-					for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
-					{
-						const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
-						const float totalTerrainHeight = terrainHeights[QFULLHEIGHT];
-
-						glm::vec2 tempT;
-						// TODO: Test if a prior check improves performance (i.e. height-based)
-						bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), rayOriginGrid, i_r_dir, tempT);
-						if (intersect) {
-							hit = true;
-							t.x = tempT.x;
-							break;
-						}
-
-						floor = terrainHeights[QCEILING];
-					}
-				}
-
-				if (hit && (currentLevel < 0)) {
-					glm::vec3 hitPos = rayOriginGrid + closest * r_dir;
-					glm::vec3 bmin = glm::vec3(bmin2D.x, boxHeights.x, bmin2D.y);
-					glm::vec3 bmax = glm::vec3(bmax2D.x, boxHeights.y, bmax2D.y);
-					glm::vec3 diffMin = hitPos - bmin;
-					glm::vec3 diffMax = hitPos - bmax;
-					glm::vec3 distances = glm::min(glm::abs(diffMin), glm::abs(diffMax));
-
-					// Determine the closest face based on the minimum distance
-					if (distances.x <= distances.y && distances.x <= distances.z) {
-						normal.x = (diffMin.x < 0.0f) ? -1.0f : 1.0f;
-					} else if (distances.y <= distances.x && distances.y <= distances.z) {
-						normal.y = (diffMin.y < 0.0f) ? -1.0f : 1.0f;
-					} else {
-						normal.z = (diffMin.z < 0.0f) ? -1.0f : 1.0f;
-					}
+				if (hit.hit && (currentLevel < 0)) {
+					// Hit actual terrain geometry
+					resolveBoxHit(hit, state, ray);
 					break;
 				}
-				else if (hit) {
-					rayOriginGrid = rayOriginGrid + t.x * r_dir;
+				else if (hit.hit) {
+					// Hit coarse geometry in QuadTree. Move to finer level.
 					currentLevel--;
-					if (currentLevel < 0) {
-						currentCell = glm::clamp(glm::ivec2(glm::floor(glm::vec2(rayOriginGrid.x, rayOriginGrid.z) * simulation.rGridScale)), glm::ivec2(0), simulation.gridSize - glm::ivec2(1));
-						exit = glm::ivec2(r_dir.x < 0 ? -1 : simulation.gridSize.x, r_dir.z < 0 ? -1 : simulation.gridSize.y);
-						deltaT = glm::abs(glm::vec2(simulation.gridScale * i_r_dir.x, simulation.gridScale * i_r_dir.z));
-						T = t.x + ((glm::vec2(currentCell) + glm::clamp(1.f + glm::sign(glm::vec2(r_dir.x, r_dir.z)), 0.f, 1.f)) * simulation.gridScale - glm::vec2(rayOriginGrid.x, rayOriginGrid.z)) * glm::vec2(i_r_dir.x, i_r_dir.z);
-					}
-					else {
-						currentCell = glm::clamp(glm::ivec2(glm::floor(glm::vec2(rayOriginGrid.x, rayOriginGrid.z) * simulation.quadTree[currentLevel].rGridScale)), glm::ivec2(0), simulation.quadTree[currentLevel].gridSize - glm::ivec2(1));
-						exit = glm::ivec2(r_dir.x < 0 ? -1 : simulation.quadTree[currentLevel].gridSize.x, r_dir.z < 0 ? -1 : simulation.quadTree[currentLevel].gridSize.y);
-						deltaT = glm::abs(glm::vec2(simulation.quadTree[currentLevel].gridScale * i_r_dir.x, simulation.quadTree[currentLevel].gridScale * i_r_dir.z));
-						T = t.x + ((glm::vec2(currentCell) + glm::clamp(1.f + glm::sign(glm::vec2(r_dir.x, r_dir.z)), 0.f, 1.f)) * simulation.quadTree[currentLevel].gridScale - glm::vec2(rayOriginGrid.x, rayOriginGrid.z)) * glm::vec2(i_r_dir.x, i_r_dir.z);
-					}
-					hit = false;
+					calculateDDAState(state, ray, currentLevel);
+					hit.hit = false;
 					continue;
 				}
-				// Advance to next cell
-				const bool axis = T.x >= T.y;
-				if (t.y < T[axis]) break;
-				currentCell[axis] += step[axis];
-				if (currentCell[axis] == exit[axis]) break;
-				T[axis] += deltaT[axis];
-				//t.x = T[axis];
+				else {
+					// TODO: Step back up to a coarser level (more complicated than it seems)
+				}
+
+				if (advanceDDA(state, ray, currentLevel)) break;
 			}
 		}
 
 		//normal = hit ? glm::vec3(1) : glm::vec3(-1);
 
 		const glm::vec3 bgCol = glm::vec3(0);
-		glm::vec3 col = 0.5f + 0.5f * normal;
-		col = hit ? col : bgCol;
+		glm::vec3 col = 0.5f + 0.5f * hit.normal;
+		col = hit.hit ? col : bgCol;
 
 
 
