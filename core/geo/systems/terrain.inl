@@ -215,16 +215,28 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 	    }
 
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
+			if (perf.measureRendering) perf.measurements["Build Quad Tree"].start();
 			if (terrain.quadTreeDirty) {
 				device::buildQuadTree(treeLaunch);
 				terrain.quadTreeDirty = false;
 			}
+			if (perf.measureRendering) perf.measurements["Build Quad Tree"].stop();
+
+
+			if (perf.measureRendering) perf.measurements["Raymarching"].start();
 			device::Launch screenLaunch;
 			screenLaunch.blockSize = dim3{ 16, 16, 1 };
 			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
 			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
-			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor, ui->rendering.debugLayer);
+			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor, ui->rendering.missCount, ui->rendering.debugLayer);
+			if (perf.measureRendering) perf.measurements["Raymarching"].stop();
+		}
+		else {
+			if (perf.measureRendering) {
+				perf.measurements["Build Quad Tree"].update(0.f);
+				perf.measurements["Raymarching"].update(0.f);
+			}
 		}
 
 		if (ui->rendering.renderScene && !ui->rendering.useRaymarching) {
@@ -234,6 +246,9 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 			PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
 			pointRenderer.count = terrain.numValidColumns;
+		}
+		else {
+			if (perf.measureRendering) perf.measurements["Build Draw List"].update(0.f);
 		}
 	}
 }

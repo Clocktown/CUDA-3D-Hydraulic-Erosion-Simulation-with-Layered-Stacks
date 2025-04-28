@@ -178,10 +178,10 @@ void UI::updatePerformance() {
 		}
 
 		ImGui::LabelText("Total Rendering", "%f / %f / %f / %f [ms]", 
-			performance.measurements["Rendering"].last + performance.measurements["Build Draw List"].last,
-			performance.measurements["Rendering"].mean + performance.measurements["Build Draw List"].mean,
-			performance.measurements["Rendering"].minimum + performance.measurements["Build Draw List"].minimum,
-			performance.measurements["Rendering"].maximum + performance.measurements["Build Draw List"].maximum
+			performance.measurements["Rendering"].last + performance.measurements["Build Draw List"].last + performance.measurements["Build Quad Tree"].last + performance.measurements["Raymarching"].last,
+			performance.measurements["Rendering"].mean + performance.measurements["Build Draw List"].mean + performance.measurements["Build Quad Tree"].mean + performance.measurements["Raymarching"].mean,
+			performance.measurements["Rendering"].minimum + performance.measurements["Build Draw List"].minimum + performance.measurements["Build Quad Tree"].minimum + performance.measurements["Raymarching"].minimum,
+			performance.measurements["Rendering"].maximum + performance.measurements["Build Draw List"].maximum + performance.measurements["Build Quad Tree"].maximum + performance.measurements["Raymarching"].maximum
 		);
 		if (ImGui::TreeNode("Rendering Details")) {
 			ImGui::LabelText("Draw Call", "%f / %f / %f / %f [ms]", 
@@ -195,6 +195,18 @@ void UI::updatePerformance() {
 				performance.measurements["Build Draw List"].mean,
 				performance.measurements["Build Draw List"].minimum,
 				performance.measurements["Build Draw List"].maximum
+			);
+			ImGui::LabelText("Build Quad Tree", "%f / %f / %f / %f [ms]", 
+				performance.measurements["Build Quad Tree"].last,
+				performance.measurements["Build Quad Tree"].mean,
+				performance.measurements["Build Quad Tree"].minimum,
+				performance.measurements["Build Quad Tree"].maximum
+			);
+			ImGui::LabelText("Raymarching", "%f / %f / %f / %f [ms]", 
+				performance.measurements["Raymarching"].last,
+				performance.measurements["Raymarching"].mean,
+				performance.measurements["Raymarching"].minimum,
+				performance.measurements["Raymarching"].maximum
 			);
 
 			ImGui::TreePop();
@@ -548,7 +560,8 @@ void UI::updateRendering()
 		ImGui::DragFloat("Volume Percentage", &rendering.surfaceVolumePercentage, 0.01f, 0.5f, 1.f);
 		ImGui::DragFloat("Smoothing Radius [cells]", &rendering.smoothingRadiusInCells, 0.01f, 0.f, 2.f);
 		ImGui::DragFloat("Normal Smoothing Factor", &rendering.normalSmoothingFactor, 0.01f, 1.f, 4.f);
-		ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -1, geo::NUM_QUADTREE_LAYERS - 1);
+		ImGui::DragInt("Miss Count", &rendering.missCount, 0.01f, 0, 20);
+		ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -2, geo::NUM_QUADTREE_LAYERS - 1);
 
 		ImGui::TreePop();
 	}

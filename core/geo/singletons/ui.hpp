@@ -37,7 +37,8 @@ struct UI
 		float surfaceVolumePercentage{ 0.5f };
 		float smoothingRadiusInCells{ 1.f };
 		float normalSmoothingFactor{ 1.f };
-		int debugLayer{ -1 };
+		int missCount{ 8 };
+		int debugLayer{ -2 };
 	} rendering;
 
 	performance performance{};
