@@ -233,7 +233,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if (perf.measureRendering) perf.measurements["Raymarching"].stop();
 		}
 		else {
-			if (perf.measureRendering) {
+			if (perf.measureRendering && ui->rendering.renderScene) {
 				perf.measurements["Build Quad Tree"].update(0.f);
 				perf.measurements["Raymarching"].update(0.f);
 			}
@@ -248,7 +248,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			pointRenderer.count = terrain.numValidColumns;
 		}
 		else {
-			if (perf.measureRendering) perf.measurements["Build Draw List"].update(0.f);
+			if (perf.measureRendering && ui->rendering.renderScene) perf.measurements["Build Draw List"].update(0.f);
 		}
 	}
 }
