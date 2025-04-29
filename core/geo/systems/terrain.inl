@@ -217,7 +217,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].start();
 			if (terrain.quadTreeDirty) {
-				device::buildQuadTree(treeLaunch);
+				device::buildQuadTree(treeLaunch, ui->rendering.smoothingRadiusInCells);
 				terrain.quadTreeDirty = false;
 			}
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].stop();
@@ -229,7 +229,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
 			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
-			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor, ui->rendering.missCount, ui->rendering.debugLayer);
+			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor, ui->rendering.missCount, ui->rendering.fineMissCount, ui->rendering.debugLayer);
 			if (perf.measureRendering) perf.measurements["Raymarching"].stop();
 		}
 		else {

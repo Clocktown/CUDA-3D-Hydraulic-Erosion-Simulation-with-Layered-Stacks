@@ -38,6 +38,7 @@ struct UI
 		float smoothingRadiusInCells{ 1.f };
 		float normalSmoothingFactor{ 1.f };
 		int missCount{ 8 };
+		int fineMissCount{ 16 };
 		int debugLayer{ -2 };
 	} rendering;
 

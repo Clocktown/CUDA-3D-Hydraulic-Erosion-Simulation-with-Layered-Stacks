@@ -149,7 +149,7 @@ void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
 
-void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int missCount = 8, int debugLayer = -2);
-void buildQuadTree(const std::vector<Launch>& launch);
+void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int missCount = 8, int fineMissCount = 16, int debugLayer = -2);
+void buildQuadTree(const std::vector<Launch>& launch, float smoothingRadiusInCells);
 }
 }

@@ -558,9 +558,12 @@ void UI::updateRendering()
 		}
 
 		ImGui::DragFloat("Volume Percentage", &rendering.surfaceVolumePercentage, 0.01f, 0.5f, 1.f);
-		ImGui::DragFloat("Smoothing Radius [cells]", &rendering.smoothingRadiusInCells, 0.01f, 0.f, 2.f);
+		if (ImGui::DragFloat("Smoothing Radius [cells]", &rendering.smoothingRadiusInCells, 0.01f, 0.1f, 2.f)) {
+			terrain.quadTreeDirty = true;
+		}
 		ImGui::DragFloat("Normal Smoothing Factor", &rendering.normalSmoothingFactor, 0.01f, 1.f, 4.f);
-		ImGui::DragInt("Miss Count", &rendering.missCount, 0.01f, 0, 20);
+		ImGui::DragInt("Miss Count", &rendering.missCount, 0.1f, 0, 20);
+		ImGui::DragInt("Fine Miss Count", &rendering.fineMissCount, 0.1f, 1, 50);
 		ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -2, geo::NUM_QUADTREE_LAYERS - 1);
 
 		ImGui::TreePop();

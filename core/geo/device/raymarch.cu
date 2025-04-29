@@ -162,57 +162,67 @@ __device__ __forceinline__ Ray createRay(const glm::vec3& offset, const glm::ive
 }
 
 template <class State>
+__device__ __forceinline__ void intersectColumns(const State& state, const Ray& ray, BoxHit& hit) {
+	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
+	const int layerCount{ simulation.layerCounts[flatIndex] };
+
+	float floor = -FLT_MAX;
+
+	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+	{
+		const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+		const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
+
+		glm::vec2 tempT;
+		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, totalTerrainHeight, state.bmax2D.y), ray.o, ray.i_dir, tempT);
+
+		if (intersect && tempT.x < hit.t) {
+			hit.hit = true;
+			hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
+			hit.t = tempT.x;
+		}
+
+		floor = terrainHeights[CEILING];
+	}
+}
+
+template <class State>
+__device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
+	int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
+	const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
+
+	float floor = -FLT_MAX;
+
+	const glm::vec2 bmin2D = glm::vec2(state.currentCell) * simulation.quadTree[currentLevel].gridScale;
+	const glm::vec2 bmax2D = bmin2D + simulation.quadTree[currentLevel].gridScale;
+
+	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
+	{
+		const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
+		const float totalTerrainHeight = terrainHeights[QFULLHEIGHT];
+
+		glm::vec2 tempT;
+		bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), ray.o, ray.i_dir, tempT);
+		if (intersect && (tempT.y > ray.t.x)) {
+			hit.hit = true;
+			hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
+			hit.t = glm::max(tempT.x, ray.t.x);
+			break;
+		}
+
+		floor = terrainHeights[QCEILING];
+	}
+}
+
+template <class State>
 __device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	if (currentLevel < 0) {
 		// Terrain column intersection
-		int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
-		const int layerCount{ simulation.layerCounts[flatIndex] };
-					
-		float floor = -FLT_MAX;
-
-		for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
-		{
-			const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
-			const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
-
-			glm::vec2 tempT;
-			bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, totalTerrainHeight, state.bmax2D.y), ray.o, ray.i_dir, tempT);
-
-			if (intersect && tempT.x < hit.t) {
-				hit.hit = true;
-				hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
-				hit.t = tempT.x;
-			}
-
-			floor = terrainHeights[CEILING];
-		}
+		intersectColumns(state, ray, hit);
 	}
 	else {
 		// QuadTree Column Intersection
-		int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
-		const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
-					
-		float floor = -FLT_MAX;
-
-		const glm::vec2 bmin2D = glm::vec2(state.currentCell) * simulation.quadTree[currentLevel].gridScale;
-		const glm::vec2 bmax2D = bmin2D + simulation.quadTree[currentLevel].gridScale;
-
-		for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
-		{
-			const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
-			const float totalTerrainHeight = terrainHeights[QFULLHEIGHT];
-
-			glm::vec2 tempT;
-			bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), ray.o, ray.i_dir, tempT);
-			if (intersect && (tempT.y > ray.t.x)) {
-				hit.hit = true;
-				hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
-				hit.t = glm::max(tempT.x, ray.t.x);
-				break;
-			}
-
-			floor = terrainHeights[QCEILING];
-		}
+		intersectQuadTreeColumns(state, ray, hit, currentLevel);
 	}
 }
 
@@ -477,6 +487,135 @@ __device__ __forceinline__ float calculateSafeStep(float volume, float targetVol
 	return glm::max(d1, d2);
 }
 
+template <class State>
+__global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount, float volumePercentage, float radiusG, float normalSmoothingFactor) {
+	const glm::ivec2 index{ getLaunchIndex() };
+
+	if (isOutside(index, simulation.windowSize))
+	{
+		return;
+	}
+
+	const glm::vec3 gridOffset = 0.5f * simulation.gridScale * glm::vec3(simulation.gridSize.x, 0.f, simulation.gridSize.y);
+	Ray ray{ createRay(gridOffset, index) };
+
+	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
+	const glm::vec3 bmax = glm::vec3(2.f * gridOffset.x, FLT_MAX, 2.f * gridOffset.z);
+
+	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, ray.t);
+	ray.t.x = glm::max(ray.t.x, 0.f);
+
+	BoxHit hit;
+
+	int currentLevel = MAX_QUADTREE_LAYER;
+
+	int steps = 0;
+	if (intersect) {
+		// DDA prep
+		State state;
+		calculateDDAState(state, ray, currentLevel);
+
+		const float radius = simulation.gridScale * radiusG;
+		const float targetVolume = volumePercentage * 8.f * radius * radius * radius;
+		// DDA
+		while (true) {
+			steps++;
+
+			// Simpler alternative to backtracking, no stack in state needed, has better performance
+			if constexpr (std::is_same_v<State, DDAMissState>) {
+				const int currentMissCount = currentLevel >= 0 ? missCount : fineMissCount;
+				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == currentMissCount) {
+					currentLevel++;
+					calculateDDAState(state, ray, currentLevel);
+					continue;
+				}
+			}
+
+			if (currentLevel < 0) {
+				const glm::vec3 p = ray.o + (ray.t.x - radius) * ray.dir;
+				const float volume = getVolume(p, radius, radiusG);
+
+				if (volume > 0.99f * targetVolume) {
+					hit.hit = true;
+					hit.t = ray.t.x - radius;
+					hit.pos = p;
+					// TODO: keep normal using smoother terrain?
+					const float e = normalSmoothingFactor * radius;
+					const float eG = normalSmoothingFactor * radiusG;
+					const float volumeN = normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
+					hit.normal = glm::normalize(glm::vec3(
+						volumeN - getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG),
+						volumeN - getVolume(p + glm::vec3(0.f, e, 0.f), e, eG),
+						volumeN - getVolume(p + glm::vec3(0.f, 0.f, e), e, eG)
+					));
+					break;
+				}
+				hit.t = volume; // Remember volume for step
+			}
+			else {
+				intersectQuadTreeColumns(state, ray, hit, currentLevel);
+			}
+
+			if (hit.hit && (currentLevel >= 0)) {
+				// Remember Exit for Backtracking
+				if constexpr (std::is_same_v<State, DDAExitLevelState>) {
+					const bool axis = state.T.x >= state.T.y;
+					state.exitLevels[currentLevel] = state.T[axis];
+				}
+				// Hit coarse geometry in QuadTree. Move to finer level.
+				ray.t.x = glm::max(ray.t.x, hit.t);
+				currentLevel--;
+				if (currentLevel >= 0) calculateDDAState(state, ray, currentLevel);
+				hit.hit = false;
+				continue;
+			}
+
+			// Backtracking - very delicate, easy to implement wrong
+			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
+				bool movedUp = false;
+				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - 1e-4f)) {
+					currentLevel++;
+					movedUp = true;
+				}
+				if (movedUp) {
+					const float oldRay = ray.t.x;
+					ray.t.x = glm::max(ray.t.x + 1e-4f, state.exitLevels[currentLevel] + 1e-4f);
+					if (ray.t.y < ray.t.x) break;
+					calculateDDAState(state, ray, currentLevel);
+					ray.t.x = oldRay;
+					continue;
+				}
+			}
+
+			if (currentLevel < 0) {
+				const float step = calculateSafeStep(hit.t, targetVolume, 2.f * radius);
+				ray.t.x += step;
+				if (ray.t.y < ray.t.x) break;
+				if constexpr (std::is_same_v<State, DDAMissState>) {
+					state.miss++;
+				}
+			}
+			else {
+				if (advanceDDA(state, ray, currentLevel)) break;
+			}
+
+		}
+	}
+
+	hit.pos -= gridOffset;
+
+	const glm::vec3 bgCol = glm::vec3(0);
+	glm::vec3 col = /*glm::vec3(0.005f * steps);*/ 0.5f + 0.5f * hit.normal;
+	col = hit.hit ? col : bgCol;
+
+
+
+	col = glm::clamp(col, 0.f, 1.f);
+	uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
+	surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+}
+
+
 __global__ void raymarchSmoothKernel(float volumePercentage, float radiusG, float normalSmoothingFactor) {
 		const glm::ivec2 index{ getLaunchIndex() };
 
@@ -554,7 +693,7 @@ __global__ void raymarchSmoothKernel(float volumePercentage, float radiusG, floa
 		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
-__global__ void buildQuadTreeFirstLayer() {
+__global__ void buildQuadTreeFirstLayer(float radiusG) {
 	const glm::ivec2 index{ getLaunchIndex() };
 
 	if (isOutside(index, simulation.quadTree[0].gridSize))
@@ -564,6 +703,7 @@ __global__ void buildQuadTreeFirstLayer() {
 
 	int flatIndex{ flattenIndex(index, simulation.quadTree[0].gridSize) };
 	int maxOLayers = 0;
+	const float radius = radiusG * simulation.gridScale;
 
 	struct Neighbor {
 		glm::ivec2 index;
@@ -605,10 +745,10 @@ __global__ void buildQuadTreeFirstLayer() {
 				// TODO: pad heights with smoothing radius? (splitting fullHeight to one padded up, one padded down as planned)
 				const float solidHeight = oTerrainHeights[BEDROCK] + oTerrainHeights[SAND];
 				const float fullHeight = solidHeight + oTerrainHeights[WATER];
-				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight);
-				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING]);
-				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight);
-				heights[QAIR] = glm::min(heights[QAIR], fullHeight);
+				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight + radius);
+				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING] - radius);
+				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight + radius);
+				heights[QAIR] = glm::min(heights[QAIR], fullHeight - radius);
 			}
 		}
 		simulation.quadTree[0].heights[flatIndex + simulation.quadTree[0].layerStride * layer] = glm::cuda_cast(heights);
@@ -630,10 +770,10 @@ __global__ void buildQuadTreeFirstLayer() {
 				// TODO: pad heights with smoothing radius? (splitting fullHeight to one padded up, one padded down as planned)
 				const float solidHeight = oTerrainHeights[BEDROCK] + oTerrainHeights[SAND];
 				const float fullHeight = solidHeight + oTerrainHeights[WATER];
-				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight);
-				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING]);
-				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight);
-				heights[QAIR] = glm::min(heights[QAIR], fullHeight);
+				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight + radius);
+				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING] - radius);
+				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight + radius);
+				heights[QAIR] = glm::min(heights[QAIR], fullHeight - radius);
 			}
 		}
 	}
@@ -730,18 +870,29 @@ __global__ void buildQuadTreeLayer(int i) {
 	// TODO: Compact tree (merge overlapping columns)
 }
 
-void buildQuadTree(const std::vector<Launch>& launch) {
+void buildQuadTree(const std::vector<Launch>& launch, float smoothingRadiusInCells) {
 	// first layer (special)
-	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > ());
+	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > (smoothingRadiusInCells));
 	// remaining layers
 	for (int i = 1; i < launch.size(); ++i) {
 		CU_CHECK_KERNEL(buildQuadTreeLayer << <launch[i].gridSize, launch[i].blockSize >> > (i));
 	}
 }
 
-void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int missCount, int debugLayer) {
+void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int missCount, int fineMissCount, int debugLayer) {
 	if (useInterpolation) {
-		CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > (volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+		if (missCount < 0) {
+			CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > (volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+		}
+		else if (missCount == 0) {
+			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAExitLevelState> << <launch.gridSize, launch.blockSize >> > (missCount, fineMissCount, volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+		}
+		else if (missCount >= 3) {
+			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAMissState> << <launch.gridSize, launch.blockSize >> > (missCount, fineMissCount, volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+		}
+		else {
+			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAState> << <launch.gridSize, launch.blockSize >> > (missCount, fineMissCount, volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+		}
 	}
 	else {
 		if (debugLayer < -1) {
