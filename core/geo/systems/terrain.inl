@@ -14,7 +14,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 {
 	onec::World& world{ onec::getWorld() };
 
-	const auto view{ world.getView<Terrain, PointRenderer, onec::LocalToWorld, Includes...>(excludes) };
+	const auto view{ world.getView<Terrain, PointRenderer, onec::Scale, onec::LocalToWorld, Includes...>(excludes) };
 	const auto view2{ world.getView<onec::WorldToView, onec::ViewToClip, onec::Position, Includes...>(excludes) };
 
 	auto ui = world.getSingleton<geo::UI>();
@@ -27,6 +27,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		onec::Buffer sedimentBuffer{ terrain.sedimentBuffer };
 		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
 		onec::Buffer indicesBuffer{ terrain.indicesBuffer };
+		onec::Buffer renderPipelineBuffer{ world.getSingleton<onec::RenderPipeline>()->uniformBuffer };
 
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
 			glm::ivec2 windowSize = onec::getWindow().getFramebufferSize();
@@ -133,12 +134,30 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		glm::vec4 lr = iPV * glm::vec4(1, -1, 1, 1);
 		lr /= lr.w;
 
-		simulation.camPos = view2.get<onec::Position>(ui->camera.entity).position;
-		simulation.lowerLeft = glm::vec3(ll);
-		simulation.rightVec = glm::vec3(lr - ll) / float(terrain.windowSize.x);
-		simulation.upVec = glm::vec3(ul - ll) / float(terrain.windowSize.y);
-		simulation.windowSize = terrain.windowSize;
-		simulation.screenSurface = screenArray.getSurfaceObject();
+		simulation.rendering.camPos = view2.get<onec::Position>(ui->camera.entity).position;
+		simulation.rendering.lowerLeft = glm::vec3(ll);
+		simulation.rendering.rightVec = glm::vec3(lr - ll) / float(terrain.windowSize.x);
+		simulation.rendering.upVec = glm::vec3(ul - ll) / float(terrain.windowSize.y);
+		simulation.rendering.windowSize = terrain.windowSize;
+		simulation.rendering.screenSurface = screenArray.getSurfaceObject();
+
+		simulation.rendering.materialColors[0] = pow(ui->rendering.bedrockColor, glm::vec3(2.2f));
+		simulation.rendering.materialColors[1] = pow(ui->rendering.sandColor, glm::vec3(2.2f));
+		simulation.rendering.materialColors[2] = pow(ui->rendering.waterColor, glm::vec3(2.2f));
+		simulation.rendering.renderSand = ui->rendering.renderSand;
+		simulation.rendering.renderWater = ui->rendering.renderWater;
+		simulation.rendering.surfaceVolumePercentage = ui->rendering.surfaceVolumePercentage;
+		simulation.rendering.smoothingRadiusInCells = ui->rendering.smoothingRadiusInCells;
+		simulation.rendering.normalSmoothingFactor = ui->rendering.normalSmoothingFactor;
+
+		simulation.rendering.i_scale = 1.f / world.getComponent<onec::Scale>(entity)->scale;
+
+		simulation.rendering.materialColors[3] = world.getSingleton<onec::RenderPipeline>()->clearColor;
+		simulation.rendering.uniforms = reinterpret_cast<onec::RenderPipelineUniforms*> (renderPipelineBuffer.getData());
+
+		simulation.rendering.missCount = ui->rendering.missCount;
+		simulation.rendering.fineMissCount = ui->rendering.fineMissCount;
+		simulation.rendering.gridOffset = 0.5f * simulation.gridScale * glm::vec3(simulation.gridSize.x, 0.f, simulation.gridSize.y);
 
 		launch.blockSize = dim3{ 8, 8, 1 };
 		launch.gridSize.x = (simulation.gridSize.x + launch.blockSize.x - 1) / launch.blockSize.x;
@@ -217,7 +236,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].start();
 			if (terrain.quadTreeDirty) {
-				device::buildQuadTree(treeLaunch, ui->rendering.smoothingRadiusInCells);
+				device::buildQuadTree(treeLaunch);
 				terrain.quadTreeDirty = false;
 			}
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].stop();
@@ -229,7 +248,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
 			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
-			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.surfaceVolumePercentage, ui->rendering.smoothingRadiusInCells, ui->rendering.normalSmoothingFactor, ui->rendering.missCount, ui->rendering.fineMissCount, ui->rendering.debugLayer);
+			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.missCount, ui->rendering.debugLayer);
 			if (perf.measureRendering) perf.measurements["Raymarching"].stop();
 		}
 		else {

@@ -34,9 +34,7 @@ struct DirectionalLight
 float getAttenuation(const float distance, const float range)
 {
 	float ratio = distance / range;
-	ratio = clamp(1.0f - ratio * ratio * ratio * ratio, 0.0f, 1.0f);
-
-	return ratio * ratio / (distance * distance + 1.0f);
+	return 1.f / (ratio * ratio + 1.0f);
 }
 
 vec3 getPointLightIlluminance(const PointLight pointLight, const vec3 direction, const float distance, const vec3 normal)

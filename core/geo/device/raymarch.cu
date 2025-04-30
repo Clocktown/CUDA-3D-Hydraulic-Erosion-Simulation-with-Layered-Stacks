@@ -6,6 +6,7 @@ namespace geo {
 	namespace device {
 
 constexpr int MAX_QUADTREE_LAYER = geo::NUM_QUADTREE_LAYERS - 1;
+constexpr int AIR = CEILING;
 
 struct Ray {
 	glm::vec2 t;
@@ -18,6 +19,7 @@ struct Ray {
 struct BoxHit {
 	float t{ FLT_MAX };
 	bool hit{ false };
+	int material{ AIR };
 	glm::vec2 boxHeights{ 0.f };
 	glm::vec3 normal{ 0.f };
 	glm::vec3 pos{ 0.f };
@@ -62,6 +64,121 @@ struct DDAState {
 	glm::vec2 bmin2D;
 	glm::vec2 bmax2D;
 };
+
+struct PhongBRDF
+{
+	glm::vec3 diffuseReflectance;
+	glm::vec3 specularReflectance;
+	float shininess;
+	float alpha;
+	glm::vec3 position;
+	glm::vec3 normal;
+	float F;
+};
+
+constexpr float epsilon = 1.192092896e-07f;
+constexpr float bigEpsilon = 1e-4f;
+constexpr float rPi = 0.318309886f;
+
+
+__device__ __forceinline__ glm::vec3 adjustGamma(const glm::vec3 color, const float gamma)
+{
+	return pow(color, glm::vec3(gamma));
+}
+
+__device__ __forceinline__ glm::vec3 sRGBToLinear(const glm::vec3 color)
+{
+	return adjustGamma(color, 2.2f);
+}
+
+__device__ __forceinline__ glm::vec3 linearToSRGB(const glm::vec3 color)
+{
+	return adjustGamma(color, 1.0f / 2.2f);
+}
+
+__device__ __forceinline__ glm::vec3 applyReinhardToneMap(const glm::vec3 luminance)
+{
+	return luminance / (luminance + 1.0f);
+}
+
+__device__ __forceinline__ float getAttenuation(const float distance, const float range)
+{
+	float ratio = distance / range;
+	return 1.f / (ratio * ratio + 1.0f);
+}
+
+__device__ __forceinline__ glm::vec3 getPointLightIlluminance(const onec::RenderPipelineUniforms::PointLight pointLight, const glm::vec3 direction, const float distance, const glm::vec3 normal)
+{
+	return getAttenuation(distance, pointLight.range) * pointLight.intensity * glm::max(glm::dot(-direction, normal), 0.0f);
+}
+
+__device__ __forceinline__ glm::vec3 getSpotLightIlluminance(const onec::RenderPipelineUniforms::SpotLight spotLight, const glm::vec3 direction, const float distance, const glm::vec3 normal)
+{
+	const float cutOff = glm::dot(spotLight.direction, direction);
+
+	if (cutOff < spotLight.outerCutOff)
+	{
+		return glm::vec3(0.0f);
+	}
+
+	const float attenuation = glm::min((cutOff - spotLight.outerCutOff) / (spotLight.innerCutOff - spotLight.outerCutOff + epsilon), 1.0f) * getAttenuation(distance, spotLight.range);
+
+	return attenuation * spotLight.intensity * glm::max(glm::dot(-direction, normal), 0.0f);
+}
+
+__device__ __forceinline__ glm::vec3 getDirectionalLightIlluminance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const glm::vec3 direction, const glm::vec3 normal)
+{
+	return directionalLight.luminance * glm::max(glm::dot(-direction, normal), 0.0f);
+}
+
+__device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF phongBRDF, const glm::vec3 lightDirection, const glm::vec3 viewDirection)
+{
+	const glm::vec3 reflection = reflect(-lightDirection, phongBRDF.normal);
+	const float cosPhi = glm::max(dot(viewDirection, reflection), 0.0f);
+
+	const glm::vec3 diffuseBRDF = rPi * phongBRDF.diffuseReflectance;
+	const glm::vec3 specularBRDF = 0.5f * rPi * (phongBRDF.shininess + 2.0f) * pow(cosPhi, phongBRDF.shininess) * phongBRDF.specularReflectance;
+
+	return diffuseBRDF + specularBRDF;
+}
+
+__device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight ambientLight, const PhongBRDF phongBRDF)
+{
+	return (rPi * phongBRDF.diffuseReflectance) * ambientLight.luminance;
+}
+
+__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight pointLight, const PhongBRDF phongBRDF, const glm::vec3 direction)
+{
+	const glm::vec3 lightVector = pointLight.position - phongBRDF.position;
+	const float lightDistance = length(lightVector);
+	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
+
+	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, lightDirection, direction) *
+		                   getPointLightIlluminance(pointLight, -lightDirection, lightDistance, phongBRDF.normal);
+
+	return luminance;
+}
+
+__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight spotLight, const PhongBRDF phongBRDF, const glm::vec3 direction)
+{
+	const glm::vec3 lightVector = spotLight.position - phongBRDF.position;
+	const float lightDistance = length(lightVector);
+	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
+
+	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, lightDirection, direction) *
+		                   getSpotLightIlluminance(spotLight, -lightDirection, lightDistance, phongBRDF.normal);
+
+	return luminance;
+}
+
+__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const PhongBRDF phongBRDF, const glm::vec3 direction)
+{
+	const glm::vec3 lightDirection = -directionalLight.direction;
+	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, lightDirection, direction) *
+		                   getDirectionalLightIlluminance(directionalLight, directionalLight.direction, phongBRDF.normal);
+
+	return luminance;
+}
 
 __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::vec3& b_max, const glm::vec3& r_o, const glm::vec3& inv_r_dir, glm::vec2& t) {
     glm::vec3 t1 = (b_min - r_o) * inv_r_dir;
@@ -144,11 +261,10 @@ __device__ __forceinline__ void calculateDDAState(State& state, const Ray& ray) 
 	return calculateDDAState(state, ray, simulation.gridSize, simulation.gridScale, simulation.rGridScale);
 }
 
-__device__ __forceinline__ Ray createRay(const glm::vec3& offset, const glm::ivec2& index) {
+__device__ __forceinline__ Ray createRay(const glm::vec3& o, const glm::vec3& dir) {
 	Ray ray;
-	ray.o = simulation.camPos + offset;
-	const glm::vec3 pW = simulation.lowerLeft + (index.x + 0.5f) * simulation.rightVec + (index.y + 0.5f) * simulation.upVec + offset;
-	ray.dir = glm::normalize(pW - ray.o);
+	ray.o = o;
+	ray.dir = dir;
 	ray.orientation = glm::bvec2(ray.dir.x < 0.f, ray.dir.z < 0.f);
 
 	const glm::vec3 inv_r_dir = 1.0f / ray.dir;
@@ -158,7 +274,44 @@ __device__ __forceinline__ Ray createRay(const glm::vec3& offset, const glm::ive
 		inf_mask.y ? 0.f : inv_r_dir.y,
 		inf_mask.z ? 0.f : inv_r_dir.z
 	);
+	ray.t.x = 0.f;
+	ray.t.y = FLT_MAX;
 	return ray;
+}
+
+__device__ __forceinline__ Ray createRay(const glm::ivec2& index) {
+	const glm::vec3 o = simulation.rendering.i_scale * simulation.rendering.camPos;
+	const glm::vec3 pW = simulation.rendering.i_scale * (simulation.rendering.lowerLeft + (index.x + 0.5f) * simulation.rendering.rightVec + (index.y + 0.5f) * simulation.rendering.upVec);
+
+	return createRay(
+		o,
+		glm::normalize(pW - o)
+	);
+}
+
+template <class State>
+__device__ __forceinline__ void intersectColumnsAny(const State& state, const Ray& ray, BoxHit& hit) {
+	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
+	const int layerCount{ simulation.layerCounts[flatIndex] };
+
+	float floor = -FLT_MAX;
+
+	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+	{
+		auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+		terrainHeights[SAND] += terrainHeights[BEDROCK];
+		terrainHeights[WATER] += terrainHeights[SAND];
+
+		glm::vec2 tempT;
+		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, terrainHeights[WATER], state.bmax2D.y), ray.o, ray.i_dir, tempT);
+
+		if (intersect && tempT.x < ray.t.y) {
+			hit.hit = true;
+			break;
+		}
+
+		floor = terrainHeights[CEILING];
+	}
 }
 
 template <class State>
@@ -170,16 +323,22 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 	{
-		const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
-		const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
+		auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+		terrainHeights[SAND] += terrainHeights[BEDROCK];
+		terrainHeights[WATER] += terrainHeights[SAND];
 
 		glm::vec2 tempT;
-		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, totalTerrainHeight, state.bmax2D.y), ray.o, ray.i_dir, tempT);
+		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, terrainHeights[WATER], state.bmax2D.y), ray.o, ray.i_dir, tempT);
 
 		if (intersect && tempT.x < hit.t) {
 			hit.hit = true;
-			hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
+			hit.boxHeights = glm::vec2(floor, terrainHeights[WATER]);
 			hit.t = tempT.x;
+			const float height = ray.o.y + hit.t * ray.dir.y;
+			hit.material = WATER;
+			for (int i = SAND; i >= BEDROCK; --i) {
+				if (height <= terrainHeights[i] + bigEpsilon) hit.material = i;
+			}
 		}
 
 		floor = terrainHeights[CEILING];
@@ -227,6 +386,18 @@ __device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const 
 }
 
 template <class State>
+__device__ __forceinline__ void intersectSceneAsBoxesAny(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
+	if (currentLevel < 0) {
+		// Terrain column intersection
+		intersectColumnsAny(state, ray, hit);
+	}
+	else {
+		// QuadTree Column Intersection
+		intersectQuadTreeColumns(state, ray, hit, currentLevel);
+	}
+}
+
+template <class State>
 __device__ __forceinline__ bool advanceDDA(State& state, Ray& ray, int currentLevel) {
 	if constexpr (std::is_same_v<State, DDAMissState>) {
 		state.miss++;
@@ -265,116 +436,184 @@ __device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, c
 	}
 }
 
+template <class State, bool Shadow>
+__device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
+	BoxHit hit;
+	ray.o += simulation.rendering.gridOffset;
+	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
+	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, FLT_MAX, 2.f * simulation.rendering.gridOffset.z);
+
+	glm::vec2 t;
+	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, t);
+	ray.t.x = glm::max(ray.t.x, t.x);
+	ray.t.y = glm::min(ray.t.y, t.y);
+	if (ray.t.y <= ray.t.x) intersect = false;
+
+	int currentLevel = MAX_QUADTREE_LAYER;
+
+	int steps = 0;
+	if (intersect) {
+		// DDA prep
+		State state;
+		calculateDDAState(state, ray, currentLevel);
+		// DDA
+		while (true) {
+			steps++;
+
+			// Simpler alternative to backtracking, no stack in state needed, has better performance
+			if constexpr (std::is_same_v<State, DDAMissState>) {
+				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == simulation.rendering.missCount) {
+					currentLevel++;
+					calculateDDAState(state, ray, currentLevel);
+					continue;
+				}
+			}
+
+			hit.t = FLT_MAX;
+			if constexpr (Shadow) {
+				intersectSceneAsBoxesAny(state, ray, hit, currentLevel);
+			}
+			else {
+				intersectSceneAsBoxes(state, ray, hit, currentLevel);
+			}
+
+			if (hit.hit && (currentLevel < 0)) {
+				// Hit actual terrain geometry
+				if constexpr (!Shadow) resolveBoxHit(hit, state, ray);
+				break;
+			}
+			else if (hit.hit) {
+				// Remember Exit for Backtracking
+				if constexpr (std::is_same_v<State, DDAExitLevelState>) {
+					const bool axis = state.T.x >= state.T.y;
+					state.exitLevels[currentLevel] = state.T[axis];
+				}
+				// Hit coarse geometry in QuadTree. Move to finer level.
+				ray.t.x = glm::max(ray.t.x, hit.t);
+				currentLevel--;
+				calculateDDAState(state, ray, currentLevel);
+				hit.hit = false;
+				continue;
+			}
+
+			// Backtracking - very delicate, easy to implement wrong
+			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
+				bool movedUp = false;
+				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
+					currentLevel++;
+					movedUp = true;
+				}
+				if (movedUp) {
+					const float oldRay = ray.t.x;
+					ray.t.x = glm::max(ray.t.x + bigEpsilon, state.exitLevels[currentLevel] + bigEpsilon);
+					if (ray.t.y < ray.t.x) break;
+					calculateDDAState(state, ray, currentLevel);
+					ray.t.x = oldRay;
+					continue;
+				}
+			}
+				
+			if (advanceDDA(state, ray, currentLevel)) break;
+		}
+	}
+	ray.o -= simulation.rendering.gridOffset;
+	hit.pos -= simulation.rendering.gridOffset;
+
+	return hit;
+}
+
 template <class State>
-__global__ void raymarchDDAQuadTreeKernel(int missCount) {
+__device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF phongBRDF)
+{
+	const glm::vec3 viewDirection = glm::normalize(simulation.rendering.camPos - phongBRDF.position);
+	glm::vec3 luminance = getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, phongBRDF);
+
+	for (int i = 0; i < simulation.rendering.uniforms->pointLightCount; ++i)
+	{
+		const auto lum = getPointLightLuminance(simulation.rendering.uniforms->pointLights[i], phongBRDF, viewDirection);
+		if (lum != glm::vec3(0.f)) {
+			glm::vec3 direction = simulation.rendering.uniforms->pointLights[i].position - phongBRDF.position;
+			float distance = glm::length(direction);
+			direction = direction / distance;
+			Ray ray{ createRay(phongBRDF.position + bigEpsilon * direction, direction) };
+			ray.t.y = distance - bigEpsilon;
+			auto hit = traceRayBoxes<State, true>(ray);
+			if(!hit.hit) luminance += lum;
+		}
+	}
+
+	for (int i = 0; i < simulation.rendering.uniforms->spotLightCount; ++i)
+	{
+		const auto lum = getSpotLightLuminance(simulation.rendering.uniforms->spotLights[i], phongBRDF, viewDirection);
+		if (lum != glm::vec3(0.f)) {
+			glm::vec3 direction = simulation.rendering.uniforms->spotLights[i].position - phongBRDF.position;
+			float distance = glm::length(direction);
+			direction = direction / distance;
+			Ray ray{ createRay(phongBRDF.position + bigEpsilon * direction, direction) };
+			ray.t.y = distance - bigEpsilon;
+			auto hit = traceRayBoxes<State, true>(ray);
+			if(!hit.hit) luminance += lum;
+		}
+	}
+
+	for (int i = 0; i < simulation.rendering.uniforms->directionalLightCount; ++i)
+	{
+		const auto lum = getDirectionalLightLuminance(simulation.rendering.uniforms->directionalLights[i], phongBRDF, viewDirection);
+		if (lum != glm::vec3(0.f)) {
+			Ray ray{ createRay(phongBRDF.position - bigEpsilon * simulation.rendering.uniforms->directionalLights[i].direction, -simulation.rendering.uniforms->directionalLights[i].direction) };
+			auto hit = traceRayBoxes<State, true>(ray);
+			if(!hit.hit) luminance += lum;
+		}
+	}
+
+	return simulation.rendering.uniforms->exposure * luminance;
+}
+
+template <class State>
+__global__ void raymarchDDAQuadTreeKernel() {
 		const glm::ivec2 index{ getLaunchIndex() };
 
-		if (isOutside(index, simulation.windowSize))
+		if (isOutside(index, simulation.rendering.windowSize))
 		{
 			return;
 		}
 
-		const glm::vec3 gridOffset = 0.5f * simulation.gridScale * glm::vec3(simulation.gridSize.x, 0.f, simulation.gridSize.y);
-		Ray ray{ createRay(gridOffset, index) };
+		Ray ray{ createRay(index) };
+		BoxHit hit{ traceRayBoxes<State, false>(ray) };
 
-		const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
-		const glm::vec3 bmax = glm::vec3(2.f * gridOffset.x, FLT_MAX, 2.f * gridOffset.z);
+		glm::vec3 col = simulation.rendering.materialColors[hit.material];
 
-		bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, ray.t);
-		ray.t.x = glm::max(ray.t.x, 0.f);
+		if (hit.hit) {
+			PhongBRDF brdf;
+			brdf.position = hit.pos;
+			brdf.normal = hit.normal;
+			brdf.diffuseReflectance = col;
+			brdf.alpha = 1.f;
+			brdf.shininess = 40.f;
+			brdf.F = 0.f;
+			brdf.specularReflectance = glm::vec3(0);
 
-		BoxHit hit;
-
-		int currentLevel = MAX_QUADTREE_LAYER;
-
-		int steps = 0;
-		if (intersect) {
-			// DDA prep
-			State state;
-			calculateDDAState(state, ray, currentLevel);
-			// DDA
-			while (true) {
-				steps++;
-
-				// Simpler alternative to backtracking, no stack in state needed, has better performance
-				if constexpr (std::is_same_v<State, DDAMissState>) {
-					if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == missCount) {
-						currentLevel++;
-						calculateDDAState(state, ray, currentLevel);
-						continue;
-					}
-				}
-
-				hit.t = FLT_MAX;
-				intersectSceneAsBoxes(state, ray, hit, currentLevel);
-
-				if (hit.hit && (currentLevel < 0)) {
-					// Hit actual terrain geometry
-					resolveBoxHit(hit, state, ray);
-					break;
-				}
-				else if (hit.hit) {
-					// Remember Exit for Backtracking
-					if constexpr (std::is_same_v<State, DDAExitLevelState>) {
-						const bool axis = state.T.x >= state.T.y;
-						state.exitLevels[currentLevel] = state.T[axis];
-					}
-					// Hit coarse geometry in QuadTree. Move to finer level.
-					ray.t.x = glm::max(ray.t.x, hit.t);
-					currentLevel--;
-					calculateDDAState(state, ray, currentLevel);
-					hit.hit = false;
-					continue;
-				}
-
-				// Backtracking - very delicate, easy to implement wrong
-				if constexpr (std::is_same_v<State, DDAExitLevelState>) {
-					bool movedUp = false;
-					while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - 1e-4f)) {
-						currentLevel++;
-						movedUp = true;
-					}
-					if (movedUp) {
-						const float oldRay = ray.t.x;
-						ray.t.x = glm::max(ray.t.x + 1e-4f, state.exitLevels[currentLevel] + 1e-4f);
-						if (ray.t.y < ray.t.x) break;
-						calculateDDAState(state, ray, currentLevel);
-						ray.t.x = oldRay;
-						continue;
-					}
-				}
-				
-				if (advanceDDA(state, ray, currentLevel)) break;
-
-			}
+			col = linearToSRGB(applyReinhardToneMap(shadePhongBRDFBoxes<State>(brdf) + simulation.rendering.uniforms->exposure * brdf.F * simulation.rendering.uniforms->ambientLight.luminance));
 		}
-
-		hit.pos -= gridOffset;
-
-		const glm::vec3 bgCol = glm::vec3(0);
-		glm::vec3 col = /*glm::vec3(0.005f * steps);*/ 0.5f + 0.5f * hit.normal;
-		col = hit.hit ? col : bgCol;
-
-
 
 		col = glm::clamp(col, 0.f, 1.f);
 		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
-		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
 __global__ void raymarchDDAQuadTreeLevelKernel(int level) {
 		const glm::ivec2 index{ getLaunchIndex() };
 
-		if (isOutside(index, simulation.windowSize))
+		if (isOutside(index, simulation.rendering.windowSize))
 		{
 			return;
 		}
 
-		const glm::vec3 gridOffset = 0.5f * simulation.gridScale * glm::vec3(simulation.gridSize.x, 0.f, simulation.gridSize.y);
-		Ray ray{ createRay(gridOffset, index) };
+		Ray ray{ createRay(index) };
+		ray.o += simulation.rendering.gridOffset;
 
 		const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
-		const glm::vec3 bmax = glm::vec3(2.f * gridOffset.x, FLT_MAX, 2.f * gridOffset.z);
+		const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, FLT_MAX, 2.f * simulation.rendering.gridOffset.z);
 
 		bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, ray.t);
 		ray.t.x = glm::max(ray.t.x, 0.f);
@@ -403,7 +642,7 @@ __global__ void raymarchDDAQuadTreeLevelKernel(int level) {
 			}
 		}
 
-		hit.pos -= gridOffset;
+		hit.pos -= simulation.rendering.gridOffset;
 
 		const glm::vec3 bgCol = glm::vec3(0);
 		glm::vec3 col = /*glm::vec3(0.005f * steps);*/ 0.5f + 0.5f * hit.normal;
@@ -413,7 +652,7 @@ __global__ void raymarchDDAQuadTreeLevelKernel(int level) {
 
 		col = glm::clamp(col, 0.f, 1.f);
 		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
-		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
 __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
@@ -478,6 +717,7 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 // since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
 // then the required volume Y is 0.5s^3, so the new volume gained is simply |X - (0.5s^3)|
 __device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize) {
+	// TODO Precompute boxsize values?
 	const float requiredVolumeGain = glm::abs(volume - targetVolume);
 	const float boxSize2 = boxSize * boxSize;
 	const float boxSize3 = boxSize2 * boxSize;
@@ -488,19 +728,19 @@ __device__ __forceinline__ float calculateSafeStep(float volume, float targetVol
 }
 
 template <class State>
-__global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount, float volumePercentage, float radiusG, float normalSmoothingFactor) {
+__global__ void raymarchDDAQuadTreeSmoothKernel() {
 	const glm::ivec2 index{ getLaunchIndex() };
 
-	if (isOutside(index, simulation.windowSize))
+	if (isOutside(index, simulation.rendering.windowSize))
 	{
 		return;
 	}
 
-	const glm::vec3 gridOffset = 0.5f * simulation.gridScale * glm::vec3(simulation.gridSize.x, 0.f, simulation.gridSize.y);
-	Ray ray{ createRay(gridOffset, index) };
+	Ray ray{ createRay(index) };
+	ray.o += simulation.rendering.gridOffset;
 
 	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
-	const glm::vec3 bmax = glm::vec3(2.f * gridOffset.x, FLT_MAX, 2.f * gridOffset.z);
+	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, FLT_MAX, 2.f * simulation.rendering.gridOffset.z);
 
 	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, ray.t);
 	ray.t.x = glm::max(ray.t.x, 0.f);
@@ -515,15 +755,15 @@ __global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount
 		State state;
 		calculateDDAState(state, ray, currentLevel);
 
-		const float radius = simulation.gridScale * radiusG;
-		const float targetVolume = volumePercentage * 8.f * radius * radius * radius;
+		const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
+		const float targetVolume = simulation.rendering.surfaceVolumePercentage * 8.f * radius * radius * radius;
 		// DDA
 		while (true) {
 			steps++;
 
 			// Simpler alternative to backtracking, no stack in state needed, has better performance
 			if constexpr (std::is_same_v<State, DDAMissState>) {
-				const int currentMissCount = currentLevel >= 0 ? missCount : fineMissCount;
+				const int currentMissCount = currentLevel >= 0 ? simulation.rendering.missCount : simulation.rendering.fineMissCount;
 				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == currentMissCount) {
 					currentLevel++;
 					calculateDDAState(state, ray, currentLevel);
@@ -533,16 +773,16 @@ __global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount
 
 			if (currentLevel < 0) {
 				const glm::vec3 p = ray.o + (ray.t.x - radius) * ray.dir;
-				const float volume = getVolume(p, radius, radiusG);
+				const float volume = getVolume(p, radius, simulation.rendering.smoothingRadiusInCells);
 
 				if (volume > 0.99f * targetVolume) {
 					hit.hit = true;
 					hit.t = ray.t.x - radius;
 					hit.pos = p;
 					// TODO: keep normal using smoother terrain?
-					const float e = normalSmoothingFactor * radius;
-					const float eG = normalSmoothingFactor * radiusG;
-					const float volumeN = normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
+					const float e = simulation.rendering.normalSmoothingFactor * radius;
+					const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
+					const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
 					hit.normal = glm::normalize(glm::vec3(
 						volumeN - getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG),
 						volumeN - getVolume(p + glm::vec3(0.f, e, 0.f), e, eG),
@@ -573,13 +813,13 @@ __global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount
 			// Backtracking - very delicate, easy to implement wrong
 			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
 				bool movedUp = false;
-				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - 1e-4f)) {
+				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
 					currentLevel++;
 					movedUp = true;
 				}
 				if (movedUp) {
 					const float oldRay = ray.t.x;
-					ray.t.x = glm::max(ray.t.x + 1e-4f, state.exitLevels[currentLevel] + 1e-4f);
+					ray.t.x = glm::max(ray.t.x + bigEpsilon, state.exitLevels[currentLevel] + bigEpsilon);
 					if (ray.t.y < ray.t.x) break;
 					calculateDDAState(state, ray, currentLevel);
 					ray.t.x = oldRay;
@@ -602,7 +842,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount
 		}
 	}
 
-	hit.pos -= gridOffset;
+	hit.pos -= simulation.rendering.gridOffset;
 
 	const glm::vec3 bgCol = glm::vec3(0);
 	glm::vec3 col = /*glm::vec3(0.005f * steps);*/ 0.5f + 0.5f * hit.normal;
@@ -612,20 +852,20 @@ __global__ void raymarchDDAQuadTreeSmoothKernel(int missCount, int fineMissCount
 
 	col = glm::clamp(col, 0.f, 1.f);
 	uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
-	surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+	surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
 
-__global__ void raymarchSmoothKernel(float volumePercentage, float radiusG, float normalSmoothingFactor) {
+__global__ void raymarchSmoothKernel() {
 		const glm::ivec2 index{ getLaunchIndex() };
 
-		if (isOutside(index, simulation.windowSize))
+		if (isOutside(index, simulation.rendering.windowSize))
 		{
 			return;
 		}
 
-		const glm::vec3 ro = simulation.camPos;
-		const glm::vec3 pW = simulation.lowerLeft + (index.x + 0.5f) * simulation.rightVec + (index.y + 0.5f) * simulation.upVec;
+		const glm::vec3 ro = simulation.rendering.camPos;
+		const glm::vec3 pW = simulation.rendering.lowerLeft + (index.x + 0.5f) * simulation.rendering.rightVec + (index.y + 0.5f) * simulation.rendering.upVec;
 		const glm::vec3 r_dir = glm::normalize(pW - ro);
 		const glm::vec3 inv_r_dir = 1.0f / r_dir;
 		const auto inf_mask = glm::isinf(inv_r_dir);
@@ -651,21 +891,21 @@ __global__ void raymarchSmoothKernel(float volumePercentage, float radiusG, floa
 			// prep
 			const glm::vec3 roGrid = glm::vec3(ro.x - bmin.x, ro.y, ro.z - bmin.z);
 
-			const float radius = simulation.gridScale * radiusG;
-			const float targetVolume = volumePercentage * 8.f * radius * radius * radius;
+			const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
+			const float targetVolume = simulation.rendering.surfaceVolumePercentage * 8.f * radius * radius * radius;
 
 			// raymarching with box-filter for implicit surface
 			while (t.x <= t.y) {
 				steps++;
 				p = roGrid + t.x * r_dir;
-				const float volume = getVolume(p, radius, radiusG);
+				const float volume = getVolume(p, radius, simulation.rendering.smoothingRadiusInCells);
 
 				if (volume > 0.99f * targetVolume) {
 					hit = true;
 					// TODO: keep normal using smoother terrain?
-					const float e = normalSmoothingFactor * radius;
-					const float eG = normalSmoothingFactor * radiusG;
-					const float volumeN = normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
+					const float e = simulation.rendering.normalSmoothingFactor * radius;
+					const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
+					const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
 					n = glm::normalize(glm::vec3(
 						getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG) - volumeN,
 						getVolume(p + glm::vec3(0.f, e, 0.f), e, eG) - volumeN,
@@ -690,10 +930,10 @@ __global__ void raymarchSmoothKernel(float volumePercentage, float radiusG, floa
 
 		col = glm::clamp(col, 0.f, 1.f);
 		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
-		surf2Dwrite(val, simulation.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
-__global__ void buildQuadTreeFirstLayer(float radiusG) {
+__global__ void buildQuadTreeFirstLayer() {
 	const glm::ivec2 index{ getLaunchIndex() };
 
 	if (isOutside(index, simulation.quadTree[0].gridSize))
@@ -703,7 +943,7 @@ __global__ void buildQuadTreeFirstLayer(float radiusG) {
 
 	int flatIndex{ flattenIndex(index, simulation.quadTree[0].gridSize) };
 	int maxOLayers = 0;
-	const float radius = radiusG * simulation.gridScale;
+	const float radius = simulation.rendering.smoothingRadiusInCells * simulation.gridScale;
 
 	struct Neighbor {
 		glm::ivec2 index;
@@ -870,40 +1110,40 @@ __global__ void buildQuadTreeLayer(int i) {
 	// TODO: Compact tree (merge overlapping columns)
 }
 
-void buildQuadTree(const std::vector<Launch>& launch, float smoothingRadiusInCells) {
+void buildQuadTree(const std::vector<Launch>& launch) {
 	// first layer (special)
-	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > (smoothingRadiusInCells));
+	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > ());
 	// remaining layers
 	for (int i = 1; i < launch.size(); ++i) {
 		CU_CHECK_KERNEL(buildQuadTreeLayer << <launch[i].gridSize, launch[i].blockSize >> > (i));
 	}
 }
 
-void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int missCount, int fineMissCount, int debugLayer) {
+void raymarchTerrain(const Launch& launch, bool useInterpolation, int missCount, int debugLayer) {
 	if (useInterpolation) {
 		if (missCount < 0) {
-			CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > (volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+			CU_CHECK_KERNEL(raymarchSmoothKernel << <launch.gridSize, launch.blockSize >> > ());
 		}
 		else if (missCount == 0) {
-			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAExitLevelState> << <launch.gridSize, launch.blockSize >> > (missCount, fineMissCount, volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAExitLevelState> << <launch.gridSize, launch.blockSize >> > ());
 		}
 		else if (missCount >= 3) {
-			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAMissState> << <launch.gridSize, launch.blockSize >> > (missCount, fineMissCount, volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAMissState> << <launch.gridSize, launch.blockSize >> > ());
 		}
 		else {
-			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAState> << <launch.gridSize, launch.blockSize >> > (missCount, fineMissCount, volumePercentage, smoothingRadiusInCells, normalSmoothingFactor));
+			CU_CHECK_KERNEL(raymarchDDAQuadTreeSmoothKernel<DDAState> << <launch.gridSize, launch.blockSize >> > ());
 		}
 	}
 	else {
 		if (debugLayer < -1) {
 			if (missCount == 0) {
-				CU_CHECK_KERNEL(raymarchDDAQuadTreeKernel<DDAExitLevelState> << <launch.gridSize, launch.blockSize >> > (missCount));
+				CU_CHECK_KERNEL(raymarchDDAQuadTreeKernel<DDAExitLevelState> << <launch.gridSize, launch.blockSize >> > ());
 			}
 			else if (missCount >= 3) {
-				CU_CHECK_KERNEL(raymarchDDAQuadTreeKernel<DDAMissState> << <launch.gridSize, launch.blockSize >> > (missCount));
+				CU_CHECK_KERNEL(raymarchDDAQuadTreeKernel<DDAMissState> << <launch.gridSize, launch.blockSize >> > ());
 			}
 			else {
-				CU_CHECK_KERNEL(raymarchDDAQuadTreeKernel<DDAState> << <launch.gridSize, launch.blockSize >> > (missCount));
+				CU_CHECK_KERNEL(raymarchDDAQuadTreeKernel<DDAState> << <launch.gridSize, launch.blockSize >> > ());
 			}
 		}
 		else {

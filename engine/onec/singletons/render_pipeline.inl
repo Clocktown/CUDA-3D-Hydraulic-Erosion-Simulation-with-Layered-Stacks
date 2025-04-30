@@ -98,7 +98,7 @@ inline void RenderPipeline::update(const entt::exclude_t<Excludes...> excludes)
 			uniforms.pointLights[uniforms.pointLightCount].position = localToWorld[3];
 			uniforms.pointLights[uniforms.pointLightCount].range = pointLight.range;
 			uniforms.pointLights[uniforms.pointLightCount].intensity = 0.25f * glm::one_over_pi<float>() * pointLight.power * pointLight.color;
-			
+
 			if (++uniforms.pointLightCount == uniforms.maxPointLightCount)
 			{
 				break;

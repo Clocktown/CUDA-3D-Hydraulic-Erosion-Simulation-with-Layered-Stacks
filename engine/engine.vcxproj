@@ -34,6 +34,7 @@
     <ClInclude Include="onec\resources\material.hpp" />
     <ClInclude Include="onec\resources\mesh.hpp" />
     <ClInclude Include="onec\resources\program.hpp" />
+    <ClInclude Include="onec\resources\RenderPipelineUniforms.h" />
     <ClInclude Include="onec\resources\render_state.hpp" />
     <ClInclude Include="onec\resources\sampler.hpp" />
     <ClInclude Include="onec\resources\texture.hpp" />

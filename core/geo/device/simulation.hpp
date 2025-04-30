@@ -10,6 +10,8 @@
 #include <float.h>
 #include "../config/config.h"
 
+#include <onec/resources/RenderPipelineUniforms.h>
+
 #include <vector>
 
 //#include "../components/terrain.hpp"
@@ -51,6 +53,28 @@ struct QuadTreeEntry {
 	int layerStride;
 	float4* heights; // Different format: 2 floats for Solid + Water, excluding air, 2 floats for Solid + Air, excluding water. All Absolute.
 	char* layerCounts;
+};
+
+struct Rendering {
+	glm::ivec2 windowSize;
+	glm::vec3 lowerLeft;
+	glm::vec3 rightVec;
+	glm::vec3 upVec;
+	glm::vec3 camPos;
+	glm::vec3 gridOffset;
+	int missCount;
+	int fineMissCount;
+	float i_scale;
+	cudaSurfaceObject_t screenSurface;
+
+	glm::vec3 materialColors[4];
+	bool renderSand;
+	bool renderWater;
+	float surfaceVolumePercentage;
+	float smoothingRadiusInCells;
+	float normalSmoothingFactor;
+
+	onec::RenderPipelineUniforms* uniforms;
 };
 
 struct Simulation
@@ -121,14 +145,10 @@ struct Simulation
 	float* stability;
 	float* damages;
 
-	float* sedimentFluxScale;
-	glm::ivec2 windowSize;
-	glm::vec3 lowerLeft;
-	glm::vec3 rightVec;
-	glm::vec3 upVec;
-	glm::vec3 camPos;
-	cudaSurfaceObject_t screenSurface;
 
+	float* sedimentFluxScale;
+
+	Rendering rendering;
 	QuadTreeEntry quadTree[geo::NUM_QUADTREE_LAYERS];
 };
 
@@ -149,7 +169,7 @@ void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
 
-void raymarchTerrain(const Launch& launch, bool useInterpolation, float volumePercentage, float smoothingRadiusInCells, float normalSmoothingFactor, int missCount = 8, int fineMissCount = 16, int debugLayer = -2);
-void buildQuadTree(const std::vector<Launch>& launch, float smoothingRadiusInCells);
+void raymarchTerrain(const Launch& launch, bool useInterpolation, int missCount = 8, int debugLayer = -2);
+void buildQuadTree(const std::vector<Launch>& launch);
 }
 }

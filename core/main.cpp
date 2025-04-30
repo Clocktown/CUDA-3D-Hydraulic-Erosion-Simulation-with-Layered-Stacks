@@ -47,7 +47,7 @@ void start()
 		ui.camera.entity = entity;
 	}
 
-	{
+	 {
 		const entt::entity entity{ world.addEntity() };
 
 		world.addComponent<onec::DirectionalLight>(entity);
@@ -58,7 +58,29 @@ void start()
 		world.addComponent<onec::Static>(entity);
 	}
 
+	/* {
+		const entt::entity entity{ world.addEntity() };
+
+		world.addComponent<onec::SpotLight>(entity, onec::SpotLight{{0.f, 1.f, 0.f}, 10000000.0f, 200.f, glm::radians(45.0f), 0.15f });
+		world.addComponent<onec::Position>(entity, glm::vec3(50.f, 30.f, 50.f));
+		world.addComponent<onec::Rotation>(entity, glm::quat{ glm::radians(glm::vec3{ -90.0f, 0.0f, 60.0f }) });
+		world.addComponent<onec::Scale>(entity);
+		world.addComponent<onec::LocalToWorld>(entity);
+		world.addComponent<onec::Static>(entity);
+	}
+
 		{
+		const entt::entity entity{ world.addEntity() };
+
+		world.addComponent<onec::PointLight>(entity, onec::PointLight{ {1.f, 0.f, 0.f}, 10000000.0f, 100.f });
+		world.addComponent<onec::Position>(entity, glm::vec3(0.f, 30.f, 0.f));
+		world.addComponent<onec::Rotation>(entity);
+		world.addComponent<onec::Scale>(entity);
+		world.addComponent<onec::LocalToWorld>(entity);
+		world.addComponent<onec::Static>(entity);
+	}*/
+
+	{
 		const entt::entity entity{ world.addEntity() };
 
 		world.addComponent<onec::DirectionalLight>(entity, onec::DirectionalLight{ {0.5f,0.5f,0.75f}, 50000.f });
