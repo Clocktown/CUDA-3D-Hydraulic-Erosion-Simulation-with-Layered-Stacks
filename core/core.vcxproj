@@ -69,7 +69,9 @@
   <ItemGroup>
     <CudaCompile Include="geo\device\fill_indices.cu" />
     <CudaCompile Include="geo\device\erosion.cu" />
-    <CudaCompile Include="geo\device\raymarch.cu" />
+    <CudaCompile Include="geo\device\raymarch.cu">
+      <FastMath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</FastMath>
+    </CudaCompile>
     <CudaCompile Include="geo\device\transport.cu" />
     <CudaCompile Include="geo\device\init.cu" />
     <CudaCompile Include="geo\device\rain.cu" />

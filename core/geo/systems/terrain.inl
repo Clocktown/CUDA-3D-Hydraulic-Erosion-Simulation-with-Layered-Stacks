@@ -149,10 +149,11 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rendering.surfaceVolumePercentage = ui->rendering.surfaceVolumePercentage;
 		simulation.rendering.smoothingRadiusInCells = ui->rendering.smoothingRadiusInCells;
 		simulation.rendering.normalSmoothingFactor = ui->rendering.normalSmoothingFactor;
+		simulation.rendering.aoRadius = ui->rendering.aoRadius;
 
 		simulation.rendering.i_scale = 1.f / world.getComponent<onec::Scale>(entity)->scale;
 
-		simulation.rendering.materialColors[3] = world.getSingleton<onec::RenderPipeline>()->clearColor;
+		simulation.rendering.materialColors[3] = world.getSingleton<onec::AmbientLight>()->color * world.getSingleton<onec::AmbientLight>()->strength;
 		simulation.rendering.uniforms = reinterpret_cast<onec::RenderPipelineUniforms*> (renderPipelineBuffer.getData());
 
 		simulation.rendering.missCount = ui->rendering.missCount;

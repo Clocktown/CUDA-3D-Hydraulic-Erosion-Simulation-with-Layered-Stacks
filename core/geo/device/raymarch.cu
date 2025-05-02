@@ -71,8 +71,6 @@ struct PhongBRDF
 	glm::vec3 specularReflectance;
 	float shininess;
 	float alpha;
-	glm::vec3 position;
-	glm::vec3 normal;
 	float F;
 };
 
@@ -131,9 +129,9 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightIlluminance(const onec::
 	return directionalLight.luminance * glm::max(glm::dot(-direction, normal), 0.0f);
 }
 
-__device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF phongBRDF, const glm::vec3 lightDirection, const glm::vec3 viewDirection)
+__device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& lightDirection, const glm::vec3& viewDirection)
 {
-	const glm::vec3 reflection = reflect(-lightDirection, phongBRDF.normal);
+	const glm::vec3 reflection = reflect(-lightDirection, hit.normal);
 	const float cosPhi = glm::max(dot(viewDirection, reflection), 0.0f);
 
 	const glm::vec3 diffuseBRDF = rPi * phongBRDF.diffuseReflectance;
@@ -142,42 +140,47 @@ __device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF phongBRDF
 	return diffuseBRDF + specularBRDF;
 }
 
-__device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight ambientLight, const PhongBRDF phongBRDF)
+__device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PhongBRDF& phongBRDF)
 {
 	return (rPi * phongBRDF.diffuseReflectance) * ambientLight.luminance;
 }
 
-__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight pointLight, const PhongBRDF phongBRDF, const glm::vec3 direction)
+__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& direction)
 {
-	const glm::vec3 lightVector = pointLight.position - phongBRDF.position;
+	const glm::vec3 lightVector = pointLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
 	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
 
-	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, lightDirection, direction) *
-		                   getPointLightIlluminance(pointLight, -lightDirection, lightDistance, phongBRDF.normal);
+	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
+		                   getPointLightIlluminance(pointLight, -lightDirection, lightDistance, hit.normal);
 
 	return luminance;
 }
 
-__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight spotLight, const PhongBRDF phongBRDF, const glm::vec3 direction)
+__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& direction)
 {
-	const glm::vec3 lightVector = spotLight.position - phongBRDF.position;
+	const glm::vec3 lightVector = spotLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
 	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
 
-	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, lightDirection, direction) *
-		                   getSpotLightIlluminance(spotLight, -lightDirection, lightDistance, phongBRDF.normal);
+	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
+		                   getSpotLightIlluminance(spotLight, -lightDirection, lightDistance, hit.normal);
 
 	return luminance;
 }
 
-__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const PhongBRDF phongBRDF, const glm::vec3 direction)
+__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& direction)
 {
 	const glm::vec3 lightDirection = -directionalLight.direction;
-	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, lightDirection, direction) *
-		                   getDirectionalLightIlluminance(directionalLight, directionalLight.direction, phongBRDF.normal);
+	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
+		                   getDirectionalLightIlluminance(directionalLight, directionalLight.direction, hit.normal);
 
 	return luminance;
+}
+
+__device__ __forceinline__ float fresnelSchlick(float cosTheta, float F0)
+{
+	return F0 + (1.0f - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
 }
 
 __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::vec3& b_max, const glm::vec3& r_o, const glm::vec3& inv_r_dir, glm::vec2& t) {
@@ -190,12 +193,28 @@ __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::
     t.x = glm::max(vtmin.x, glm::max(vtmin.y, vtmin.z));
     t.y = glm::min(vtmax.x, glm::min(vtmax.y, vtmax.z));
 
-	return t.y >= t.x && t.y >= 0;
+	return t.y >= t.x && t.y >= 0.f;
 }
 
 __device__ __forceinline__ float intersectionVolume(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
 	const glm::vec3 b_min = glm::max(b_min0, b_min1);
 	const glm::vec3 b_max = glm::min(b_max0, b_max1);
+	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
+
+	return d.x * d.y * d.z;
+}
+
+__device__ __forceinline__ glm::vec3 intersectionVolumeBounds(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
+	const glm::vec3 b_min = glm::max(b_min0, b_min1);
+	const glm::vec3 b_max = glm::min(b_max0, b_max1);
+	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
+
+	return glm::vec3(d.x * d.y * d.z, b_min.y, b_max.y);
+}
+
+__device__ __forceinline__ float intersectionVolumeFullBounds(glm::vec3& b_min, glm::vec3& b_max, const glm::vec3& b_min1, const glm::vec3& b_max1) {
+	b_min = glm::max(b_min, b_min1);
+	b_max = glm::min(b_max, b_max1);
 	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
 
 	return d.x * d.y * d.z;
@@ -289,7 +308,8 @@ __device__ __forceinline__ Ray createRay(const glm::ivec2& index) {
 	);
 }
 
-template <class State>
+template <class State, bool WaterMode = false>
+// Ignores Water AND Air in WaterMode
 __device__ __forceinline__ void intersectColumnsAny(const State& state, const Ray& ray, BoxHit& hit) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
@@ -303,7 +323,7 @@ __device__ __forceinline__ void intersectColumnsAny(const State& state, const Ra
 		terrainHeights[WATER] += terrainHeights[SAND];
 
 		glm::vec2 tempT;
-		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, terrainHeights[WATER], state.bmax2D.y), ray.o, ray.i_dir, tempT);
+		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, terrainHeights[WaterMode ? SAND : WATER], state.bmax2D.y), ray.o, ray.i_dir, tempT);
 
 		if (intersect && tempT.x < ray.t.y) {
 			hit.hit = true;
@@ -314,7 +334,8 @@ __device__ __forceinline__ void intersectColumnsAny(const State& state, const Ra
 	}
 }
 
-template <class State>
+template <class State, bool WaterMode = false>
+// Intersects with Air but not Water in WaterMode
 __device__ __forceinline__ void intersectColumns(const State& state, const Ray& ray, BoxHit& hit) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
@@ -326,26 +347,27 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 		auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
 		terrainHeights[SAND] += terrainHeights[BEDROCK];
 		terrainHeights[WATER] += terrainHeights[SAND];
+		const float totalTerrainHeight = terrainHeights[WaterMode ? SAND : WATER];
 
 		glm::vec2 tempT;
-		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, terrainHeights[WATER], state.bmax2D.y), ray.o, ray.i_dir, tempT);
+		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, totalTerrainHeight, state.bmax2D.y), ray.o, ray.i_dir, tempT);
 
 		if (intersect && tempT.x < hit.t) {
 			hit.hit = true;
-			hit.boxHeights = glm::vec2(floor, terrainHeights[WATER]);
+			hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
 			hit.t = tempT.x;
 			const float height = ray.o.y + hit.t * ray.dir.y;
-			hit.material = WATER;
+			hit.material = WaterMode ? AIR : WATER;
 			for (int i = SAND; i >= BEDROCK; --i) {
 				if (height <= terrainHeights[i] + bigEpsilon) hit.material = i;
 			}
 		}
 
-		floor = terrainHeights[CEILING];
+		floor = terrainHeights[WaterMode ? WATER : CEILING];
 	}
 }
 
-template <class State>
+template <class State, bool Shadow = false, bool WaterMode = false>
 __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
 	const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
@@ -358,7 +380,7 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
 	{
 		const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
-		const float totalTerrainHeight = terrainHeights[QFULLHEIGHT];
+		const float totalTerrainHeight = terrainHeights[WaterMode ? QSOLIDHEIGHT : QFULLHEIGHT];
 
 		glm::vec2 tempT;
 		bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), ray.o, ray.i_dir, tempT);
@@ -369,31 +391,31 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 			break;
 		}
 
-		floor = terrainHeights[QCEILING];
+		floor = terrainHeights[WaterMode ? (Shadow ? QCEILING : QAIR) : QCEILING];
 	}
 }
 
-template <class State>
+template <class State, bool WaterMode = false>
 __device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	if (currentLevel < 0) {
 		// Terrain column intersection
-		intersectColumns(state, ray, hit);
+		intersectColumns<State, WaterMode>(state, ray, hit);
 	}
 	else {
 		// QuadTree Column Intersection
-		intersectQuadTreeColumns(state, ray, hit, currentLevel);
+		intersectQuadTreeColumns<State, false, WaterMode>(state, ray, hit, currentLevel);
 	}
 }
 
-template <class State>
+template <class State, bool WaterMode = false>
 __device__ __forceinline__ void intersectSceneAsBoxesAny(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	if (currentLevel < 0) {
 		// Terrain column intersection
-		intersectColumnsAny(state, ray, hit);
+		intersectColumnsAny<State, WaterMode>(state, ray, hit);
 	}
 	else {
 		// QuadTree Column Intersection
-		intersectQuadTreeColumns(state, ray, hit, currentLevel);
+		intersectQuadTreeColumns<State, true, WaterMode>(state, ray, hit, currentLevel);
 	}
 }
 
@@ -436,7 +458,7 @@ __device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, c
 	}
 }
 
-template <class State, bool Shadow>
+template <class State, bool Shadow, bool WaterMode = false>
 __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	BoxHit hit;
 	ray.o += simulation.rendering.gridOffset;
@@ -471,10 +493,10 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 
 			hit.t = FLT_MAX;
 			if constexpr (Shadow) {
-				intersectSceneAsBoxesAny(state, ray, hit, currentLevel);
+				intersectSceneAsBoxesAny<State, WaterMode>(state, ray, hit, currentLevel);
 			}
 			else {
-				intersectSceneAsBoxes(state, ray, hit, currentLevel);
+				intersectSceneAsBoxes<State, WaterMode>(state, ray, hit, currentLevel);
 			}
 
 			if (hit.hit && (currentLevel < 0)) {
@@ -522,51 +544,168 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	return hit;
 }
 
-template <class State>
-__device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF phongBRDF)
+template<class State, class PositionedLight, bool WaterMode = false>
+__device__ __forceinline__ float getShadow(const PositionedLight& light, const BoxHit& hit) {
+	glm::vec3 direction = light.position - hit.pos;
+	float distance = glm::length(direction);
+	direction = direction / distance;
+	Ray ray{ createRay(hit.pos + bigEpsilon * direction, direction) };
+	ray.t.y = distance - bigEpsilon;
+	auto sHit = traceRayBoxes<State, true, WaterMode>(ray);
+	return !sHit.hit;
+}
+
+template<bool WaterMode = false>
+__device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	float volume = 0.f;
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+						
+			float floor = -FLT_MAX;
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + (WaterMode ? 0.f : terrainHeights[WATER]);
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor = terrainHeights[CEILING];
+					continue;
+				}
+
+				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+
+				floor = terrainHeights[CEILING];
+				if (floor >= boxBmax.y) break;
+			}
+		}
+	}
+	return volume;
+}
+
+template<bool WaterMode = false>
+__device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG) {
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	glm::vec4 volume = glm::vec4(0.f);
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+						
+			float floor = -FLT_MAX;
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				glm::vec3 materials = glm::vec3(0.f);
+				materials.x = terrainHeights[BEDROCK];
+				materials.y = terrainHeights[SAND] + materials.x;
+				materials.z = terrainHeights[WATER] + materials.y;
+				const float totalTerrainHeight = WaterMode ? materials.y : materials.z;
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor = terrainHeights[CEILING];
+					continue;
+				}
+
+				glm::vec3 intersection = intersectionVolumeBounds(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+				const float interval = intersection.z - intersection.y;
+				materials = glm::clamp((materials - intersection.y) / interval, 0.f, 1.f);
+				materials.z -= materials.y;
+				materials.y -= materials.x;
+				volume += glm::vec4(glm::vec3(1.f, 3.f, 10.f) * materials * intersection.x, intersection.x);
+
+				floor = terrainHeights[CEILING];
+				if (floor >= boxBmax.y) break;
+			}
+		}
+	}
+	const float i_sum = 1.f / (volume.x + volume.y + volume.z);
+	return glm::vec4(i_sum * volume.x, i_sum * volume.y, i_sum * volume.z, volume.w);
+}
+
+template <class State, bool WaterMode = false>
+__device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF& phongBRDF, const Ray& ray, const BoxHit& hit)
 {
-	const glm::vec3 viewDirection = glm::normalize(simulation.rendering.camPos - phongBRDF.position);
-	glm::vec3 luminance = getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, phongBRDF);
+	const glm::vec3 viewDirection = -ray.dir;
+	const float radius = simulation.rendering.aoRadius;
+	const float radiusG = radius * simulation.rGridScale;
+
+	const float targetVolume = 8.f * radius * radius * radius;
+	const float ao = glm::pow(1.f - getVolume<WaterMode>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f);
+
+	glm::vec3 luminance = ao * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, phongBRDF);
 
 	for (int i = 0; i < simulation.rendering.uniforms->pointLightCount; ++i)
 	{
-		const auto lum = getPointLightLuminance(simulation.rendering.uniforms->pointLights[i], phongBRDF, viewDirection);
+		const auto lum = getPointLightLuminance(simulation.rendering.uniforms->pointLights[i], phongBRDF, hit, viewDirection);
 		if (lum != glm::vec3(0.f)) {
-			glm::vec3 direction = simulation.rendering.uniforms->pointLights[i].position - phongBRDF.position;
-			float distance = glm::length(direction);
-			direction = direction / distance;
-			Ray ray{ createRay(phongBRDF.position + bigEpsilon * direction, direction) };
-			ray.t.y = distance - bigEpsilon;
-			auto hit = traceRayBoxes<State, true>(ray);
-			if(!hit.hit) luminance += lum;
+			luminance += getShadow<State, onec::RenderPipelineUniforms::PointLight, WaterMode>(simulation.rendering.uniforms->pointLights[i], hit) * lum;
 		}
 	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->spotLightCount; ++i)
 	{
-		const auto lum = getSpotLightLuminance(simulation.rendering.uniforms->spotLights[i], phongBRDF, viewDirection);
+		const auto lum = getSpotLightLuminance(simulation.rendering.uniforms->spotLights[i], phongBRDF, hit, viewDirection);
 		if (lum != glm::vec3(0.f)) {
-			glm::vec3 direction = simulation.rendering.uniforms->spotLights[i].position - phongBRDF.position;
-			float distance = glm::length(direction);
-			direction = direction / distance;
-			Ray ray{ createRay(phongBRDF.position + bigEpsilon * direction, direction) };
-			ray.t.y = distance - bigEpsilon;
-			auto hit = traceRayBoxes<State, true>(ray);
-			if(!hit.hit) luminance += lum;
+			luminance += getShadow<State, onec::RenderPipelineUniforms::SpotLight, WaterMode>(simulation.rendering.uniforms->spotLights[i], hit) * lum;
 		}
 	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->directionalLightCount; ++i)
 	{
-		const auto lum = getDirectionalLightLuminance(simulation.rendering.uniforms->directionalLights[i], phongBRDF, viewDirection);
+		const auto lum = getDirectionalLightLuminance(simulation.rendering.uniforms->directionalLights[i], phongBRDF, hit, viewDirection);
 		if (lum != glm::vec3(0.f)) {
-			Ray ray{ createRay(phongBRDF.position - bigEpsilon * simulation.rendering.uniforms->directionalLights[i].direction, -simulation.rendering.uniforms->directionalLights[i].direction) };
-			auto hit = traceRayBoxes<State, true>(ray);
+			Ray ray{ createRay(hit.pos - bigEpsilon * simulation.rendering.uniforms->directionalLights[i].direction, -simulation.rendering.uniforms->directionalLights[i].direction) };
+			auto hit = traceRayBoxes<State, true, WaterMode>(ray);
 			if(!hit.hit) luminance += lum;
 		}
 	}
 
-	return simulation.rendering.uniforms->exposure * luminance;
+	return luminance;
+}
+
+__device__ __forceinline__ PhongBRDF getBRDF(const Ray& ray, const BoxHit& hit) {
+	PhongBRDF brdf;
+	brdf.alpha = 1.f;
+	brdf.shininess = 40.f;
+	const float cosTheta = glm::max(glm::dot(-ray.dir, hit.normal), 0.0f);
+
+	brdf.F = hit.material == WATER ? fresnelSchlick(cosTheta, 0.04) : 0.f;
+	brdf.diffuseReflectance = (1.f - brdf.F) * simulation.rendering.materialColors[hit.material];
+	brdf.specularReflectance = glm::vec3(0.f);
+	return brdf;
 }
 
 template <class State>
@@ -584,19 +723,43 @@ __global__ void raymarchDDAQuadTreeKernel() {
 		glm::vec3 col = simulation.rendering.materialColors[hit.material];
 
 		if (hit.hit) {
-			PhongBRDF brdf;
-			brdf.position = hit.pos;
-			brdf.normal = hit.normal;
-			brdf.diffuseReflectance = col;
-			brdf.alpha = 1.f;
-			brdf.shininess = 40.f;
-			brdf.F = 0.f;
-			brdf.specularReflectance = glm::vec3(0);
+			PhongBRDF brdf{ getBRDF(ray, hit) };
 
-			col = linearToSRGB(applyReinhardToneMap(shadePhongBRDFBoxes<State>(brdf) + simulation.rendering.uniforms->exposure * brdf.F * simulation.rendering.uniforms->ambientLight.luminance));
+			glm::vec3 reflection = glm::vec3(0.f);
+			if (brdf.F > 0.f) {
+				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
+				Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
+				BoxHit rHit{ traceRayBoxes<State, false>(rRay) };
+				reflection = simulation.rendering.materialColors[rHit.material];
+
+				if (rHit.hit) {
+					PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+					// Secondary reflections simply sample background
+					reflection = shadePhongBRDFBoxes<State>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+				}
+			}
+			glm::vec3 refraction = glm::vec3(0.f);
+			if (hit.material == WATER) {
+				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
+				Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
+				BoxHit rHit{ traceRayBoxes<State, false, true>(rRay) };
+				refraction = simulation.rendering.materialColors[rHit.material];
+
+				if (rHit.hit) {
+					PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+					// Secondary reflections simply sample background
+					refraction = shadePhongBRDFBoxes<State, true>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+				}
+
+				col = glm::mix(refraction, reflection, brdf.F);
+			}
+			else {
+				col = (shadePhongBRDFBoxes<State>(brdf, ray, hit) + brdf.F * reflection);
+			}
+
 		}
 
-		col = glm::clamp(col, 0.f, 1.f);
+		col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
 		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
 		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
@@ -653,54 +816,6 @@ __global__ void raymarchDDAQuadTreeLevelKernel(int level) {
 		col = glm::clamp(col, 0.f, 1.f);
 		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
 		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
-}
-
-__device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
-	const glm::vec3 boxBmin = p - radius;
-	const glm::vec3 boxBmax = p + radius;
-
-	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
-
-	float volume = 0.f;
-
-	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
-	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
-	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
-	for (; y < endY; ++y) {
-		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
-		for (; x < endX; ++x) {
-			glm::ivec2 currentCell = glm::ivec2(x, y);
-
-			//if (isOutside(currentCell, simulation.gridSize)) {
-			//	continue;
-			//}
-
-			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
-			const int layerCount{ simulation.layerCounts[flatIndex] };
-						
-			float floor = -FLT_MAX;
-
-			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
-			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
-
-			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
-			{
-				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
-				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + terrainHeights[WATER];
-
-				if (totalTerrainHeight <= boxBmin.y) {
-					floor = terrainHeights[CEILING];
-					continue;
-				}
-
-				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
-
-				floor = terrainHeights[CEILING];
-				if (floor >= boxBmax.y) break;
-			}
-		}
-	}
-	return volume;
 }
 
 // How far can we step when computing the volume overlap of columns to an AABB of side length s? (see Arches paper definition of the implicit surface)
@@ -842,10 +957,30 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		}
 	}
 
-	hit.pos -= simulation.rendering.gridOffset;
+
 
 	const glm::vec3 bgCol = glm::vec3(0);
+
 	glm::vec3 col = /*glm::vec3(0.005f * steps);*/ 0.5f + 0.5f * hit.normal;
+
+	if (hit.hit) {
+		glm::vec4 materials = getMaterialVolume(hit.pos, simulation.gridScale * simulation.rendering.smoothingRadiusInCells, simulation.rendering.smoothingRadiusInCells);
+
+		col = materials.z * simulation.rendering.materialColors[WATER];
+		col += materials.y * simulation.rendering.materialColors[SAND];
+		col += materials.x * simulation.rendering.materialColors[BEDROCK];
+
+		const float radius = simulation.rendering.aoRadius;
+		const float radiusG = radius * simulation.rGridScale;
+
+		const float targetVolume = 8.f * radius * radius * radius;
+		const float ao = glm::pow(1.f - getVolume(hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f);
+
+		col *= ao;
+	}
+
+	hit.pos -= simulation.rendering.gridOffset;
+
 	col = hit.hit ? col : bgCol;
 
 
@@ -907,9 +1042,9 @@ __global__ void raymarchSmoothKernel() {
 					const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
 					const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
 					n = glm::normalize(glm::vec3(
-						getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG) - volumeN,
-						getVolume(p + glm::vec3(0.f, e, 0.f), e, eG) - volumeN,
-						getVolume(p + glm::vec3(0.f, 0.f, e), e, eG) - volumeN
+						volumeN - getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG),
+						volumeN - getVolume(p + glm::vec3(0.f, e, 0.f), e, eG),
+						volumeN - getVolume(p + glm::vec3(0.f, 0.f, e), e, eG)
 					));
 					break;
 				}

@@ -562,6 +562,7 @@ void UI::updateRendering()
 			terrain.quadTreeDirty = true;
 		}
 		ImGui::DragFloat("Normal Smoothing Factor", &rendering.normalSmoothingFactor, 0.01f, 1.f, 4.f);
+		ImGui::DragFloat("AO Radius", &rendering.aoRadius, 0.01f, 0.01f, 3.f);
 		ImGui::DragInt("Miss Count", &rendering.missCount, 0.1f, 0, 20);
 		ImGui::DragInt("Fine Miss Count", &rendering.fineMissCount, 0.1f, 1, 50);
 		ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -2, geo::NUM_QUADTREE_LAYERS - 1);

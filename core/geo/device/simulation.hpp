@@ -73,6 +73,7 @@ struct Rendering {
 	float surfaceVolumePercentage;
 	float smoothingRadiusInCells;
 	float normalSmoothingFactor;
+	float aoRadius;
 
 	onec::RenderPipelineUniforms* uniforms;
 };
