@@ -25,6 +25,14 @@ struct BoxHit {
 	glm::vec3 pos{ 0.f };
 };
 
+struct SmoothHit {
+	float t{ FLT_MAX };
+	bool hit{ false };
+	glm::vec4 materials{ 0.f };
+	glm::vec3 normal{ 0.f };
+	glm::vec3 pos{ 0.f };
+};
+
 struct DDAExitLevelState {
 	glm::ivec2 currentCell;
 	glm::ivec2 exit;
@@ -129,7 +137,8 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightIlluminance(const onec::
 	return directionalLight.luminance * glm::max(glm::dot(-direction, normal), 0.0f);
 }
 
-__device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& lightDirection, const glm::vec3& viewDirection)
+template<class Hit>
+__device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& lightDirection, const glm::vec3& viewDirection)
 {
 	const glm::vec3 reflection = reflect(-lightDirection, hit.normal);
 	const float cosPhi = glm::max(dot(viewDirection, reflection), 0.0f);
@@ -145,7 +154,8 @@ __device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::Render
 	return (rPi * phongBRDF.diffuseReflectance) * ambientLight.luminance;
 }
 
-__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& direction)
+template<class Hit>
+__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& direction)
 {
 	const glm::vec3 lightVector = pointLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
@@ -157,7 +167,8 @@ __device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPi
 	return luminance;
 }
 
-__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& direction)
+template<class Hit>
+__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& direction)
 {
 	const glm::vec3 lightVector = spotLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
@@ -169,7 +180,8 @@ __device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPip
 	return luminance;
 }
 
-__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PhongBRDF& phongBRDF, const BoxHit& hit, const glm::vec3& direction)
+template<class Hit>
+__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& direction)
 {
 	const glm::vec3 lightDirection = -directionalLight.direction;
 	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
@@ -365,10 +377,21 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 
 		floor = terrainHeights[WaterMode ? WATER : CEILING];
 	}
+	if constexpr (WaterMode) {
+		glm::vec2 tempT;
+		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, FLT_MAX, state.bmax2D.y), ray.o, ray.i_dir, tempT);
+		if (intersect && tempT.x < hit.t) {
+			hit.hit = true;
+			hit.boxHeights = glm::vec2(floor, FLT_MAX);
+			hit.t = tempT.x;
+			const float height = ray.o.y + hit.t * ray.dir.y;
+			hit.material = AIR;
+		}
+	}
 }
 
-template <class State, bool Shadow = false, bool WaterMode = false>
-__device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
+template <class State, class Hit, bool Shadow = false, bool WaterMode = false>
+__device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, Hit& hit, int currentLevel) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
 	const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
 
@@ -377,7 +400,8 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 	const glm::vec2 bmin2D = glm::vec2(state.currentCell) * simulation.quadTree[currentLevel].gridScale;
 	const glm::vec2 bmax2D = bmin2D + simulation.quadTree[currentLevel].gridScale;
 
-	for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
+	int layer{ 0 };
+	for (; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
 	{
 		const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
 		const float totalTerrainHeight = terrainHeights[WaterMode ? QSOLIDHEIGHT : QFULLHEIGHT];
@@ -386,12 +410,23 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 		bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), ray.o, ray.i_dir, tempT);
 		if (intersect && (tempT.y > ray.t.x)) {
 			hit.hit = true;
-			hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
+			if constexpr(std::is_same_v<Hit, BoxHit>) hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
 			hit.t = glm::max(tempT.x, ray.t.x);
 			break;
 		}
 
 		floor = terrainHeights[WaterMode ? (Shadow ? QCEILING : QAIR) : QCEILING];
+	}
+	if constexpr (WaterMode && !Shadow) {
+		if (layer == layerCount) {
+			glm::vec2 tempT;
+			bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, FLT_MAX, bmax2D.y), ray.o, ray.i_dir, tempT);
+			if (intersect && (tempT.y > ray.t.x)) {
+				hit.hit = true;
+				if constexpr(std::is_same_v<Hit, BoxHit>) hit.boxHeights = glm::vec2(floor, FLT_MAX);
+				hit.t = glm::max(tempT.x, ray.t.x);
+			}
+		}
 	}
 }
 
@@ -403,7 +438,7 @@ __device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const 
 	}
 	else {
 		// QuadTree Column Intersection
-		intersectQuadTreeColumns<State, false, WaterMode>(state, ray, hit, currentLevel);
+		intersectQuadTreeColumns<State, BoxHit, false, WaterMode>(state, ray, hit, currentLevel);
 	}
 }
 
@@ -415,7 +450,7 @@ __device__ __forceinline__ void intersectSceneAsBoxesAny(const State& state, con
 	}
 	else {
 		// QuadTree Column Intersection
-		intersectQuadTreeColumns<State, true, WaterMode>(state, ray, hit, currentLevel);
+		intersectQuadTreeColumns<State, BoxHit, true, WaterMode>(state, ray, hit, currentLevel);
 	}
 }
 
@@ -458,6 +493,154 @@ __device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, c
 	}
 }
 
+// How far can we step when computing the volume overlap of columns to an AABB of side length s? (see Arches paper definition of the implicit surface)
+// My derivation:
+// based on the last overlap, we calculate the volume change necessary to hit the surface (f(p) = 0)
+// Moving along our ray, we retain part of the previous volume, remove some and add new volume.
+// The fastest change would occur when moving diagonally through the AABB.
+// Worst case, all the "old" volume was previously empty and all new volume is filled.
+// The new volume gained is calculated as new_volume = s^3 - (s - distance/sqrt(3))^3.
+// Solving for distance we get distance = 2*s*sqrt(3) - sqrt(3) (s + (s^3 - new_volume)^(1/3))
+// However, for distances closer to s, the worst case changes to new_volume =  s^3 - (s - distance) * s * s 
+// in which case distance = new_volume / (s * s)
+// Using the necessary volume change from above as new_volume, we can calculate the safe distance.
+// since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
+// then the required volume Y is 0.5s^3, so the new volume gained is simply |X - (0.5s^3)|
+__device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize) {
+	// TODO Precompute boxsize values?
+	const float requiredVolumeGain = glm::abs(volume - targetVolume);
+	const float boxSize2 = boxSize * boxSize;
+	const float boxSize3 = boxSize2 * boxSize;
+	const float d1 = requiredVolumeGain / boxSize2;
+	constexpr float sqrt3 = std::numbers::sqrt3_v<float>;
+	const float d2 = 2.f * boxSize * sqrt3 - sqrt3 * (boxSize + pow(boxSize3 - requiredVolumeGain, 1.f / 3.f));
+	return glm::min(d1, d2);
+}
+
+template<bool Shadow = false, bool WaterMode = false>
+__device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	float volume = 0.f;
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+						
+			float floor = -FLT_MAX;
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			int layer{ 0 };
+			for (; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + (WaterMode ? 0.f : terrainHeights[WATER]);
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor = terrainHeights[WaterMode ? (Shadow ? CEILING : totalTerrainHeight + terrainHeights[WATER]) : CEILING];
+					continue;
+				}
+
+				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+
+				floor = terrainHeights[WaterMode ? (Shadow ? CEILING : totalTerrainHeight + terrainHeights[WATER]) : CEILING];
+				if (floor >= boxBmax.y) break;
+			}
+			if constexpr (WaterMode && !Shadow) {
+				// last check with infinite air column
+				if (layer == layerCount) {
+					volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, FLT_MAX, bmax2D.y), boxBmin, boxBmax);
+				}
+			}
+		}
+	}
+	return volume;
+}
+
+template<bool WaterMode = false>
+__device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG, const glm::vec3& weight = glm::vec3(1.f)) {
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	glm::vec4 volume = glm::vec4(0.f);
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+						
+			float floor = -FLT_MAX;
+			float waterLevel = -FLT_MAX;
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			int layer{ 0 };
+			for (; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				glm::vec3 materials = glm::vec3(0.f);
+				materials.x = WaterMode ? waterLevel : terrainHeights[BEDROCK];
+				materials.y = WaterMode ? terrainHeights[BEDROCK]: terrainHeights[SAND] + materials.x;
+				materials.z = WaterMode ? terrainHeights[SAND] + materials.y : terrainHeights[WATER] + materials.y;
+				const float totalTerrainHeight = materials.z;
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor = WaterMode ? totalTerrainHeight + terrainHeights[WATER] : terrainHeights[CEILING];
+					if constexpr (WaterMode) waterLevel = terrainHeights[CEILING];
+					continue;
+				}
+
+				glm::vec3 intersection = intersectionVolumeBounds(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+				const float interval = intersection.z - intersection.y;
+				materials = glm::clamp((materials - intersection.y) / interval, 0.f, 1.f);
+				materials.z -= materials.y;
+				materials.y -= materials.x;
+				volume += glm::vec4(weight * materials * intersection.x, intersection.x);
+
+				floor = WaterMode ? totalTerrainHeight + terrainHeights[WATER] : terrainHeights[CEILING];
+				if constexpr (WaterMode) waterLevel = terrainHeights[CEILING];
+				if (floor >= boxBmax.y) break;
+			}
+			if constexpr (WaterMode) {
+				// last check with infinite air column
+				if (layer == layerCount) {
+					glm::vec3 intersection = intersectionVolumeBounds(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, FLT_MAX, bmax2D.y), boxBmin, boxBmax);
+					const float interval = intersection.z - intersection.y;
+					volume += glm::vec4(weight * glm::vec3(1.f, 0.f, 0.f) * intersection.x, intersection.x);
+				}
+			}
+		}
+	}
+	const float i_sum = 1.f / (volume.x + volume.y + volume.z);
+	const float i_sum2 = 1.f / (volume.x + volume.y + epsilon);
+
+	if constexpr (WaterMode) {
+		return glm::vec4(i_sum2 * volume.y, i_sum2 * volume.z, i_sum * volume.x, volume.w);
+	}
+	return glm::vec4(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z, volume.w);
+}
+
 template <class State, bool Shadow, bool WaterMode = false>
 __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	BoxHit hit;
@@ -473,14 +656,12 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 
 	int currentLevel = MAX_QUADTREE_LAYER;
 
-	int steps = 0;
 	if (intersect) {
 		// DDA prep
 		State state;
 		calculateDDAState(state, ray, currentLevel);
 		// DDA
 		while (true) {
-			steps++;
 
 			// Simpler alternative to backtracking, no stack in state needed, has better performance
 			if constexpr (std::is_same_v<State, DDAMissState>) {
@@ -544,126 +725,149 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	return hit;
 }
 
-template<class State, class PositionedLight, bool WaterMode = false>
-__device__ __forceinline__ float getShadow(const PositionedLight& light, const BoxHit& hit) {
+template <class State, bool Shadow = false, bool WaterMode = false>
+__device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
+	ray.o += simulation.rendering.gridOffset;
+
+	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
+	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, FLT_MAX, 2.f * simulation.rendering.gridOffset.z);
+
+	glm::vec2 t;
+	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, t);
+	ray.t.x = glm::max(ray.t.x, t.x);
+	ray.t.y = glm::min(ray.t.y, t.y);
+	if (ray.t.y <= ray.t.x) intersect = false;
+
+	SmoothHit hit;
+
+	int currentLevel = MAX_QUADTREE_LAYER;
+
+	int steps = 0;
+	if (intersect) {
+		// DDA prep
+		State state;
+		calculateDDAState(state, ray, currentLevel);
+
+		const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
+		const float targetVolume = simulation.rendering.surfaceVolumePercentage * 8.f * radius * radius * radius;
+		// DDA
+		while (true) {
+			steps++;
+
+			// Simpler alternative to backtracking, no stack in state needed, has better performance
+			if constexpr (std::is_same_v<State, DDAMissState>) {
+				const int currentMissCount = currentLevel >= 0 ? simulation.rendering.missCount : simulation.rendering.fineMissCount;
+				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == currentMissCount) {
+					currentLevel++;
+					calculateDDAState(state, ray, currentLevel);
+					continue;
+				}
+			}
+
+			if (currentLevel < 0) {
+				const glm::vec3 p = ray.o + glm::max(ray.t.x - radius, 0.f) * ray.dir;
+				const float volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
+
+				if (volume > 0.99f * targetVolume) {
+					hit.hit = true;
+					if constexpr (!Shadow) {
+						hit.pos = p;
+						hit.materials = getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
+						hit.t = glm::max(ray.t.x - radius, 0.f);
+						// TODO: keep normal using smoother terrain?
+						const float e = simulation.rendering.normalSmoothingFactor * radius;
+						const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
+						const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume<Shadow, WaterMode>(p, e, eG) : volume;
+						hit.normal = glm::normalize(glm::vec3(
+							volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(e, 0.f, 0.f), e, eG),
+							volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(0.f, e, 0.f), e, eG),
+							volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(0.f, 0.f, e), e, eG)
+						));
+					}
+					break;
+				}
+				hit.t = volume; // Remember volume for step
+			}
+			else {
+				intersectQuadTreeColumns<State, SmoothHit, Shadow, WaterMode>(state, ray, hit, currentLevel);
+			}
+
+			if (hit.hit && (currentLevel >= 0)) {
+				// Remember Exit for Backtracking
+				if constexpr (std::is_same_v<State, DDAExitLevelState>) {
+					const bool axis = state.T.x >= state.T.y;
+					state.exitLevels[currentLevel] = state.T[axis];
+				}
+				// Hit coarse geometry in QuadTree. Move to finer level.
+				ray.t.x = glm::max(ray.t.x, hit.t);
+				currentLevel--;
+				if (currentLevel >= 0) calculateDDAState(state, ray, currentLevel);
+				hit.hit = false;
+				continue;
+			}
+
+			// Backtracking - very delicate, easy to implement wrong
+			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
+				bool movedUp = false;
+				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
+					currentLevel++;
+					movedUp = true;
+				}
+				if (movedUp) {
+					const float oldRay = ray.t.x;
+					ray.t.x = glm::max(ray.t.x + bigEpsilon, state.exitLevels[currentLevel] + bigEpsilon);
+					if (ray.t.y < ray.t.x) break;
+					calculateDDAState(state, ray, currentLevel);
+					ray.t.x = oldRay;
+					continue;
+				}
+			}
+
+			if (currentLevel < 0) {
+				const float step = calculateSafeStep(hit.t, targetVolume, 2.f * radius);
+				ray.t.x += step;
+				if (ray.t.y < ray.t.x) break;
+				if constexpr (std::is_same_v<State, DDAMissState>) {
+					state.miss++;
+				}
+			}
+			else {
+				if (advanceDDA(state, ray, currentLevel)) break;
+			}
+
+		}
+	}
+	ray.o -= simulation.rendering.gridOffset;
+	hit.pos -= simulation.rendering.gridOffset;
+
+	return hit;
+}
+
+template<class State, class Hit, class PositionedLight, bool WaterMode = false>
+__device__ __forceinline__ float getShadow(const PositionedLight& light, const Hit& hit) {
+	const float eps = bigEpsilon + (std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
 	glm::vec3 direction = light.position - hit.pos;
 	float distance = glm::length(direction);
 	direction = direction / distance;
-	Ray ray{ createRay(hit.pos + bigEpsilon * direction, direction) };
+	Ray ray{ createRay(hit.pos + eps * direction, direction) };
+
 	ray.t.y = distance - bigEpsilon;
-	auto sHit = traceRayBoxes<State, true, WaterMode>(ray);
-	return !sHit.hit;
-}
+	if (std::is_same_v<Hit, BoxHit>) {
 
-template<bool WaterMode = false>
-__device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
-	const glm::vec3 boxBmin = p - radius;
-	const glm::vec3 boxBmax = p + radius;
-
-	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
-
-	float volume = 0.f;
-
-	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
-	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
-	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
-	for (; y < endY; ++y) {
-		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
-		for (; x < endX; ++x) {
-			glm::ivec2 currentCell = glm::ivec2(x, y);
-
-			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
-			const int layerCount{ simulation.layerCounts[flatIndex] };
-						
-			float floor = -FLT_MAX;
-
-			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
-			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
-
-			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
-			{
-				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
-				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + (WaterMode ? 0.f : terrainHeights[WATER]);
-
-				if (totalTerrainHeight <= boxBmin.y) {
-					floor = terrainHeights[CEILING];
-					continue;
-				}
-
-				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
-
-				floor = terrainHeights[CEILING];
-				if (floor >= boxBmax.y) break;
-			}
-		}
 	}
-	return volume;
+	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
 }
 
-template<bool WaterMode = false>
-__device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG) {
-	const glm::vec3 boxBmin = p - radius;
-	const glm::vec3 boxBmax = p + radius;
-
-	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
-
-	glm::vec4 volume = glm::vec4(0.f);
-
-	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
-	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
-	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
-	for (; y < endY; ++y) {
-		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
-		for (; x < endX; ++x) {
-			glm::ivec2 currentCell = glm::ivec2(x, y);
-
-			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
-			const int layerCount{ simulation.layerCounts[flatIndex] };
-						
-			float floor = -FLT_MAX;
-
-			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
-			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
-
-			for (int layer{ 0 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
-			{
-				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
-				glm::vec3 materials = glm::vec3(0.f);
-				materials.x = terrainHeights[BEDROCK];
-				materials.y = terrainHeights[SAND] + materials.x;
-				materials.z = terrainHeights[WATER] + materials.y;
-				const float totalTerrainHeight = WaterMode ? materials.y : materials.z;
-
-				if (totalTerrainHeight <= boxBmin.y) {
-					floor = terrainHeights[CEILING];
-					continue;
-				}
-
-				glm::vec3 intersection = intersectionVolumeBounds(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
-				const float interval = intersection.z - intersection.y;
-				materials = glm::clamp((materials - intersection.y) / interval, 0.f, 1.f);
-				materials.z -= materials.y;
-				materials.y -= materials.x;
-				volume += glm::vec4(glm::vec3(1.f, 3.f, 10.f) * materials * intersection.x, intersection.x);
-
-				floor = terrainHeights[CEILING];
-				if (floor >= boxBmax.y) break;
-			}
-		}
-	}
-	const float i_sum = 1.f / (volume.x + volume.y + volume.z);
-	return glm::vec4(i_sum * volume.x, i_sum * volume.y, i_sum * volume.z, volume.w);
-}
-
-template <class State, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF& phongBRDF, const Ray& ray, const BoxHit& hit)
+template <class State, class Hit, bool WaterMode = false>
+__device__ __forceinline__ glm::vec3 shadePhongBRDF(const PhongBRDF& phongBRDF, const Ray& ray, const Hit& hit)
 {
 	const glm::vec3 viewDirection = -ray.dir;
 	const float radius = simulation.rendering.aoRadius;
 	const float radiusG = radius * simulation.rGridScale;
 
 	const float targetVolume = 8.f * radius * radius * radius;
-	const float ao = glm::pow(1.f - getVolume<WaterMode>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f);
+	// Always WaterMode for AO, so Water is ignored
+	const float ao = glm::pow(1.f - getVolume<true, true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f);
 
 	glm::vec3 luminance = ao * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, phongBRDF);
 
@@ -671,7 +875,7 @@ __device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF& phongB
 	{
 		const auto lum = getPointLightLuminance(simulation.rendering.uniforms->pointLights[i], phongBRDF, hit, viewDirection);
 		if (lum != glm::vec3(0.f)) {
-			luminance += getShadow<State, onec::RenderPipelineUniforms::PointLight, WaterMode>(simulation.rendering.uniforms->pointLights[i], hit) * lum;
+			luminance += getShadow<State, Hit, onec::RenderPipelineUniforms::PointLight, WaterMode>(simulation.rendering.uniforms->pointLights[i], hit) * lum;
 		}
 	}
 
@@ -679,7 +883,7 @@ __device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF& phongB
 	{
 		const auto lum = getSpotLightLuminance(simulation.rendering.uniforms->spotLights[i], phongBRDF, hit, viewDirection);
 		if (lum != glm::vec3(0.f)) {
-			luminance += getShadow<State, onec::RenderPipelineUniforms::SpotLight, WaterMode>(simulation.rendering.uniforms->spotLights[i], hit) * lum;
+			luminance += getShadow<State, Hit, onec::RenderPipelineUniforms::SpotLight, WaterMode>(simulation.rendering.uniforms->spotLights[i], hit) * lum;
 		}
 	}
 
@@ -687,23 +891,36 @@ __device__ __forceinline__ glm::vec3 shadePhongBRDFBoxes(const PhongBRDF& phongB
 	{
 		const auto lum = getDirectionalLightLuminance(simulation.rendering.uniforms->directionalLights[i], phongBRDF, hit, viewDirection);
 		if (lum != glm::vec3(0.f)) {
-			Ray ray{ createRay(hit.pos - bigEpsilon * simulation.rendering.uniforms->directionalLights[i].direction, -simulation.rendering.uniforms->directionalLights[i].direction) };
-			auto hit = traceRayBoxes<State, true, WaterMode>(ray);
-			if(!hit.hit) luminance += lum;
+			const float eps = bigEpsilon + (std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
+			Ray ray{ createRay(hit.pos - eps * simulation.rendering.uniforms->directionalLights[i].direction, -simulation.rendering.uniforms->directionalLights[i].direction) };
+			
+			auto sHit = (std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
+			if (!sHit) luminance += lum;
 		}
 	}
 
 	return luminance;
 }
 
-__device__ __forceinline__ PhongBRDF getBRDF(const Ray& ray, const BoxHit& hit) {
+template <class Hit>
+__device__ __forceinline__ PhongBRDF getBRDF(const Ray& ray, const Hit& hit) {
 	PhongBRDF brdf;
 	brdf.alpha = 1.f;
 	brdf.shininess = 40.f;
 	const float cosTheta = glm::max(glm::dot(-ray.dir, hit.normal), 0.0f);
 
-	brdf.F = hit.material == WATER ? fresnelSchlick(cosTheta, 0.04) : 0.f;
-	brdf.diffuseReflectance = (1.f - brdf.F) * simulation.rendering.materialColors[hit.material];
+	if constexpr (std::is_same_v<Hit, BoxHit>) {
+		brdf.F = hit.material == WATER ? fresnelSchlick(cosTheta, 0.04) : 0.f;
+		brdf.diffuseReflectance = (1.f - brdf.F) * simulation.rendering.materialColors[hit.material];
+	}
+	else {
+		brdf.F = hit.materials.z * fresnelSchlick(cosTheta, 0.04);
+		brdf.diffuseReflectance = (1.f - brdf.F) * (
+			  hit.materials.x * simulation.rendering.materialColors[BEDROCK]
+			+ hit.materials.y * simulation.rendering.materialColors[SAND]
+			//+ hit.materials.z * simulation.rendering.materialColors[WATER]
+			);
+	}
 	brdf.specularReflectance = glm::vec3(0.f);
 	return brdf;
 }
@@ -735,7 +952,7 @@ __global__ void raymarchDDAQuadTreeKernel() {
 				if (rHit.hit) {
 					PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePhongBRDFBoxes<State>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+					reflection = shadePhongBRDF<State>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
 				}
 			}
 			glm::vec3 refraction = glm::vec3(0.f);
@@ -745,16 +962,16 @@ __global__ void raymarchDDAQuadTreeKernel() {
 				BoxHit rHit{ traceRayBoxes<State, false, true>(rRay) };
 				refraction = simulation.rendering.materialColors[rHit.material];
 
-				if (rHit.hit) {
+				if (rHit.hit && rHit.material != AIR) {
 					PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					refraction = shadePhongBRDFBoxes<State, true>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+					refraction = shadePhongBRDF<State, BoxHit, true>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
 				}
 
 				col = glm::mix(refraction, reflection, brdf.F);
 			}
 			else {
-				col = (shadePhongBRDFBoxes<State>(brdf, ray, hit) + brdf.F * reflection);
+				col = (shadePhongBRDF<State>(brdf, ray, hit) + brdf.F * reflection);
 			}
 
 		}
@@ -818,30 +1035,6 @@ __global__ void raymarchDDAQuadTreeLevelKernel(int level) {
 		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
-// How far can we step when computing the volume overlap of columns to an AABB of side length s? (see Arches paper definition of the implicit surface)
-// My derivation:
-// based on the last overlap, we calculate the volume change necessary to hit the surface (f(p) = 0)
-// Moving along our ray, we retain part of the previous volume, remove some and add new volume.
-// The fastest change would occur when moving diagonally through the AABB.
-// Worst case, all the "old" volume was previously empty and all new volume is filled.
-// The new volume gained is calculated as new_volume = s^3 - (s - distance/sqrt(3))^3.
-// Solving for distance we get distance = 2*s*sqrt(3) - sqrt(3) (s + (s^3 - new_volume)^(1/3))
-// However, for distances closer to s, the worst case changes to new_volume =  s^3 - (s - distance) * s * s 
-// in which case distance = new_volume / (s * s)
-// Using the necessary volume change from above as new_volume, we can calculate the safe distance.
-// since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
-// then the required volume Y is 0.5s^3, so the new volume gained is simply |X - (0.5s^3)|
-__device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize) {
-	// TODO Precompute boxsize values?
-	const float requiredVolumeGain = glm::abs(volume - targetVolume);
-	const float boxSize2 = boxSize * boxSize;
-	const float boxSize3 = boxSize2 * boxSize;
-	const float d1 = requiredVolumeGain / boxSize2;
-	constexpr float sqrt3 = std::numbers::sqrt3_v<float>;
-	const float d2 = 2.f * boxSize * sqrt3 - sqrt3 * (boxSize + pow(boxSize3 - requiredVolumeGain, 1.f / 3.f));
-	return glm::max(d1, d2);
-}
-
 template <class State>
 __global__ void raymarchDDAQuadTreeSmoothKernel() {
 	const glm::ivec2 index{ getLaunchIndex() };
@@ -852,140 +1045,54 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 	}
 
 	Ray ray{ createRay(index) };
-	ray.o += simulation.rendering.gridOffset;
-
-	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
-	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, FLT_MAX, 2.f * simulation.rendering.gridOffset.z);
-
-	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, ray.t);
-	ray.t.x = glm::max(ray.t.x, 0.f);
-
-	BoxHit hit;
-
-	int currentLevel = MAX_QUADTREE_LAYER;
-
-	int steps = 0;
-	if (intersect) {
-		// DDA prep
-		State state;
-		calculateDDAState(state, ray, currentLevel);
-
-		const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
-		const float targetVolume = simulation.rendering.surfaceVolumePercentage * 8.f * radius * radius * radius;
-		// DDA
-		while (true) {
-			steps++;
-
-			// Simpler alternative to backtracking, no stack in state needed, has better performance
-			if constexpr (std::is_same_v<State, DDAMissState>) {
-				const int currentMissCount = currentLevel >= 0 ? simulation.rendering.missCount : simulation.rendering.fineMissCount;
-				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == currentMissCount) {
-					currentLevel++;
-					calculateDDAState(state, ray, currentLevel);
-					continue;
-				}
-			}
-
-			if (currentLevel < 0) {
-				const glm::vec3 p = ray.o + (ray.t.x - radius) * ray.dir;
-				const float volume = getVolume(p, radius, simulation.rendering.smoothingRadiusInCells);
-
-				if (volume > 0.99f * targetVolume) {
-					hit.hit = true;
-					hit.t = ray.t.x - radius;
-					hit.pos = p;
-					// TODO: keep normal using smoother terrain?
-					const float e = simulation.rendering.normalSmoothingFactor * radius;
-					const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
-					const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume(p, e, eG) : volume;
-					hit.normal = glm::normalize(glm::vec3(
-						volumeN - getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG),
-						volumeN - getVolume(p + glm::vec3(0.f, e, 0.f), e, eG),
-						volumeN - getVolume(p + glm::vec3(0.f, 0.f, e), e, eG)
-					));
-					break;
-				}
-				hit.t = volume; // Remember volume for step
-			}
-			else {
-				intersectQuadTreeColumns(state, ray, hit, currentLevel);
-			}
-
-			if (hit.hit && (currentLevel >= 0)) {
-				// Remember Exit for Backtracking
-				if constexpr (std::is_same_v<State, DDAExitLevelState>) {
-					const bool axis = state.T.x >= state.T.y;
-					state.exitLevels[currentLevel] = state.T[axis];
-				}
-				// Hit coarse geometry in QuadTree. Move to finer level.
-				ray.t.x = glm::max(ray.t.x, hit.t);
-				currentLevel--;
-				if (currentLevel >= 0) calculateDDAState(state, ray, currentLevel);
-				hit.hit = false;
-				continue;
-			}
-
-			// Backtracking - very delicate, easy to implement wrong
-			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
-				bool movedUp = false;
-				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
-					currentLevel++;
-					movedUp = true;
-				}
-				if (movedUp) {
-					const float oldRay = ray.t.x;
-					ray.t.x = glm::max(ray.t.x + bigEpsilon, state.exitLevels[currentLevel] + bigEpsilon);
-					if (ray.t.y < ray.t.x) break;
-					calculateDDAState(state, ray, currentLevel);
-					ray.t.x = oldRay;
-					continue;
-				}
-			}
-
-			if (currentLevel < 0) {
-				const float step = calculateSafeStep(hit.t, targetVolume, 2.f * radius);
-				ray.t.x += step;
-				if (ray.t.y < ray.t.x) break;
-				if constexpr (std::is_same_v<State, DDAMissState>) {
-					state.miss++;
-				}
-			}
-			else {
-				if (advanceDDA(state, ray, currentLevel)) break;
-			}
-
-		}
-	}
-
-
+	SmoothHit hit{ traceRaySmooth<State>(ray) };
 
 	const glm::vec3 bgCol = glm::vec3(0);
 
-	glm::vec3 col = /*glm::vec3(0.005f * steps);*/ 0.5f + 0.5f * hit.normal;
+	glm::vec3 col = simulation.rendering.materialColors[AIR];
 
 	if (hit.hit) {
-		glm::vec4 materials = getMaterialVolume(hit.pos, simulation.gridScale * simulation.rendering.smoothingRadiusInCells, simulation.rendering.smoothingRadiusInCells);
+		const float eps = bigEpsilon + simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
+		PhongBRDF brdf{ getBRDF(ray, hit) };
 
-		col = materials.z * simulation.rendering.materialColors[WATER];
-		col += materials.y * simulation.rendering.materialColors[SAND];
-		col += materials.x * simulation.rendering.materialColors[BEDROCK];
+		glm::vec3 reflection = glm::vec3(0.f);
+		if (brdf.F > 0.f) {
+			const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
+			Ray rRay{ createRay(hit.pos + eps * rDir, rDir) };
+			SmoothHit rHit{ traceRaySmooth<State, false>(rRay) };
+			reflection = simulation.rendering.materialColors[AIR];
 
-		const float radius = simulation.rendering.aoRadius;
-		const float radiusG = radius * simulation.rGridScale;
+			if (rHit.hit) {
+				PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+				// Secondary reflections simply sample background
+				reflection = shadePhongBRDF<State>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+			}
+		}
+		glm::vec3 refraction = glm::vec3(0.f);
+		if (hit.materials.z < 1.f) {
+			col = shadePhongBRDF<State>(brdf, ray, hit);
+		}
+		if (hit.materials.z > 0.f) {
+			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
+			Ray rRay{ createRay(hit.pos + eps * rDir, rDir) };
+			SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay) };
+			refraction = simulation.rendering.materialColors[AIR];
 
-		const float targetVolume = 8.f * radius * radius * radius;
-		const float ao = glm::pow(1.f - getVolume(hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f);
+			if (rHit.hit) {
+				PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+				rBrdf.F = 1.f;
+				// Secondary reflections simply sample background
+				refraction = shadePhongBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+			}
 
-		col *= ao;
+			refraction *= (1.f - brdf.F);
+		}
+		col = glm::mix(col, refraction, hit.materials.z) + brdf.F * reflection;
 	}
 
-	hit.pos -= simulation.rendering.gridOffset;
-
-	col = hit.hit ? col : bgCol;
 
 
-
-	col = glm::clamp(col, 0.f, 1.f);
+	col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
 	uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
 	surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
