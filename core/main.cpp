@@ -78,7 +78,7 @@ void start()
 		world.addComponent<onec::Scale>(entity);
 		world.addComponent<onec::LocalToWorld>(entity);
 		world.addComponent<onec::Static>(entity);
-	}*/
+	}
 
 	{
 		const entt::entity entity{ world.addEntity() };
@@ -89,7 +89,7 @@ void start()
 		world.addComponent<onec::Scale>(entity);
 		world.addComponent<onec::LocalToWorld>(entity);
 		world.addComponent<onec::Static>(entity);
-	}
+	}*/
 
 	{
 		const entt::entity entity{ world.addEntity() };
