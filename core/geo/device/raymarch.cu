@@ -73,12 +73,10 @@ struct DDAState {
 	glm::vec2 bmax2D;
 };
 
-struct PhongBRDF
+struct PbrBRDF
 {
 	glm::vec3 diffuseReflectance;
-	glm::vec3 specularReflectance;
-	float shininess;
-	float alpha;
+	float roughness;
 	float F;
 };
 
@@ -107,18 +105,53 @@ __device__ __forceinline__ glm::vec3 applyReinhardToneMap(const glm::vec3 lumina
 	return luminance / (luminance + 1.0f);
 }
 
+__device__ __forceinline__ float DistributionGGX(const glm::vec3 &N, const glm::vec3& H, float roughness)
+{
+	float a = roughness * roughness;
+	float a2 = a * a;
+	float NdotH = glm::max(dot(N, H), 0.0f);
+	float NdotH2 = NdotH * NdotH;
+
+	float num = a2;
+	float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
+	denom = glm::pi<float>() * denom * denom;
+
+	return num / denom;
+}
+
+__device__ __forceinline__ float GeometrySchlickGGX(float NdotV, float roughness)
+{
+	float r = (roughness + 1.0f);
+	float k = (r * r) / 8.0f;
+
+	float num = NdotV;
+	float denom = NdotV * (1.0f - k) + k;
+
+	return num / denom;
+}
+
+__device__ __forceinline__ float GeometrySmith(const glm::vec3& N, const glm::vec3& V, const glm::vec3& L, float roughness)
+{
+	float NdotV = glm::max(dot(N, V), 0.0f);
+	float NdotL = glm::max(dot(N, L), 0.0f);
+	float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+	float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+	return ggx1 * ggx2;
+}
+
 __device__ __forceinline__ float getAttenuation(const float distance, const float range)
 {
 	float ratio = distance / range;
 	return 1.f / (ratio * ratio + 1.0f);
 }
 
-__device__ __forceinline__ glm::vec3 getPointLightIlluminance(const onec::RenderPipelineUniforms::PointLight pointLight, const glm::vec3 direction, const float distance, const glm::vec3 normal)
+__device__ __forceinline__ glm::vec3 getPointLightRadiance(const onec::RenderPipelineUniforms::PointLight pointLight, const glm::vec3 direction, const float distance)
 {
-	return getAttenuation(distance, pointLight.range) * pointLight.intensity * glm::max(glm::dot(-direction, normal), 0.0f);
+	return getAttenuation(distance, pointLight.range) * pointLight.intensity;
 }
 
-__device__ __forceinline__ glm::vec3 getSpotLightIlluminance(const onec::RenderPipelineUniforms::SpotLight spotLight, const glm::vec3 direction, const float distance, const glm::vec3 normal)
+__device__ __forceinline__ glm::vec3 getSpotLightRadiance(const onec::RenderPipelineUniforms::SpotLight spotLight, const glm::vec3 direction, const float distance)
 {
 	const float cutOff = glm::dot(spotLight.direction, direction);
 
@@ -129,65 +162,26 @@ __device__ __forceinline__ glm::vec3 getSpotLightIlluminance(const onec::RenderP
 
 	const float attenuation = glm::min((cutOff - spotLight.outerCutOff) / (spotLight.innerCutOff - spotLight.outerCutOff + epsilon), 1.0f) * getAttenuation(distance, spotLight.range);
 
-	return attenuation * spotLight.intensity * glm::max(glm::dot(-direction, normal), 0.0f);
+	return attenuation * spotLight.intensity;
 }
 
-__device__ __forceinline__ glm::vec3 getDirectionalLightIlluminance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const glm::vec3 direction, const glm::vec3 normal)
+__device__ __forceinline__ glm::vec3 getDirectionalLightRadiance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const glm::vec3 direction)
 {
-	return directionalLight.luminance * glm::max(glm::dot(-direction, normal), 0.0f);
-}
-
-template<class Hit>
-__device__ __forceinline__ glm::vec3 evaluatePhongBRDF(const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& lightDirection, const glm::vec3& viewDirection)
-{
-	const glm::vec3 reflection = reflect(-lightDirection, hit.normal);
-	const float cosPhi = glm::max(dot(viewDirection, reflection), 0.0f);
-
-	const glm::vec3 diffuseBRDF = rPi * phongBRDF.diffuseReflectance;
-	const glm::vec3 specularBRDF = 0.5f * rPi * (phongBRDF.shininess + 2.0f) * pow(cosPhi, phongBRDF.shininess) * phongBRDF.specularReflectance;
-
-	return diffuseBRDF + specularBRDF;
-}
-
-__device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PhongBRDF& phongBRDF)
-{
-	return (rPi * phongBRDF.diffuseReflectance) * ambientLight.luminance;
+	return directionalLight.luminance;
 }
 
 template<class Hit>
-__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& direction)
+__device__ __forceinline__ glm::vec3 evaluatePbrBRDF(const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& L, const glm::vec3& V)
 {
-	const glm::vec3 lightVector = pointLight.position - hit.pos;
-	const float lightDistance = length(lightVector);
-	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
+	const glm::vec3 H = normalize(hit.normal + L);
+	float NDF = DistributionGGX(hit.normal, H, pbrBRDF.roughness);
+	float G = GeometrySmith(hit.normal, V, L, pbrBRDF.roughness);
+	float numerator = NDF * G * pbrBRDF.F;
+	float denominator = 4.0f * glm::max(dot(hit.normal, V), 0.0f) * glm::max(dot(hit.normal, L), 0.0f) + bigEpsilon;
+	glm::vec3 specular = glm::vec3(numerator / denominator);
 
-	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
-		                   getPointLightIlluminance(pointLight, -lightDirection, lightDistance, hit.normal);
-
-	return luminance;
-}
-
-template<class Hit>
-__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& direction)
-{
-	const glm::vec3 lightVector = spotLight.position - hit.pos;
-	const float lightDistance = length(lightVector);
-	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
-
-	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
-		                   getSpotLightIlluminance(spotLight, -lightDirection, lightDistance, hit.normal);
-
-	return luminance;
-}
-
-template<class Hit>
-__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PhongBRDF& phongBRDF, const Hit& hit, const glm::vec3& direction)
-{
-	const glm::vec3 lightDirection = -directionalLight.direction;
-	const glm::vec3 luminance = evaluatePhongBRDF(phongBRDF, hit, lightDirection, direction) *
-		                   getDirectionalLightIlluminance(directionalLight, directionalLight.direction, hit.normal);
-
-	return luminance;
+	float NdotL = glm::max(dot(hit.normal, L), 0.0f);
+	return (pbrBRDF.diffuseReflectance * rPi + specular) * NdotL;
 }
 
 __device__ __forceinline__ float fresnelSchlick(float cosTheta, float F0)
@@ -647,7 +641,7 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 		volume = glm::vec4(volume.y, volume.z, volume.x, volume.w);
 	}
 	const float i_sum = 1.f / (volume.x + volume.y + volume.z + epsilon);
-	const float i_sum2 = 1.f / (volume.x + volume.y + epsilon);
+	const float i_sum2 = i_sum;// 1.f / (volume.x + volume.y + epsilon);
 
 	return glm::vec4(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z, volume.w);
 }
@@ -893,23 +887,70 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 	return hit;
 }
 
-template<class State, class Hit, class PositionedLight, bool WaterMode = false>
-__device__ __forceinline__ float getShadow(const PositionedLight& light, const Hit& hit) {
+template<class State, class Hit, bool WaterMode = false>
+__device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance) {
 	const float eps = bigEpsilon + (std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
-	glm::vec3 direction = light.position - hit.pos;
-	float distance = glm::length(direction);
-	direction = direction / distance;
 	Ray ray{ createRay(hit.pos + eps * direction, direction) };
-
-	ray.t.y = distance - bigEpsilon;
-	if (std::is_same_v<Hit, BoxHit>) {
-
-	}
+	ray.t.y = lightDistance - bigEpsilon;
 	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
 }
 
+__device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PbrBRDF& pbrBRDF)
+{
+	return (rPi * pbrBRDF.diffuseReflectance) * ambientLight.luminance;
+}
+
+template<class State, class Hit, bool WaterMode = false>
+__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow)
+{
+	const glm::vec3 lightVector = pointLight.position - hit.pos;
+	const float lightDistance = length(lightVector);
+	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
+
+	const glm::vec3 luminance = evaluatePbrBRDF(pbrBRDF, hit, lightDirection, direction) *
+		getPointLightRadiance(pointLight, -lightDirection, lightDistance);
+
+	if (shadow && luminance != glm::vec3(0.f)) {
+		return luminance * getShadow<State, Hit, WaterMode>(hit, lightDirection, lightDistance);
+	}
+
+	return luminance;
+}
+
+template<class State, class Hit, bool WaterMode = false>
+__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow)
+{
+	const glm::vec3 lightVector = spotLight.position - hit.pos;
+	const float lightDistance = length(lightVector);
+	const glm::vec3 lightDirection = lightVector / (lightDistance + epsilon);
+
+	const glm::vec3 luminance = evaluatePbrBRDF(pbrBRDF, hit, lightDirection, direction) *
+		getSpotLightRadiance(spotLight, -lightDirection, lightDistance);
+
+	if (shadow && luminance != glm::vec3(0.f)) {
+		return luminance * getShadow<State, Hit, WaterMode>(hit, lightDirection, lightDistance);
+	}
+
+	return luminance;
+}
+
+template<class State, class Hit, bool WaterMode = false>
+__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow)
+{
+	const glm::vec3 L = -directionalLight.direction;
+
+	const glm::vec3 luminance = evaluatePbrBRDF(pbrBRDF, hit, L, direction) *
+		getDirectionalLightRadiance(directionalLight, directionalLight.direction);
+
+	if (shadow && luminance != glm::vec3(0.f)) {
+		return luminance * getShadow<State, Hit, WaterMode>(hit, L, FLT_MAX);
+	}
+
+	return luminance;
+}
+
 template <class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 shadePhongBRDF(const PhongBRDF& phongBRDF, const Ray& ray, const Hit& hit)
+__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao)
 {
 	const glm::vec3 viewDirection = -ray.dir;
 	const float radius = simulation.rendering.aoRadius;
@@ -917,45 +958,31 @@ __device__ __forceinline__ glm::vec3 shadePhongBRDF(const PhongBRDF& phongBRDF, 
 
 	const float targetVolume = 8.f * radius * radius * radius;
 	// Always WaterMode for AO, so Water is ignored
-	const float ao = glm::pow(1.f - getVolume<true, true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f);
+	const float sAo = ao ? glm::pow(1.f - getVolume<true, true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f) : 0.f;
 
-	glm::vec3 luminance = ao * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, phongBRDF);
+	glm::vec3 luminance = sAo * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, pbrBRDF);
 
 	for (int i = 0; i < simulation.rendering.uniforms->pointLightCount; ++i)
 	{
-		const auto lum = getPointLightLuminance(simulation.rendering.uniforms->pointLights[i], phongBRDF, hit, viewDirection);
-		if (lum != glm::vec3(0.f)) {
-			luminance += getShadow<State, Hit, onec::RenderPipelineUniforms::PointLight, WaterMode>(simulation.rendering.uniforms->pointLights[i], hit) * lum;
-		}
+		luminance += getPointLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->pointLights[i], pbrBRDF, hit, viewDirection, shadow);
 	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->spotLightCount; ++i)
 	{
-		const auto lum = getSpotLightLuminance(simulation.rendering.uniforms->spotLights[i], phongBRDF, hit, viewDirection);
-		if (lum != glm::vec3(0.f)) {
-			luminance += getShadow<State, Hit, onec::RenderPipelineUniforms::SpotLight, WaterMode>(simulation.rendering.uniforms->spotLights[i], hit) * lum;
-		}
+		luminance += getSpotLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->spotLights[i], pbrBRDF, hit, viewDirection, shadow);
 	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->directionalLightCount; ++i)
 	{
-		const auto lum = getDirectionalLightLuminance(simulation.rendering.uniforms->directionalLights[i], phongBRDF, hit, viewDirection);
-		if (lum != glm::vec3(0.f)) {
-			const float eps = bigEpsilon + (std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
-			Ray ray{ createRay(hit.pos - eps * simulation.rendering.uniforms->directionalLights[i].direction, -simulation.rendering.uniforms->directionalLights[i].direction) };
-			
-			auto sHit = (std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
-			if (!sHit) luminance += lum;
-		}
+		luminance += getDirectionalLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->directionalLights[i], pbrBRDF, hit, viewDirection, shadow);
 	}
 
 	return luminance;
 }
 
 template <class Hit>
-__device__ __forceinline__ PhongBRDF getBRDF(const Ray& ray, Hit& hit, const glm::vec3& fallbackNormal = glm::vec3(0.f,1.f,0.f)) {
-	PhongBRDF brdf;
-	brdf.alpha = 1.f;
+__device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, const glm::vec3& fallbackNormal = glm::vec3(0.f,1.f,0.f)) {
+	PbrBRDF brdf;
 
 	if (glm::any(glm::isnan(hit.normal))) {
 		hit.normal = fallbackNormal;
@@ -964,15 +991,13 @@ __device__ __forceinline__ PhongBRDF getBRDF(const Ray& ray, Hit& hit, const glm
 	const float cosTheta = glm::max(glm::dot(-ray.dir, hit.normal), 0.0f);
 
 	if constexpr (std::is_same_v<Hit, BoxHit>) {
-		brdf.F = hit.material == WATER ? fresnelSchlick(cosTheta, 0.04) : 0.f;
-		brdf.shininess = hit.material == WATER ? 10000.f : 40.f;
-		brdf.specularReflectance = hit.material == WATER ? glm::vec3(1.f) : glm::vec3(0.f);
-		brdf.diffuseReflectance = (1.f - brdf.F) * simulation.rendering.materialColors[hit.material];
+		brdf.F = fresnelSchlick(cosTheta, (hit.material == WATER) ? 0.02f : 0.04f);
+		brdf.roughness = (hit.material == WATER) ? 0.0f : 1.f;
+		brdf.diffuseReflectance = (hit.material == WATER) ? glm::vec3(0.f) : (1.f - brdf.F) * simulation.rendering.materialColors[hit.material];
 	}
 	else {
-		brdf.F = glm::max(10.f * hit.materials.z - 9.f, 0.f) * fresnelSchlick(cosTheta, 0.04);
-		brdf.shininess = glm::max(10.f * hit.materials.z - 9.f, 0.f) * (10000.f - 40.f) + 40.f;
-		brdf.specularReflectance = glm::vec3(brdf.F);
+		brdf.F = fresnelSchlick(cosTheta, glm::mix(0.04f, 0.02f, hit.materials.z));
+		brdf.roughness = 1.f - 0.99f * hit.materials.z;
 		brdf.diffuseReflectance = (1.f - brdf.F) * (
 			  hit.materials.x * simulation.rendering.materialColors[BEDROCK]
 			+ hit.materials.y * simulation.rendering.materialColors[SAND]
@@ -997,19 +1022,19 @@ __global__ void raymarchDDAQuadTreeKernel() {
 		glm::vec3 col = simulation.rendering.materialColors[hit.material];
 
 		if (hit.hit) {
-			PhongBRDF brdf{ getBRDF(ray, hit) };
+			PbrBRDF brdf{ getBRDF(ray, hit) };
 
 			glm::vec3 reflection = glm::vec3(0.f);
-			if (brdf.F > 0.f) {
+			if (hit.material == WATER) {
 				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 				Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
 				BoxHit rHit{ traceRayBoxes<State, false>(rRay) };
 				reflection = simulation.rendering.materialColors[rHit.material];
 
 				if (rHit.hit) {
-					PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePhongBRDF<State>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+					reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true);
 				}
 			}
 			glm::vec3 refraction = glm::vec3(0.f);
@@ -1020,17 +1045,12 @@ __global__ void raymarchDDAQuadTreeKernel() {
 				refraction = simulation.rendering.materialColors[rHit.material];
 
 				if (rHit.hit && rHit.material != AIR) {
-					PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					refraction = shadePhongBRDF<State, BoxHit, true>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+					refraction = shadePbrBRDF<State, BoxHit, true>(rBrdf, rRay, rHit, true, true);
 				}
-
-				col = glm::mix(refraction, reflection, brdf.F);
 			}
-			else {
-				col = (shadePhongBRDF<State>(brdf, ray, hit) + brdf.F * reflection);
-			}
-
+			col = shadePbrBRDF<State>(brdf, ray, hit, true, true);// +glm::mix(refraction, reflection, brdf.F);
 		}
 
 		col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
@@ -1110,24 +1130,27 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 
 	if (hit.hit) {
 		const float eps = bigEpsilon + simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
-		PhongBRDF brdf{ getBRDF(ray, hit) };
+		PbrBRDF brdf{ getBRDF(ray, hit) };
 
 		glm::vec3 reflection = glm::vec3(0.f);
-		if (brdf.F > 0.f) {
+		if (brdf.roughness < 1.f) {
 			const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 			Ray rRay{ createRay(hit.pos + eps * rDir, rDir) };
 			SmoothHit rHit{ traceRaySmooth<State, false>(rRay) };
 			reflection = simulation.rendering.materialColors[AIR];
 
 			if (rHit.hit) {
-				PhongBRDF rBrdf{ getBRDF(rRay, rHit) };
+				PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 				// Secondary reflections simply sample background
-				reflection = shadePhongBRDF<State>(rBrdf, rRay, rHit) + rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+				reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true);
 			}
 		}
 		glm::vec3 refraction = glm::vec3(0.f);
 		//if (hit.materials.z < 1.0f) {
-			col = shadePhongBRDF<State>(brdf, ray, hit);
+		col = shadePbrBRDF<State>(brdf, ray, hit, true, true);
+		//}
+		//else {
+		//	col = glm::vec3(0.f);
 		//}
 		if (hit.materials.z > 0.0f) {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
@@ -1136,16 +1159,16 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 			refraction = simulation.rendering.materialColors[AIR];
 
 			if (rHit.hit) {
-				PhongBRDF rBrdf{ getBRDF(rRay, rHit, hit.normal) };
+				PbrBRDF rBrdf{ getBRDF(rRay, rHit, hit.normal) };
 				
 				// Secondary reflections simply sample background
-				refraction = shadePhongBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit) +
-					rBrdf.F * simulation.rendering.uniforms->ambientLight.luminance;
+				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true);
 			}
 
-			refraction *= (1.f - brdf.F);
+			//refraction *= (1.f - brdf.F);
+			//col /= (1.f - brdf.F);
 		}
-		col = col + refraction + brdf.F * reflection;
+		col = col + hit.materials.z * refraction * glm::mix(1.f, 1.f - brdf.F, hit.materials.z) + brdf.F * glm::mix(glm::vec3(0.f), reflection, hit.materials.z);
 	}
 
 
