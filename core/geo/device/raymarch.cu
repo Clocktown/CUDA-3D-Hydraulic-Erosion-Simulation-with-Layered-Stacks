@@ -747,7 +747,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 
 	int currentLevel = MAX_QUADTREE_LAYER;
 	const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
-	const float targetVolume = simulation.rendering.surfaceVolumePercentage * 8.f * radius * radius * radius;
+	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + ((Shadow && !ForceNormal) ? 0.01f : 0.f)) * 8.f * radius * radius * radius;
 
 	int steps = 0;
 	if (intersect) {
@@ -889,8 +889,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 
 template<class State, class Hit, bool WaterMode = false>
 __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance) {
-	const float eps = 100.f*bigEpsilon;// +(std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
-	Ray ray{ createRay(hit.pos + eps * hit.normal, direction) };
+	Ray ray{ createRay(hit.pos, direction) };
 	ray.t.y = lightDistance;
 	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
 }
@@ -1129,13 +1128,12 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 	glm::vec3 col = simulation.rendering.materialColors[AIR];
 
 	if (hit.hit) {
-		const float eps = bigEpsilon;// +simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
 		PbrBRDF brdf{ getBRDF(ray, hit) };
 
 		glm::vec3 reflection = glm::vec3(0.f);
 		if (hit.materials.z > 0.f) {
 			const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
-			Ray rRay{ createRay(hit.pos + eps * rDir, rDir) };
+			Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
 			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay) };
 			reflection = simulation.rendering.materialColors[AIR];
 
@@ -1154,7 +1152,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		//}
 		if (hit.materials.z > 0.0f) {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
-			Ray rRay{ createRay(hit.pos, rDir) };
+			Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
 			//rRay.t.y = simulation.gridScale;
 			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay) };
 			refraction = simulation.rendering.materialColors[AIR];
