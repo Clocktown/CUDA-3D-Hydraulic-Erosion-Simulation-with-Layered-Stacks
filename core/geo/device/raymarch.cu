@@ -641,7 +641,7 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 		volume = glm::vec4(volume.y, volume.z, volume.x, volume.w);
 	}
 	const float i_sum = 1.f / (volume.x + volume.y + volume.z + bigEpsilon);
-	const float i_sum2 = 1.f / (volume.x + volume.y + bigEpsilon);
+	const float i_sum2 = i_sum;// 1.f / (volume.x + volume.y + bigEpsilon);
 
 	return glm::vec4(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z, volume.w);
 }
@@ -730,7 +730,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	return hit;
 }
 
-template <class State, bool Shadow = false, bool WaterMode = false>
+template <class State, bool Shadow = false, bool WaterMode = false, bool ForceNormal = false>
 __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 	ray.o += simulation.rendering.gridOffset;
 
@@ -774,9 +774,9 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 				const glm::vec3 p = ray.o + ray.t.x * ray.dir;// glm::max(ray.t.x - radius, 0.f)* ray.dir;
 				const float volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
 
-				if (volume > 0.99f * targetVolume) {
+				if (volume >= 0.99f * targetVolume) {
 					hit.hit = true;
-					if constexpr (!Shadow) {
+					if constexpr (!Shadow || ForceNormal) {
 						hit.pos = p;
 						hit.materials = getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
 						//if constexpr(WaterMode) hit.materials = glm::vec4(1.f, 0.f, 0.f, 1.f);
@@ -997,7 +997,7 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, const glm::
 	}
 	else {
 		brdf.F = fresnelSchlick(cosTheta, glm::mix(0.04f, 0.02f, hit.materials.z));
-		brdf.roughness = 1.f;// -0.99f * hit.materials.z;
+		brdf.roughness = 1.f - 0.99f * hit.materials.z;
 		brdf.diffuseReflectance = (1.f - brdf.F) * (
 			  hit.materials.x * simulation.rendering.materialColors[BEDROCK]
 			+ hit.materials.y * simulation.rendering.materialColors[SAND]
@@ -1133,10 +1133,10 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		PbrBRDF brdf{ getBRDF(ray, hit) };
 
 		glm::vec3 reflection = glm::vec3(0.f);
-		if (brdf.roughness < 1.f) {
+		if (hit.materials.z > 0.f) {
 			const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 			Ray rRay{ createRay(hit.pos + eps * rDir, rDir) };
-			SmoothHit rHit{ traceRaySmooth<State, false>(rRay) };
+			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay) };
 			reflection = simulation.rendering.materialColors[AIR];
 
 			if (rHit.hit) {
@@ -1146,8 +1146,8 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 			}
 		}
 		glm::vec3 refraction = glm::vec3(0.f);
-		//if (hit.materials.z < 1.0f) {
-		col = shadePbrBRDF<State>(brdf, ray, hit, true, true);
+		//if (hit.materials.z == 0.0f) {
+			col = shadePbrBRDF<State>(brdf, ray, hit, true, true);
 		//}
 		//else {
 		//	col = glm::vec3(0.f);
@@ -1155,9 +1155,14 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		if (hit.materials.z > 0.0f) {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
 			Ray rRay{ createRay(hit.pos, rDir) };
-			SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay) };
+			//rRay.t.y = simulation.gridScale;
+			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay) };
 			refraction = simulation.rendering.materialColors[AIR];
 
+			if (!rHit.hit) {
+				//rRay = createRay(hit.pos + simulation.gridScale * rDir, rDir);
+				//rHit = traceRaySmooth<State, false, true>(rRay);
+			}
 			if (rHit.hit) {
 				PbrBRDF rBrdf{ getBRDF(rRay, rHit, hit.normal) };
 				
@@ -1168,7 +1173,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 			//refraction *= (1.f - brdf.F);
 			//col /= (1.f - brdf.F);
 		}
-		col = col + hit.materials.z * refraction * glm::mix(1.f, 1.f - brdf.F, hit.materials.z) + brdf.F * glm::mix(glm::vec3(0.f), reflection, hit.materials.z);
+		col = col + hit.materials.z * (1.f - brdf.F) * refraction + brdf.F * glm::mix(glm::vec3(0.f), reflection, hit.materials.z);
 	}
 
 
