@@ -171,6 +171,6 @@ void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
 
 void raymarchTerrain(const Launch& launch, bool useInterpolation, int missCount = 8, int debugLayer = -2);
-void buildQuadTree(const std::vector<Launch>& launch);
+void buildQuadTree(const std::vector<Launch>& launch, bool useInterpolation);
 }
 }

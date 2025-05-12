@@ -537,6 +537,7 @@ void UI::updateRendering()
 		bool useInterpolation = bool(rendering.useInterpolation);
 		if (ImGui::Checkbox("Use Interpolation", &useInterpolation)) {
 			rendering.useInterpolation = int(useInterpolation);
+			terrain.quadTreeDirty = true;
 			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.useInterpolation, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, useInterpolation)), sizeof(int));
 		}
 

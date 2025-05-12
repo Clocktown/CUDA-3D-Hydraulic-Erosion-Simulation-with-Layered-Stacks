@@ -178,7 +178,7 @@ __device__ __forceinline__ glm::vec3 evaluatePbrBRDF(const PbrBRDF& pbrBRDF, con
 	float G = GeometrySmith(hit.normal, V, L, pbrBRDF.roughness);
 	float numerator = NDF * G * pbrBRDF.F;
 	float denominator = 4.0f * glm::max(dot(hit.normal, V), 0.0f) * glm::max(dot(hit.normal, L), 0.0f) + bigEpsilon;
-	glm::vec3 specular = glm::vec3(numerator / denominator);
+	glm::vec3 specular = glm::clamp(glm::vec3(numerator / denominator), glm::vec3(0.f), glm::vec3(1.f));
 
 	float NdotL = glm::max(dot(hit.normal, L), 0.0f);
 	return (pbrBRDF.diffuseReflectance * rPi + specular) * NdotL;
@@ -640,8 +640,8 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 	if constexpr (WaterMode) {
 		volume = glm::vec4(volume.y, volume.z, volume.x, volume.w);
 	}
-	const float i_sum = 1.f / (volume.x + volume.y + volume.z + epsilon);
-	const float i_sum2 = i_sum;// 1.f / (volume.x + volume.y + epsilon);
+	const float i_sum = 1.f / (volume.x + volume.y + volume.z + bigEpsilon);
+	const float i_sum2 = 1.f / (volume.x + volume.y + bigEpsilon);
 
 	return glm::vec4(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z, volume.w);
 }
@@ -771,7 +771,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 			}
 
 			if (currentLevel < 0) {
-				const glm::vec3 p = ray.o + glm::max(ray.t.x - radius, 0.f) * ray.dir;
+				const glm::vec3 p = ray.o + ray.t.x * ray.dir;// glm::max(ray.t.x - radius, 0.f)* ray.dir;
 				const float volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
 
 				if (volume > 0.99f * targetVolume) {
@@ -780,7 +780,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 						hit.pos = p;
 						hit.materials = getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
 						//if constexpr(WaterMode) hit.materials = glm::vec4(1.f, 0.f, 0.f, 1.f);
-						hit.t = glm::max(ray.t.x - radius, 0.f);
+						hit.t = ray.t.x;// glm::max(ray.t.x - radius, 0.f);
 						// TODO: keep normal using smoother terrain?
 						const float e = simulation.rendering.normalSmoothingFactor * radius;
 						const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
@@ -889,9 +889,9 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 
 template<class State, class Hit, bool WaterMode = false>
 __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance) {
-	const float eps = bigEpsilon + (std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
-	Ray ray{ createRay(hit.pos + eps * direction, direction) };
-	ray.t.y = lightDistance - bigEpsilon;
+	const float eps = 100.f*bigEpsilon;// +(std::is_same_v<Hit, BoxHit> ? 0.f : simulation.gridScale * simulation.rendering.smoothingRadiusInCells);
+	Ray ray{ createRay(hit.pos + eps * hit.normal, direction) };
+	ray.t.y = lightDistance;
 	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
 }
 
@@ -997,7 +997,7 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, const glm::
 	}
 	else {
 		brdf.F = fresnelSchlick(cosTheta, glm::mix(0.04f, 0.02f, hit.materials.z));
-		brdf.roughness = 1.f - 0.99f * hit.materials.z;
+		brdf.roughness = 1.f;// -0.99f * hit.materials.z;
 		brdf.diffuseReflectance = (1.f - brdf.F) * (
 			  hit.materials.x * simulation.rendering.materialColors[BEDROCK]
 			+ hit.materials.y * simulation.rendering.materialColors[SAND]
@@ -1050,7 +1050,7 @@ __global__ void raymarchDDAQuadTreeKernel() {
 					refraction = shadePbrBRDF<State, BoxHit, true>(rBrdf, rRay, rHit, true, true);
 				}
 			}
-			col = shadePbrBRDF<State>(brdf, ray, hit, true, true);// +glm::mix(refraction, reflection, brdf.F);
+			col = shadePbrBRDF<State>(brdf, ray, hit, true, true) + glm::mix(refraction, reflection, brdf.F);
 		}
 
 		col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
@@ -1129,7 +1129,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 	glm::vec3 col = simulation.rendering.materialColors[AIR];
 
 	if (hit.hit) {
-		const float eps = bigEpsilon + simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
+		const float eps = bigEpsilon;// +simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
 		PbrBRDF brdf{ getBRDF(ray, hit) };
 
 		glm::vec3 reflection = glm::vec3(0.f);
@@ -1154,7 +1154,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		//}
 		if (hit.materials.z > 0.0f) {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
-			Ray rRay{ createRay(hit.pos + eps * rDir, rDir) };
+			Ray rRay{ createRay(hit.pos, rDir) };
 			SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay) };
 			refraction = simulation.rendering.materialColors[AIR];
 
@@ -1256,7 +1256,30 @@ __global__ void raymarchSmoothKernel() {
 		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
-__global__ void buildQuadTreeFirstLayer() {
+
+struct Neighbor {
+	glm::ivec2 index;
+	int flatIndex;
+	int layerCount;
+	bool outside;
+};
+
+__device__ __forceinline__ Neighbor getNeighbor(const glm::ivec2& index, const glm::ivec2& offset) {
+	Neighbor neigh;
+	neigh.index = 2 * index + offset;
+	neigh.outside = isOutside(neigh.index, simulation.gridSize);
+	if (neigh.outside)
+	{
+		neigh.layerCount = 0;
+		return neigh;
+	}
+
+	neigh.flatIndex = flattenIndex(neigh.index, simulation.gridSize);
+	neigh.layerCount = simulation.layerCounts[neigh.flatIndex];
+	return neigh;
+}
+
+__global__ void buildQuadTreeFirstLayer(bool interpolation) {
 	const glm::ivec2 index{ getLaunchIndex() };
 
 	if (isOutside(index, simulation.quadTree[0].gridSize))
@@ -1266,45 +1289,36 @@ __global__ void buildQuadTreeFirstLayer() {
 
 	int flatIndex{ flattenIndex(index, simulation.quadTree[0].gridSize) };
 	int maxOLayers = 0;
-	const float radius = simulation.rendering.smoothingRadiusInCells * simulation.gridScale;
-
-	struct Neighbor {
-		glm::ivec2 index;
-		int flatIndex;
-		int layerCount;
-		bool outside;
-	} neighbors[4];
+	const float radius = interpolation ? simulation.rendering.smoothingRadiusInCells * simulation.gridScale : 0.f;
+	Neighbor neighbors[4];
 
 	for (int y = 0; y <= 1; ++y) {
 		for (int x = 0; x <= 1; ++x) {
 			const int oIndex = 2 * y + x;
 			
-			neighbors[oIndex].index = 2 * index + glm::ivec2(x, y);
-			neighbors[oIndex].outside = isOutside(neighbors[oIndex].index, simulation.gridSize);
-			if (neighbors[oIndex].outside)
-			{
-				continue;
-			}
-
-			neighbors[oIndex].flatIndex = flattenIndex(neighbors[oIndex].index, simulation.gridSize);
-			neighbors[oIndex].layerCount = simulation.layerCounts[neighbors[oIndex].flatIndex];
+			neighbors[oIndex] = getNeighbor(index, glm::ivec2(x, y));
+			
 			maxOLayers = glm::max(maxOLayers, neighbors[oIndex].layerCount);
 		}
 	}
 	const char layerCount = glm::min(simulation.quadTree[0].maxLayerCount, maxOLayers);
 
+	int indexRadius = interpolation ? glm::ceil(simulation.rendering.smoothingRadiusInCells) : 0.f;
+
 	glm::vec4 heights;
 	// Merge layer by layer, bottom to top
 	for (int layer{ 0 }; layer < layerCount; ++layer) {
 		heights = glm::vec4(-FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX);
-		for (int y = 0; y <= 1; ++y) {
-			for (int x = 0; x <= 1; ++x) {
+		for (int y = 0 - indexRadius; y <= 1 + indexRadius; ++y) {
+			for (int x = 0 - indexRadius; x <= 1 + indexRadius; ++x) {
 				const int oIndex = 2 * y + x;
+				const bool validIndex = interpolation ? (y >= 0 && x >= 0 && y <= 1 && x <= 1) : true;
+				Neighbor neighbor = validIndex ? neighbors[oIndex] : getNeighbor(index, glm::ivec2(x, y));
 
-				if (neighbors[oIndex].outside || (neighbors[oIndex].layerCount < (layer + 1))) {
+				if (neighbor.outside || (neighbor.layerCount < (layer + 1))) {
 					continue;
 				}
-				const auto oTerrainHeights = glm::cuda_cast(simulation.heights[neighbors[oIndex].flatIndex + simulation.layerStride * layer]);
+				const auto oTerrainHeights = glm::cuda_cast(simulation.heights[neighbor.flatIndex + simulation.layerStride * layer]);
 				// TODO: pad heights with smoothing radius? (splitting fullHeight to one padded up, one padded down as planned)
 				const float solidHeight = oTerrainHeights[BEDROCK] + oTerrainHeights[SAND];
 				const float fullHeight = solidHeight + oTerrainHeights[WATER];
@@ -1321,15 +1335,17 @@ __global__ void buildQuadTreeFirstLayer() {
 
 	// Merge remaining columns into topmost column
 	for (int layer{ simulation.quadTree[0].maxLayerCount - 1 }; layer < maxOLayers; ++layer) {
-		for (int y = 0; y <= 1; ++y) {
-			for (int x = 0; x <= 1; ++x) {
+		for (int y = 0 - indexRadius; y <= 1 + indexRadius; ++y) {
+			for (int x = 0 - indexRadius; x <= 1 + indexRadius; ++x) {
 				const int oIndex = 2 * y + x;
+				const bool validIndex = (y >= 0 && x >= 0 && y <= 1 && x <= 1);
+				Neighbor neighbor = validIndex ? neighbors[oIndex] : getNeighbor(index, glm::ivec2(x, y));
 
-				if (neighbors[oIndex].outside || (neighbors[oIndex].layerCount < (layer + 1))) {
+				if (neighbor.outside || (neighbor.layerCount < (layer + 1))) {
 					continue;
 				}
 
-				const auto oTerrainHeights = glm::cuda_cast(simulation.heights[neighbors[oIndex].flatIndex + simulation.layerStride * layer]);
+				const auto oTerrainHeights = glm::cuda_cast(simulation.heights[neighbor.flatIndex + simulation.layerStride * layer]);
 				// TODO: pad heights with smoothing radius? (splitting fullHeight to one padded up, one padded down as planned)
 				const float solidHeight = oTerrainHeights[BEDROCK] + oTerrainHeights[SAND];
 				const float fullHeight = solidHeight + oTerrainHeights[WATER];
@@ -1433,9 +1449,9 @@ __global__ void buildQuadTreeLayer(int i) {
 	// TODO: Compact tree (merge overlapping columns)
 }
 
-void buildQuadTree(const std::vector<Launch>& launch) {
+void buildQuadTree(const std::vector<Launch>& launch, bool useInterpolation) {
 	// first layer (special)
-	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > ());
+	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > (useInterpolation));
 	// remaining layers
 	for (int i = 1; i < launch.size(); ++i) {
 		CU_CHECK_KERNEL(buildQuadTreeLayer << <launch[i].gridSize, launch[i].blockSize >> > (i));

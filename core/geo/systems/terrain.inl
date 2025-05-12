@@ -237,7 +237,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].start();
 			if (terrain.quadTreeDirty) {
-				device::buildQuadTree(treeLaunch);
+				device::buildQuadTree(treeLaunch, ui->rendering.useInterpolation);
 				terrain.quadTreeDirty = false;
 			}
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].stop();
