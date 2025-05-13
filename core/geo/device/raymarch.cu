@@ -28,6 +28,7 @@ struct BoxHit {
 struct SmoothHit {
 	float t{ FLT_MAX };
 	bool hit{ false };
+	bool hit_air{ false };
 	glm::vec4 materials{ 0.f };
 	glm::vec3 normal{ 0.f };
 	glm::vec3 pos{ 0.f };
@@ -520,8 +521,8 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 
 	float volume = 0.f;
 	if constexpr (WaterMode && !Shadow) {
-		volume = 8.f * radius * radius * radius;
-		volume -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
+		//volume = 8.f * radius * radius * radius;
+		//volume -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
 	}
 
 	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
@@ -567,6 +568,56 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 	return volume;
 }
 
+//template<bool Shadow = false, bool WaterMode = false>
+__device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, const float radius, const float radiusG) {
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	glm::vec2 volume = glm::vec2(0.f);
+	//volume.y = 8.f * radius * radius * radius;
+	//volume.y -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+
+			glm::vec2 floor = glm::vec2(-FLT_MAX);
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			int layer{ 0 };
+			for (; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND];
+				floor.y = totalTerrainHeight + terrainHeights[WATER];
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor.x = terrainHeights[CEILING];
+					continue;
+				}
+
+				volume.x += intersectionVolume(glm::vec3(bmin2D.x, floor.x, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+				volume.y += intersectionVolume(glm::vec3(bmin2D.x, floor.y, bmin2D.y), glm::vec3(bmax2D.x, terrainHeights[CEILING], bmax2D.y), boxBmin, boxBmax);
+
+				floor.x = terrainHeights[CEILING];
+				if (floor.x >= boxBmax.y) break;
+			}
+		}
+	}
+	return volume;
+}
+
 template<bool WaterMode = false>
 __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG, const glm::vec3& weight = glm::vec3(1.f)) {
 	const glm::vec3 boxBmin = p - radius;
@@ -578,9 +629,9 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 
 	glm::vec4 volume = glm::vec4(0.f);
 	if constexpr (WaterMode) {
-		volume.w = 8.f * radius * radius * radius;
-		volume.w -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
-		volume.x = vWeight.x * volume.w;
+		//volume.w = 8.f * radius * radius * radius;
+		//volume.w -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
+		//volume.x = vWeight.x * volume.w;
 	}
 
 	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
@@ -731,7 +782,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 }
 
 template <class State, bool Shadow = false, bool WaterMode = false, bool ForceNormal = false>
-__device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
+__device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) {
 	ray.o += simulation.rendering.gridOffset;
 
 	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
@@ -747,7 +798,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 
 	int currentLevel = MAX_QUADTREE_LAYER;
 	const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
-	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + ((Shadow && !ForceNormal) ? 0.01f : 0.f)) * 8.f * radius * radius * radius;
+	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + bias) * 8.f * radius * radius * radius;
 
 	int steps = 0;
 	if (intersect) {
@@ -772,13 +823,28 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 
 			if (currentLevel < 0) {
 				const glm::vec3 p = ray.o + ray.t.x * ray.dir;// glm::max(ray.t.x - radius, 0.f)* ray.dir;
-				const float volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
+				float volume;
+				bool air_hit = false;
+				if constexpr (WaterMode && !Shadow) {
+					glm::vec2 taVolume = getTerrainAirVolume(p, radius, simulation.rendering.smoothingRadiusInCells);
+					if (taVolume.y > taVolume.x) {
+						volume = taVolume.y;
+						air_hit = true;
+					}
+					else {
+						volume = taVolume.x;
+					}
+				}
+				else {
+					volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
+				}
 
 				if (volume >= 0.99f * targetVolume) {
 					hit.hit = true;
 					if constexpr (!Shadow || ForceNormal) {
 						hit.pos = p;
-						hit.materials = getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
+						hit.materials = air_hit ? glm::vec4(0.f) : getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
+						hit.hit_air = air_hit;
 						//if constexpr(WaterMode) hit.materials = glm::vec4(1.f, 0.f, 0.f, 1.f);
 						hit.t = ray.t.x;// glm::max(ray.t.x - radius, 0.f);
 						// TODO: keep normal using smoother terrain?
@@ -888,10 +954,14 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray) {
 }
 
 template<class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance) {
+__device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance, float bias = 0.f) {
+
 	Ray ray{ createRay(hit.pos, direction) };
+	if constexpr (std::is_same_v<Hit, BoxHit>) {
+		ray.o += bigEpsilon * direction;
+	}
 	ray.t.y = lightDistance;
-	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray).hit);
+	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray, bias).hit);
 }
 
 __device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PbrBRDF& pbrBRDF)
@@ -900,7 +970,7 @@ __device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::Render
 }
 
 template<class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow)
+__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
 {
 	const glm::vec3 lightVector = pointLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
@@ -910,14 +980,14 @@ __device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPi
 		getPointLightRadiance(pointLight, -lightDirection, lightDistance);
 
 	if (shadow && luminance != glm::vec3(0.f)) {
-		return luminance * getShadow<State, Hit, WaterMode>(hit, lightDirection, lightDistance);
+		return luminance * getShadow<State, Hit, WaterMode>(hit, lightDirection, lightDistance, bias);
 	}
 
 	return luminance;
 }
 
 template<class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow)
+__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
 {
 	const glm::vec3 lightVector = spotLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
@@ -927,14 +997,14 @@ __device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPip
 		getSpotLightRadiance(spotLight, -lightDirection, lightDistance);
 
 	if (shadow && luminance != glm::vec3(0.f)) {
-		return luminance * getShadow<State, Hit, WaterMode>(hit, lightDirection, lightDistance);
+		return luminance * getShadow<State, Hit, WaterMode>(hit, lightDirection, lightDistance, bias);
 	}
 
 	return luminance;
 }
 
 template<class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow)
+__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
 {
 	const glm::vec3 L = -directionalLight.direction;
 
@@ -942,38 +1012,43 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::Re
 		getDirectionalLightRadiance(directionalLight, directionalLight.direction);
 
 	if (shadow && luminance != glm::vec3(0.f)) {
-		return luminance * getShadow<State, Hit, WaterMode>(hit, L, FLT_MAX);
+		return luminance * getShadow<State, Hit, WaterMode>(hit, L, FLT_MAX, bias);
 	}
 
 	return luminance;
 }
 
 template <class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao)
+__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f)
 {
 	const glm::vec3 viewDirection = -ray.dir;
-	const float radius = simulation.rendering.aoRadius;
-	const float radiusG = radius * simulation.rGridScale;
 
-	const float targetVolume = 8.f * radius * radius * radius;
-	// Always WaterMode for AO, so Water is ignored
-	const float sAo = ao ? glm::pow(1.f - getVolume<true, true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG) / targetVolume, 2.0f) : 0.f;
+	float sAo = 0.f;
+	if (ao) {
+		const float radius = simulation.rendering.aoRadius;
+		const float iRadius = simulation.rendering.iAoRadius;
+		const float radiusG = radius * simulation.rGridScale;
+		const float iTargetVolume = 0.125f * iRadius * iRadius * iRadius;
+		const float volumePercent = 1.f - iTargetVolume * getVolume<true, true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG);
+		
+		sAo = volumePercent * volumePercent;
+	}
 
 	glm::vec3 luminance = sAo * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, pbrBRDF);
 
 	for (int i = 0; i < simulation.rendering.uniforms->pointLightCount; ++i)
 	{
-		luminance += getPointLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->pointLights[i], pbrBRDF, hit, viewDirection, shadow);
+		luminance += getPointLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->pointLights[i], pbrBRDF, hit, viewDirection, shadow, bias);
 	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->spotLightCount; ++i)
 	{
-		luminance += getSpotLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->spotLights[i], pbrBRDF, hit, viewDirection, shadow);
+		luminance += getSpotLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->spotLights[i], pbrBRDF, hit, viewDirection, shadow, bias);
 	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->directionalLightCount; ++i)
 	{
-		luminance += getDirectionalLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->directionalLights[i], pbrBRDF, hit, viewDirection, shadow);
+		luminance += getDirectionalLightLuminance<State, Hit, WaterMode>(simulation.rendering.uniforms->directionalLights[i], pbrBRDF, hit, viewDirection, shadow, bias);
 	}
 
 	return luminance;
@@ -1133,39 +1208,35 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		glm::vec3 reflection = glm::vec3(0.f);
 		if (hit.materials.z > 0.f) {
 			const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
-			Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
-			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay) };
+			Ray rRay{ createRay(hit.pos, rDir) };
+			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
 			reflection = simulation.rendering.materialColors[AIR];
 
 			if (rHit.hit) {
 				PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 				// Secondary reflections simply sample background
-				reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true);
+				reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true, 0.02f);
 			}
 		}
 		glm::vec3 refraction = glm::vec3(0.f);
 		//if (hit.materials.z == 0.0f) {
-			col = shadePbrBRDF<State>(brdf, ray, hit, true, true);
+			col = shadePbrBRDF<State>(brdf, ray, hit, true, true, 0.01f);
 		//}
 		//else {
 		//	col = glm::vec3(0.f);
 		//}
 		if (hit.materials.z > 0.0f) {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
-			Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
+			Ray rRay{ createRay(hit.pos, rDir) };
 			//rRay.t.y = simulation.gridScale;
-			SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay) };
+			SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay, 0.0f) };
 			refraction = simulation.rendering.materialColors[AIR];
 
-			if (!rHit.hit) {
-				//rRay = createRay(hit.pos + simulation.gridScale * rDir, rDir);
-				//rHit = traceRaySmooth<State, false, true>(rRay);
-			}
-			if (rHit.hit) {
+			if (rHit.hit && !rHit.hit_air) {
 				PbrBRDF rBrdf{ getBRDF(rRay, rHit, hit.normal) };
 				
 				// Secondary reflections simply sample background
-				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true);
+				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.01f);
 			}
 
 			//refraction *= (1.f - brdf.F);

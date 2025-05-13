@@ -74,6 +74,7 @@ struct Rendering {
 	float smoothingRadiusInCells;
 	float normalSmoothingFactor;
 	float aoRadius;
+	float iAoRadius;
 
 	onec::RenderPipelineUniforms* uniforms;
 };
