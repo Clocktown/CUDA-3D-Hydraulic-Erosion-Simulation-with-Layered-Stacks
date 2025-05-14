@@ -19,6 +19,15 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 
 	windowSize = glm::ivec2(1,1);
 	screenTexture.initialize(GL_TEXTURE_2D, glm::ivec3(windowSize.x, windowSize.y, 0), GL_RGBA8, 1, onec::SamplerState{}, true);
+
+	cudaTextureDesc texDesc{};
+	texDesc.addressMode[0] = cudaTextureAddressMode::cudaAddressModeClamp;
+	texDesc.addressMode[1] = cudaTextureAddressMode::cudaAddressModeClamp;
+	texDesc.filterMode = cudaTextureFilterMode::cudaFilterModeLinear;
+	texDesc.readMode = cudaTextureReadMode::cudaReadModeElementType;
+	texDesc.normalizedCoords = 1;
+
+	integratedBRDF.initialize(glm::ivec3(512, 512, 0), cudaCreateChannelDescHalf2(), 0, texDesc);
 	layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)), true);
 	heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)), true);
 	sedimentBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)), true);

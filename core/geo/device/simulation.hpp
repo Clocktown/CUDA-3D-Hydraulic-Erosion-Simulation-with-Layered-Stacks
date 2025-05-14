@@ -66,6 +66,8 @@ struct Rendering {
 	int fineMissCount;
 	float i_scale;
 	cudaSurfaceObject_t screenSurface;
+	cudaSurfaceObject_t integratedBRDFSurface;
+	cudaTextureObject_t integratedBRDFTexture;
 
 	glm::vec3 materialColors[4];
 	bool renderSand;
@@ -75,6 +77,7 @@ struct Rendering {
 	float normalSmoothingFactor;
 	float aoRadius;
 	float iAoRadius;
+	float rBoxSize2;
 
 	onec::RenderPipelineUniforms* uniforms;
 };
@@ -171,6 +174,7 @@ void stepSupportCheck(const Launch&, bool use_weight);
 void startSupportCheck(const Launch& launch);
 void endSupportCheck(const Launch& launch);
 
+void integrateBRDF(const Launch& launch, glm::ivec2 size);
 void raymarchTerrain(const Launch& launch, bool useInterpolation, int missCount = 8, int debugLayer = -2);
 void buildQuadTree(const std::vector<Launch>& launch, bool useInterpolation);
 }

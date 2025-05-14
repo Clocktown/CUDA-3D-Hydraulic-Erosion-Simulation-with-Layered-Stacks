@@ -140,6 +140,8 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rendering.upVec = glm::vec3(ul - ll) / float(terrain.windowSize.y);
 		simulation.rendering.windowSize = terrain.windowSize;
 		simulation.rendering.screenSurface = screenArray.getSurfaceObject();
+		simulation.rendering.integratedBRDFSurface = terrain.integratedBRDF.getSurfaceObject();
+		simulation.rendering.integratedBRDFTexture = terrain.integratedBRDF.getTextureObject();
 
 		simulation.rendering.materialColors[0] = pow(ui->rendering.bedrockColor, glm::vec3(2.2f));
 		simulation.rendering.materialColors[1] = pow(ui->rendering.sandColor, glm::vec3(2.2f));
@@ -151,6 +153,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rendering.normalSmoothingFactor = ui->rendering.normalSmoothingFactor;
 		simulation.rendering.aoRadius = ui->rendering.aoRadius;
 		simulation.rendering.iAoRadius = 1.f / ui->rendering.aoRadius;
+		simulation.rendering.rBoxSize2 = 1.f / (4.f * ui->rendering.smoothingRadiusInCells * ui->rendering.smoothingRadiusInCells * simulation.gridScale * simulation.gridScale);
 
 
 		simulation.rendering.i_scale = 1.f / world.getComponent<onec::Scale>(entity)->scale;
@@ -177,6 +180,16 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if (terrain.simulation.supportCheckEnabled) {
 				device::startSupportCheck(launch);
 			}
+
+			auto brdfSize = terrain.integratedBRDF.getSize();
+
+			device::Launch brdfLaunch{};
+			brdfLaunch.blockSize = dim3{ 8, 8, 1 };
+			brdfLaunch.gridSize.x = (brdfSize.x + brdfLaunch.blockSize.x - 1) / brdfLaunch.blockSize.x;
+			brdfLaunch.gridSize.y = (brdfSize.y + brdfLaunch.blockSize.y - 1) / brdfLaunch.blockSize.y;
+			brdfLaunch.gridSize.z = 1;
+
+			device::integrateBRDF(brdfLaunch, glm::ivec2(brdfSize));
 
 			terrain.simulation.init = false;
 		}

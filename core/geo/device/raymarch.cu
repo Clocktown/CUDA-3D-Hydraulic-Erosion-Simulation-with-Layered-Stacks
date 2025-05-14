@@ -2,6 +2,8 @@
 
 #include <numbers>
 
+#include <cuda_fp16.h>
+
 namespace geo {
 	namespace device {
 
@@ -78,6 +80,8 @@ struct PbrBRDF
 {
 	glm::vec3 diffuseReflectance;
 	float roughness;
+	float NdotV;
+	float F0;
 	float F;
 };
 
@@ -171,23 +175,29 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightRadiance(const onec::Ren
 	return directionalLight.luminance;
 }
 
+__device__ __forceinline__ float fresnelSchlick(float cosTheta, float F0)
+{
+	return F0 + (1.0f - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+}
+
+__device__ __forceinline__ float fresnelSchlickRoughness(float cosTheta, float F0, float roughness)
+{
+    return F0 + (glm::max(1.0f - roughness, F0) - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+}  
+
 template<class Hit>
 __device__ __forceinline__ glm::vec3 evaluatePbrBRDF(const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& L, const glm::vec3& V)
 {
-	const glm::vec3 H = normalize(hit.normal + L);
+	const glm::vec3 H = normalize(V + L);
+	float F  = fresnelSchlick(glm::max(dot(H, V), 0.0f), pbrBRDF.F0);
 	float NDF = DistributionGGX(hit.normal, H, pbrBRDF.roughness);
 	float G = GeometrySmith(hit.normal, V, L, pbrBRDF.roughness);
-	float numerator = NDF * G * pbrBRDF.F;
+	float numerator = NDF * G * F;
 	float denominator = 4.0f * glm::max(dot(hit.normal, V), 0.0f) * glm::max(dot(hit.normal, L), 0.0f) + bigEpsilon;
 	glm::vec3 specular = glm::clamp(glm::vec3(numerator / denominator), glm::vec3(0.f), glm::vec3(1.f));
 
 	float NdotL = glm::max(dot(hit.normal, L), 0.0f);
-	return (pbrBRDF.diffuseReflectance * rPi + specular) * NdotL;
-}
-
-__device__ __forceinline__ float fresnelSchlick(float cosTheta, float F0)
-{
-	return F0 + (1.0f - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+	return ((1.f - F) * pbrBRDF.diffuseReflectance * rPi + specular) * NdotL;
 }
 
 __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::vec3& b_max, const glm::vec3& r_o, const glm::vec3& inv_r_dir, glm::vec2& t) {
@@ -506,7 +516,9 @@ __device__ __forceinline__ float calculateSafeStep(float volume, float targetVol
 	const float requiredVolumeGain = glm::abs(volume - targetVolume);
 	const float boxSize2 = boxSize * boxSize;
 	const float boxSize3 = boxSize2 * boxSize;
-	const float d1 = requiredVolumeGain / boxSize2;
+	//const float d1 = min_step + factor * requiredVolumeGain * simulation.rendering.rBoxSize2;// / boxSize2;
+	const float d1 = requiredVolumeGain * simulation.rendering.rBoxSize2;
+	//return d1;
 	constexpr float sqrt3 = std::numbers::sqrt3_v<float>;
 	const float d2 = 2.f * boxSize * sqrt3 - sqrt3 * (boxSize + pow(boxSize3 - requiredVolumeGain, 1.f / 3.f));
 	return glm::min(d1, d2);
@@ -800,7 +812,6 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 	const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
 	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + bias) * 8.f * radius * radius * radius;
 
-	int steps = 0;
 	if (intersect) {
 		// DDA prep
 		State state;
@@ -809,8 +820,6 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 
 		// DDA
 		while (true) {
-			steps++;
-
 			// Simpler alternative to backtracking, no stack in state needed, has better performance
 			if constexpr (std::is_same_v<State, DDAMissState>) {
 				const int currentMissCount = currentLevel >= 0 ? simulation.rendering.missCount : simulation.rendering.fineMissCount;
@@ -822,7 +831,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 			}
 
 			if (currentLevel < 0) {
-				const glm::vec3 p = ray.o + ray.t.x * ray.dir;// glm::max(ray.t.x - radius, 0.f)* ray.dir;
+				glm::vec3 p = ray.o + ray.t.x * ray.dir;// glm::max(ray.t.x - radius, 0.f)* ray.dir;
 				float volume;
 				bool air_hit = false;
 				if constexpr (WaterMode && !Shadow) {
@@ -842,6 +851,12 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 				if (volume >= 0.99f * targetVolume) {
 					hit.hit = true;
 					if constexpr (!Shadow || ForceNormal) {
+						if (volume > targetVolume) {
+							p -= calculateSafeStep(volume, targetVolume, 2.f * radius) * ray.dir;
+						}
+						else if (volume < targetVolume) {
+							p += calculateSafeStep(volume, targetVolume, 2.f * radius) * ray.dir;
+						}
 						hit.pos = p;
 						hit.materials = air_hit ? glm::vec4(0.f) : getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
 						hit.hit_air = air_hit;
@@ -1019,11 +1034,11 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::Re
 }
 
 template <class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f)
+__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f, float specular_ao_weight = 1.f)
 {
 	const glm::vec3 viewDirection = -ray.dir;
 
-	float sAo = 0.f;
+	float sAo = 1.f;
 	if (ao) {
 		const float radius = simulation.rendering.aoRadius;
 		const float iRadius = simulation.rendering.iAoRadius;
@@ -1034,7 +1049,12 @@ __device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const 
 		sAo = volumePercent * volumePercent;
 	}
 
-	glm::vec3 luminance = sAo * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, pbrBRDF);
+	glm::vec2 envBRDF =  glm::cuda_cast(tex2D<float2>(simulation.rendering.integratedBRDFTexture, pbrBRDF.NdotV, pbrBRDF.roughness));
+
+	glm::vec3 luminance = sAo * (
+		(1.f - pbrBRDF.F) * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, pbrBRDF)
+		+ specular_ao_weight * simulation.rendering.uniforms->ambientLight.luminance * (pbrBRDF.F * envBRDF.x + envBRDF.y) 
+		);
 
 	for (int i = 0; i < simulation.rendering.uniforms->pointLightCount; ++i)
 	{
@@ -1062,17 +1082,19 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, const glm::
 		hit.normal = fallbackNormal;
 	}
 
-	const float cosTheta = glm::max(glm::dot(-ray.dir, hit.normal), 0.0f);
+	brdf.NdotV = glm::max(glm::dot(-ray.dir, hit.normal), 0.0f);
 
 	if constexpr (std::is_same_v<Hit, BoxHit>) {
-		brdf.F = fresnelSchlick(cosTheta, (hit.material == WATER) ? 0.02f : 0.04f);
-		brdf.roughness = (hit.material == WATER) ? 0.0f : 1.f;
-		brdf.diffuseReflectance = (hit.material == WATER) ? glm::vec3(0.f) : (1.f - brdf.F) * simulation.rendering.materialColors[hit.material];
+		brdf.F0 = (hit.material == WATER) ? 0.02f : 0.04f;
+		brdf.roughness = (hit.material == WATER) ? 0.1f : 1.f;
+		brdf.F = fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
+		brdf.diffuseReflectance = (hit.material == WATER) ? glm::vec3(0.f) : simulation.rendering.materialColors[hit.material];
 	}
 	else {
-		brdf.F = fresnelSchlick(cosTheta, glm::mix(0.04f, 0.02f, hit.materials.z));
-		brdf.roughness = 1.f - 0.99f * hit.materials.z;
-		brdf.diffuseReflectance = (1.f - brdf.F) * (
+		brdf.F0 = glm::mix(0.04f, 0.02f, hit.materials.z);
+		brdf.roughness = 1.f - 0.9f * hit.materials.z;
+		brdf.F = fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
+		brdf.diffuseReflectance = (
 			  hit.materials.x * simulation.rendering.materialColors[BEDROCK]
 			+ hit.materials.y * simulation.rendering.materialColors[SAND]
 			//+ hit.materials.z * simulation.rendering.materialColors[WATER]
@@ -1220,7 +1242,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		}
 		glm::vec3 refraction = glm::vec3(0.f);
 		//if (hit.materials.z == 0.0f) {
-			col = shadePbrBRDF<State>(brdf, ray, hit, true, true, 0.01f);
+		col = shadePbrBRDF<State>(brdf, ray, hit, true, true, 0.01f, 1.f - hit.materials.z);
 		//}
 		//else {
 		//	col = glm::vec3(0.f);
@@ -1229,14 +1251,14 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
 			Ray rRay{ createRay(hit.pos, rDir) };
 			//rRay.t.y = simulation.gridScale;
-			SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay, 0.0f) };
+			SmoothHit rHit{ (hit.materials.z == 1.f ) ? traceRaySmooth<State, false, true>(rRay, 0.01f) : traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
 			refraction = simulation.rendering.materialColors[AIR];
 
 			if (rHit.hit && !rHit.hit_air) {
 				PbrBRDF rBrdf{ getBRDF(rRay, rHit, hit.normal) };
 				
 				// Secondary reflections simply sample background
-				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.01f);
+				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.02f);
 			}
 
 			//refraction *= (1.f - brdf.F);
@@ -1245,9 +1267,8 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		col = col + hit.materials.z * (1.f - brdf.F) * refraction + brdf.F * glm::mix(glm::vec3(0.f), reflection, hit.materials.z);
 	}
 
-
-
 	col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
+	//col = glm::clamp(glm::vec3(hit.steps * 0.01f), 0.f, 1.f);
 	uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
 	surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
@@ -1521,6 +1542,123 @@ __global__ void buildQuadTreeLayer(int i) {
 		simulation.quadTree[i].heights[flatIndex + simulation.quadTree[i].layerStride * (layerCount - 1)] = glm::cuda_cast(heights);
 	}
 	// TODO: Compact tree (merge overlapping columns)
+}
+
+__device__ __forceinline__ float GeometrySchlickGGXIBL(float NdotV, float roughness)
+{
+    float a = roughness;
+    float k = (a * a) / 2.0f;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0f - k) + k;
+
+    return nom / denom;
+}
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ float GeometrySmithIBL(glm::vec3 N, glm::vec3 V, glm::vec3 L, float roughness)
+{
+    float NdotV = glm::max(dot(N, V), 0.0f);
+    float NdotL = glm::max(dot(N, L), 0.0f);
+    float ggx2 = GeometrySchlickGGXIBL(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGXIBL(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}  
+
+__device__ __forceinline__ glm::vec3 ImportanceSampleGGX(glm::vec2 Xi, glm::vec3 N, float roughness)
+{
+    float a = roughness*roughness;
+	
+    float phi = 2.0f * glm::pi<float>() * Xi.x;
+    float cosTheta = sqrt((1.0f - Xi.y) / (1.0f + (a*a - 1.0f) * Xi.y));
+    float sinTheta = sqrt(1.0f - cosTheta*cosTheta);
+	
+    // from spherical coordinates to cartesian coordinates
+    glm::vec3 H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
+	
+    // from tangent-space vector to world-space sample vector
+    glm::vec3 up        = abs(N.z) < 0.999f ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+    glm::vec3 tangent   = normalize(cross(up, N));
+    glm::vec3 bitangent = cross(N, tangent);
+	
+    glm::vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+    return glm::normalize(sampleVec);
+}  
+
+__device__ __forceinline__ float RadicalInverse_VdC(unsigned int bits) 
+{
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+    return float(bits) * 2.3283064365386963e-10f; // / 0x100000000
+}
+// ----------------------------------------------------------------------------
+__device__ __forceinline__ glm::vec2 Hammersley(unsigned int i, unsigned int N)
+{
+    return glm::vec2(float(i)/float(N), RadicalInverse_VdC(i));
+}  
+
+__device__ __forceinline__ glm::vec2 IntegrateBRDF(float NdotV, float roughness)
+{
+    glm::vec3 V;
+    V.x = sqrt(1.0f - NdotV*NdotV);
+    V.y = 0.0f;
+    V.z = NdotV;
+
+    float A = 0.0f;
+    float B = 0.0f;
+
+    glm::vec3 N = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    const unsigned int SAMPLE_COUNT = 1024u;
+    for(unsigned int i = 0u; i < SAMPLE_COUNT; ++i)
+    {
+        glm::vec2 Xi = Hammersley(i, SAMPLE_COUNT);
+        glm::vec3 H  = ImportanceSampleGGX(Xi, N, roughness);
+        glm::vec3 L  = glm::normalize(2.0f * dot(V, H) * H - V);
+
+        float NdotL = glm::max(L.z, 0.0f);
+        float NdotH = glm::max(H.z, 0.0f);
+        float VdotH = glm::max(dot(V, H), 0.0f);
+
+        if(NdotL > 0.0f)
+        {
+            float G = GeometrySmithIBL(N, V, L, roughness);
+            float G_Vis = (G * VdotH) / (NdotH * NdotV);
+            float Fc = pow(1.0f - VdotH, 5.0f);
+
+            A += (1.0f - Fc) * G_Vis;
+            B += Fc * G_Vis;
+        }
+    }
+    A /= float(SAMPLE_COUNT);
+    B /= float(SAMPLE_COUNT);
+    return glm::vec2(A, B);
+}
+
+__global__ void integrateBRDFKernel(glm::ivec2 size, glm::vec2 rSize) {
+	const glm::ivec2 index{ getLaunchIndex() };
+
+	if (isOutside(index, size))
+	{
+		return;
+	}
+
+	glm::vec2 uv = rSize * (glm::vec2(index) + 0.5f);
+	glm::vec2 val_f = IntegrateBRDF(uv.x, uv.y);
+
+	half2 val{ val_f.x, val_f.y };
+	ushort2 rawVal = *reinterpret_cast<ushort2*>(&val);
+	surf2Dwrite(rawVal, simulation.rendering.integratedBRDFSurface, index.x * sizeof(ushort2), index.y, cudaBoundaryModeTrap);
+}
+
+void integrateBRDF(const Launch& launch, glm::ivec2 size) {
+	CU_CHECK_KERNEL(integrateBRDFKernel << <launch.gridSize, launch.blockSize >> > (size, 1.f / glm::vec2(size)));
 }
 
 void buildQuadTree(const std::vector<Launch>& launch, bool useInterpolation) {

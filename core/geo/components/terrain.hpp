@@ -92,6 +92,7 @@ struct Terrain
 	bool quadTreeDirty = true;
 	glm::ivec2 windowSize;
 	onec::Texture screenTexture;
+	onec::Array integratedBRDF;
 	onec::GraphicsBuffer layerCountBuffer;
 	onec::GraphicsBuffer heightBuffer;
 	onec::GraphicsBuffer sedimentBuffer;
