@@ -31,6 +31,7 @@ struct SmoothHit {
 	float t{ FLT_MAX };
 	bool hit{ false };
 	bool hit_air{ false };
+	float max_volume{ FLT_MAX };
 	glm::vec3 materials{ 0.f };
 	glm::vec3 normal{ 0.f };
 	glm::vec3 pos{ 0.f };
@@ -819,6 +820,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 					volume = getVolume<WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
 				}
 
+				hit.max_volume = glm::min(hit.max_volume, glm::max((targetVolume - volume) / glm::min(0.01f * simulation.rGridScale * ray.t.x, 0.5f), 0.f));
 				if (volume >= 0.99f * targetVolume) {
 					hit.hit = true;
 					if constexpr (!Shadow || ForceNormal) {
@@ -956,7 +958,19 @@ __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& dire
 		ray.o += bigEpsilon * direction;
 	}
 	ray.t.y = lightDistance;
-	return !(std::is_same_v<Hit, BoxHit> ? traceRayBoxes<State, true, WaterMode>(ray).hit : traceRaySmooth<State, true, WaterMode>(ray, bias).hit);
+	Hit rHit;
+	float shadow = 0.f;
+	if constexpr (std::is_same_v<Hit, BoxHit>) {
+		rHit = traceRayBoxes<State, true, WaterMode>(ray);
+		shadow = !rHit.hit;
+	}
+	else {
+		rHit = traceRaySmooth<State, true, WaterMode>(ray, bias);
+		const float radius = simulation.rendering.smoothingRadiusInCells * simulation.gridScale;
+		const float targetVolume = 8.f * radius * radius * radius;
+		shadow = /*rHit.hit ? 0.f :*/ glm::clamp(rHit.max_volume / targetVolume, 0.f, 1.f);
+	}
+	return shadow;
 }
 
 __device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PbrBRDF& pbrBRDF)
