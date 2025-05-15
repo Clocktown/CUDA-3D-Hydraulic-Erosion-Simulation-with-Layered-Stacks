@@ -31,7 +31,7 @@ struct SmoothHit {
 	float t{ FLT_MAX };
 	bool hit{ false };
 	bool hit_air{ false };
-	glm::vec4 materials{ 0.f };
+	glm::vec3 materials{ 0.f };
 	glm::vec3 normal{ 0.f };
 	glm::vec3 pos{ 0.f };
 };
@@ -82,6 +82,7 @@ struct PbrBRDF
 	float roughness;
 	float NdotV;
 	float F0;
+	float Fr;
 	float F;
 };
 
@@ -180,9 +181,9 @@ __device__ __forceinline__ float fresnelSchlick(float cosTheta, float F0)
 	return F0 + (1.0f - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
 }
 
-__device__ __forceinline__ float fresnelSchlickRoughness(float cosTheta, float F0, float roughness)
+__device__ __forceinline__ glm::vec2 fresnelSchlickRoughness(float cosTheta, float F0, float roughness)
 {
-    return F0 + (glm::max(1.0f - roughness, F0) - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+    return F0 + (glm::vec2(glm::max(1.0f - roughness, F0), 1.0f) - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
 }  
 
 template<class Hit>
@@ -524,7 +525,7 @@ __device__ __forceinline__ float calculateSafeStep(float volume, float targetVol
 	return glm::min(d1, d2);
 }
 
-template<bool Shadow = false, bool WaterMode = false>
+template<bool WaterMode = false>
 __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
 	const glm::vec3 boxBmin = p - radius;
 	const glm::vec3 boxBmax = p + radius;
@@ -532,10 +533,6 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
 
 	float volume = 0.f;
-	if constexpr (WaterMode && !Shadow) {
-		//volume = 8.f * radius * radius * radius;
-		//volume -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
-	}
 
 	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
 	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
@@ -560,20 +557,14 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + (WaterMode ? 0.f : terrainHeights[WATER]);
 
 				if (totalTerrainHeight <= boxBmin.y) {
-					floor = (WaterMode && !Shadow) ? (totalTerrainHeight + terrainHeights[WATER]) : terrainHeights[CEILING];
+					floor = terrainHeights[CEILING];
 					continue;
 				}
 
 				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
 
-				floor = (WaterMode && !Shadow) ? (totalTerrainHeight + terrainHeights[WATER]) : terrainHeights[CEILING];
+				floor = terrainHeights[CEILING];
 				if (floor >= boxBmax.y) break;
-			}
-			if constexpr (WaterMode && !Shadow) {
-				// last check with infinite air column
-				if (layer == layerCount) {
-					volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, FLT_MAX, bmax2D.y), boxBmin, boxBmax);
-				}
 			}
 		}
 	}
@@ -614,7 +605,7 @@ __device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, con
 				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND];
 				floor.y = totalTerrainHeight + terrainHeights[WATER];
 
-				if (totalTerrainHeight <= boxBmin.y) {
+				if (terrainHeights[CEILING] <= boxBmin.y) {
 					floor.x = terrainHeights[CEILING];
 					continue;
 				}
@@ -630,21 +621,15 @@ __device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, con
 	return volume;
 }
 
-template<bool WaterMode = false>
-__device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG, const glm::vec3& weight = glm::vec3(1.f)) {
+__device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG, const glm::vec3& weight = glm::vec3(1.f)) {
 	const glm::vec3 boxBmin = p - radius;
 	const glm::vec3 boxBmax = p + radius;
 
 	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
 
-	const glm::vec3 vWeight = WaterMode ? glm::vec3(weight.z, weight.x, weight.y) : weight;
+	const glm::vec3 vWeight = weight;
 
 	glm::vec4 volume = glm::vec4(0.f);
-	if constexpr (WaterMode) {
-		//volume.w = 8.f * radius * radius * radius;
-		//volume.w -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
-		//volume.x = vWeight.x * volume.w;
-	}
 
 	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
 	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
@@ -658,7 +643,6 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 			const int layerCount{ simulation.layerCounts[flatIndex] };
 						
 			float floor = -FLT_MAX;
-			float airLevel = -FLT_MAX;
 
 			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
 			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
@@ -668,14 +652,13 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 			{
 				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
 				glm::vec3 materials = glm::vec3(0.f);
-				materials.x = WaterMode ? airLevel : terrainHeights[BEDROCK];
-				materials.y = WaterMode ? terrainHeights[BEDROCK] : terrainHeights[SAND] + materials.x;
-				materials.z = WaterMode ? terrainHeights[SAND] + materials.y : terrainHeights[WATER] + materials.y;
+				materials.x = terrainHeights[BEDROCK];
+				materials.y = terrainHeights[SAND] + materials.x;
+				materials.z = terrainHeights[WATER] + materials.y;
 				const float totalTerrainHeight = materials.z;
 
 				if (totalTerrainHeight <= boxBmin.y) {
-					floor = WaterMode ? (totalTerrainHeight + terrainHeights[WATER]) : terrainHeights[CEILING];
-					if constexpr (WaterMode) airLevel = terrainHeights[CEILING];
+					floor = terrainHeights[CEILING];
 					continue;
 				}
 
@@ -686,27 +669,15 @@ __device__ __forceinline__ glm::vec4 getMaterialVolume(const glm::vec3& p, const
 				materials.y -= materials.x;
 				volume += glm::vec4(vWeight * materials * intersection.x, intersection.x);
 
-				floor = WaterMode ? (totalTerrainHeight + terrainHeights[WATER]) : terrainHeights[CEILING];
-				if constexpr (WaterMode) airLevel = terrainHeights[CEILING];
+				floor = terrainHeights[CEILING];
 				if (floor >= boxBmax.y) break;
-			}
-			if constexpr (WaterMode) {
-				// last check with infinite air column
-				if (layer == layerCount) {
-					glm::vec3 intersection = intersectionVolumeBounds(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, FLT_MAX, bmax2D.y), boxBmin, boxBmax);
-					const float interval = intersection.z - intersection.y;
-					volume += glm::vec4(vWeight * glm::vec3(1.f, 0.f, 0.f) * intersection.x, intersection.x);
-				}
 			}
 		}
 	}
-	if constexpr (WaterMode) {
-		volume = glm::vec4(volume.y, volume.z, volume.x, volume.w);
-	}
-	const float i_sum = 1.f / (volume.x + volume.y + volume.z + bigEpsilon);
-	const float i_sum2 = i_sum;// 1.f / (volume.x + volume.y + bigEpsilon);
+	const float i_sum = 1.f / (volume.x + volume.y + volume.z);
+	const float i_sum2 = 1.f / (volume.x + volume.y + bigEpsilon);
 
-	return glm::vec4(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z, volume.w);
+	return glm::vec3(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z);
 }
 
 template <class State, bool Shadow, bool WaterMode = false>
@@ -845,7 +816,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 					}
 				}
 				else {
-					volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
+					volume = getVolume<WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
 				}
 
 				if (volume >= 0.99f * targetVolume) {
@@ -858,19 +829,28 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 							p += calculateSafeStep(volume, targetVolume, 2.f * radius) * ray.dir;
 						}
 						hit.pos = p;
-						hit.materials = air_hit ? glm::vec4(0.f) : getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
+						hit.materials = getMaterialVolume(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
 						hit.hit_air = air_hit;
-						//if constexpr(WaterMode) hit.materials = glm::vec4(1.f, 0.f, 0.f, 1.f);
 						hit.t = ray.t.x;// glm::max(ray.t.x - radius, 0.f);
 						// TODO: keep normal using smoother terrain?
 						const float e = simulation.rendering.normalSmoothingFactor * radius;
 						const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
-						const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume<Shadow, WaterMode>(p, e, eG) : volume;
-						hit.normal = glm::normalize(glm::vec3(
-							volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(e, 0.f, 0.f), e, eG),
-							volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(0.f, e, 0.f), e, eG),
-							volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(0.f, 0.f, e), e, eG)
-						));
+						if (hit.hit_air) {
+							const float volumeN = getVolume(p, e, eG);
+							hit.normal = glm::normalize(glm::vec3(
+								volumeN - getVolume(p + glm::vec3(e, 0.f, 0.f), e, eG),
+								volumeN - getVolume(p + glm::vec3(0.f, e, 0.f), e, eG),
+								volumeN - getVolume(p + glm::vec3(0.f, 0.f, e), e, eG)
+							));
+						}
+						else {
+							const float volumeN = getVolume<WaterMode>(p, e, eG);
+							hit.normal = glm::normalize(glm::vec3(
+								volumeN - getVolume<WaterMode>(p + glm::vec3(e, 0.f, 0.f), e, eG),
+								volumeN - getVolume<WaterMode>(p + glm::vec3(0.f, e, 0.f), e, eG),
+								volumeN - getVolume<WaterMode>(p + glm::vec3(0.f, 0.f, e), e, eG)
+							));
+						}
 					}
 					break;
 				}
@@ -928,22 +908,22 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 	if constexpr (WaterMode && !Shadow) {
 		if (!hit.hit) {
 			const glm::vec3 p = ray.o + ray.t.y * ray.dir;
-			const float volume = getVolume<Shadow, WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
+			const float volume = getVolume<WaterMode>(p, radius, simulation.rendering.smoothingRadiusInCells);
 
 			if (volume > 0.99f * targetVolume) {
 				hit.hit = true;
 				hit.pos = p;
-				hit.materials = getMaterialVolume<WaterMode>(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
+				hit.materials = getMaterialVolume(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
 				//if constexpr(WaterMode) hit.materials = glm::vec4(1.f, 0.f, 0.f, 1.f);
 				hit.t = ray.t.y;
 				// TODO: keep normal using smoother terrain?
 				const float e = simulation.rendering.normalSmoothingFactor * radius;
 				const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
-				const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume<Shadow, WaterMode>(p, e, eG) : volume;
+				const float volumeN = simulation.rendering.normalSmoothingFactor != 1.f ? getVolume<WaterMode>(p, e, eG) : volume;
 				hit.normal = glm::normalize(glm::vec3(
-					volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(e, 0.f, 0.f), e, eG),
-					volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(0.f, e, 0.f), e, eG),
-					volumeN - getVolume<Shadow, WaterMode>(p + glm::vec3(0.f, 0.f, e), e, eG)
+					volumeN - getVolume<WaterMode>(p + glm::vec3(e, 0.f, 0.f), e, eG),
+					volumeN - getVolume<WaterMode>(p + glm::vec3(0.f, e, 0.f), e, eG),
+					volumeN - getVolume<WaterMode>(p + glm::vec3(0.f, 0.f, e), e, eG)
 				));
 			}
 			// OOB
@@ -1034,27 +1014,31 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::Re
 }
 
 template <class State, class Hit, bool WaterMode = false>
-__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f, float specular_ao_weight = 1.f)
+__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f, float ambient_weight = 1.f)
 {
 	const glm::vec3 viewDirection = -ray.dir;
 
 	float sAo = 1.f;
-	if (ao) {
+	if (ao && ambient_weight > 0.f) {
 		const float radius = simulation.rendering.aoRadius;
 		const float iRadius = simulation.rendering.iAoRadius;
 		const float radiusG = radius * simulation.rGridScale;
 		const float iTargetVolume = 0.125f * iRadius * iRadius * iRadius;
-		const float volumePercent = 1.f - iTargetVolume * getVolume<true, true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG);
+		const float volumePercent = 1.f - iTargetVolume * getVolume<true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG);
 		
 		sAo = volumePercent * volumePercent;
 	}
 
-	glm::vec2 envBRDF =  glm::cuda_cast(tex2D<float2>(simulation.rendering.integratedBRDFTexture, pbrBRDF.NdotV, pbrBRDF.roughness));
+	glm::vec3 luminance(0.f);
 
-	glm::vec3 luminance = sAo * (
-		(1.f - pbrBRDF.F) * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, pbrBRDF)
-		+ specular_ao_weight * simulation.rendering.uniforms->ambientLight.luminance * (pbrBRDF.F * envBRDF.x + envBRDF.y) 
-		);
+	if (ambient_weight > 0.f) {
+		glm::vec2 envBRDF = glm::cuda_cast(tex2D<float2>(simulation.rendering.integratedBRDFTexture, pbrBRDF.NdotV, pbrBRDF.roughness));
+
+		luminance = sAo * ambient_weight * (
+			(1.f - pbrBRDF.Fr) * getAmbientLightLuminance(simulation.rendering.uniforms->ambientLight, pbrBRDF)
+			+ simulation.rendering.uniforms->ambientLight.luminance * (pbrBRDF.Fr * envBRDF.x + envBRDF.y)
+			);
+	}
 
 	for (int i = 0; i < simulation.rendering.uniforms->pointLightCount; ++i)
 	{
@@ -1075,7 +1059,7 @@ __device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const 
 }
 
 template <class Hit>
-__device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, const glm::vec3& fallbackNormal = glm::vec3(0.f,1.f,0.f)) {
+__device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, bool weight_diffuse = false, const glm::vec3& fallbackNormal = glm::vec3(0.f,1.f,0.f)) {
 	PbrBRDF brdf;
 
 	if (glm::any(glm::isnan(hit.normal))) {
@@ -1087,14 +1071,22 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, const glm::
 	if constexpr (std::is_same_v<Hit, BoxHit>) {
 		brdf.F0 = (hit.material == WATER) ? 0.02f : 0.04f;
 		brdf.roughness = (hit.material == WATER) ? 0.1f : 1.f;
-		brdf.F = fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
+		auto F = fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
+		brdf.Fr = F.x;
+		brdf.F = F.y;
 		brdf.diffuseReflectance = (hit.material == WATER) ? glm::vec3(0.f) : simulation.rendering.materialColors[hit.material];
 	}
 	else {
+		// if materials.z is exactly 1, some shading gets disabled for performance, this ensures it works properly
+		hit.materials.z *= 1.f / (1.f - bigEpsilon);
+		hit.materials.z = glm::min(hit.materials.z, 1.f);
+
 		brdf.F0 = glm::mix(0.04f, 0.02f, hit.materials.z);
 		brdf.roughness = 1.f - 0.9f * hit.materials.z;
-		brdf.F = fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
-		brdf.diffuseReflectance = (
+		auto F = fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
+		brdf.Fr = F.x;
+		brdf.F = F.y;
+		brdf.diffuseReflectance = (weight_diffuse ? 1.f - hit.materials.z : 1.f) * (
 			  hit.materials.x * simulation.rendering.materialColors[BEDROCK]
 			+ hit.materials.y * simulation.rendering.materialColors[SAND]
 			//+ hit.materials.z * simulation.rendering.materialColors[WATER]
@@ -1225,7 +1217,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 	glm::vec3 col = simulation.rendering.materialColors[AIR];
 
 	if (hit.hit) {
-		PbrBRDF brdf{ getBRDF(ray, hit) };
+		PbrBRDF brdf{ getBRDF(ray, hit, true) };
 
 		glm::vec3 reflection = glm::vec3(0.f);
 		if (hit.materials.z > 0.f) {
@@ -1237,32 +1229,26 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 			if (rHit.hit) {
 				PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 				// Secondary reflections simply sample background
-				reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true, 0.02f);
+				reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true, 0.02f, 1.f - rHit.materials.z);
 			}
 		}
 		glm::vec3 refraction = glm::vec3(0.f);
-		//if (hit.materials.z == 0.0f) {
+
 		col = shadePbrBRDF<State>(brdf, ray, hit, true, true, 0.01f, 1.f - hit.materials.z);
-		//}
-		//else {
-		//	col = glm::vec3(0.f);
-		//}
+
 		if (hit.materials.z > 0.0f) {
 			const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
 			Ray rRay{ createRay(hit.pos, rDir) };
-			//rRay.t.y = simulation.gridScale;
-			SmoothHit rHit{ (hit.materials.z == 1.f ) ? traceRaySmooth<State, false, true>(rRay, 0.01f) : traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
+
+			SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay, 0.01f) };
 			refraction = simulation.rendering.materialColors[AIR];
 
-			if (rHit.hit && !rHit.hit_air) {
-				PbrBRDF rBrdf{ getBRDF(rRay, rHit, hit.normal) };
+			if (rHit.hit) {
+				PbrBRDF rBrdf{ getBRDF(rRay, rHit, false, hit.normal) };
 				
 				// Secondary reflections simply sample background
-				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.02f);
+				refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.02f, 1.f - rHit.materials.z);
 			}
-
-			//refraction *= (1.f - brdf.F);
-			//col /= (1.f - brdf.F);
 		}
 		col = col + hit.materials.z * (1.f - brdf.F) * refraction + brdf.F * glm::mix(glm::vec3(0.f), reflection, hit.materials.z);
 	}
