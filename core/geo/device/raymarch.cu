@@ -1328,7 +1328,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 
 					// Todo: estimate actual water depth by shooting ray upward of rHit, instead of this hack
 					const float depthFactor1 = glm::exp(-(uHit.hit_air ? uHit.t : FLT_MAX) * 0.02f);
-					const float depthFactor2 = glm::exp(-(uHit.hit_air ? uHit.t : FLT_MAX) * 0.2f);
+					const float depthFactor2 = glm::exp(-(uHit.hit_air ? uHit.t : FLT_MAX) * 0.05f);
 
 					refraction = depthFactor1 * glm::mix(simulation.rendering.materialColors[WATER] * refraction, refraction, depthFactor2);
 					refraction = glm::mix(glm::vec3(0.f), refraction, glm::exp(-rHit.t * 0.02f));
