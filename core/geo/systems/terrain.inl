@@ -152,8 +152,12 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rendering.smoothingRadiusInCells = ui->rendering.smoothingRadiusInCells;
 		simulation.rendering.normalSmoothingFactor = ui->rendering.normalSmoothingFactor;
 		simulation.rendering.aoRadius = ui->rendering.aoRadius;
-		simulation.rendering.iAoRadius = 1.f / ui->rendering.aoRadius;
 		simulation.rendering.rBoxSize2 = 1.f / (4.f * ui->rendering.smoothingRadiusInCells * ui->rendering.smoothingRadiusInCells * simulation.gridScale * simulation.gridScale);
+
+		simulation.rendering.boxSize3 = 8.f * ui->rendering.smoothingRadiusInCells * ui->rendering.smoothingRadiusInCells * ui->rendering.smoothingRadiusInCells * simulation.gridScale * simulation.gridScale * simulation.gridScale;
+		simulation.rendering.rBoxSize3 = 1.f / simulation.rendering.boxSize3;
+		simulation.rendering.rAoBoxSize3 = 0.125f / (simulation.rendering.aoRadius * simulation.rendering.aoRadius * simulation.rendering.aoRadius);
+
 
 
 		simulation.rendering.i_scale = 1.f / world.getComponent<onec::Scale>(entity)->scale;

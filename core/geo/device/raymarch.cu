@@ -10,6 +10,8 @@ namespace geo {
 constexpr int MAX_QUADTREE_LAYER = geo::NUM_QUADTREE_LAYERS - 1;
 constexpr int AIR = CEILING;
 
+constexpr float3 WATER_ABSORPTION{ 0.2f, 0.15f, 0.1f };
+
 struct Ray {
 	glm::vec2 t;
 	glm::vec3 o;
@@ -533,13 +535,12 @@ __device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, c
 // Using the necessary volume change from above as new_volume, we can calculate the safe distance.
 // since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
 // then the required volume Y is 0.5s^3, so the new volume gained is simply |X - (0.5s^3)|
-__device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize) {
+
+__device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize, float rBoxSize2, float boxSize3) {
 	// TODO Precompute boxsize values?
 	const float requiredVolumeGain = glm::abs(volume - targetVolume);
-	const float boxSize2 = boxSize * boxSize;
-	const float boxSize3 = boxSize2 * boxSize;
 	//const float d1 = min_step + factor * requiredVolumeGain * simulation.rendering.rBoxSize2;// / boxSize2;
-	const float d1 = requiredVolumeGain * simulation.rendering.rBoxSize2;
+	const float d1 = requiredVolumeGain * rBoxSize2;
 	//return d1;
 	constexpr float sqrt3 = std::numbers::sqrt3_v<float>;
 	const float d2 = 2.f * boxSize * sqrt3 - sqrt3 * (boxSize + pow(boxSize3 - requiredVolumeGain, 1.f / 3.f));
@@ -752,7 +753,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 					state.exitLevels[currentLevel] = state.T[axis];
 				}
 				// Hit coarse geometry in QuadTree. Move to finer level.
-				ray.t.x = glm::max(ray.t.x, hit.t);
+				//ray.t.x = glm::max(ray.t.x, hit.t);
 				currentLevel--;
 				calculateDDAState(state, ray, currentLevel);
 				hit.hit = false;
@@ -802,7 +803,9 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 
 	int currentLevel = MAX_QUADTREE_LAYER;
 	const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
-	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + bias) * 8.f * radius * radius * radius;
+	const float rBoxSize2 = simulation.rendering.rBoxSize2;
+	const float boxSize3 = simulation.rendering.boxSize3;
+	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + bias) * simulation.rendering.boxSize3;
 
 	if (intersect) {
 		// DDA prep
@@ -845,10 +848,10 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 					hit.hit = true;
 					if constexpr (!Shadow || ForceNormal) {
 						if (volume > targetVolume) {
-							p -= calculateSafeStep(volume, targetVolume, 2.f * radius) * ray.dir;
+							p -= calculateSafeStep(volume, targetVolume, 2.f * radius, rBoxSize2, boxSize3) * ray.dir;
 						}
 						else if (volume < targetVolume) {
-							p += calculateSafeStep(volume, targetVolume, 2.f * radius) * ray.dir;
+							p += calculateSafeStep(volume, targetVolume, 2.f * radius, rBoxSize2, boxSize3) * ray.dir;
 						}
 						hit.pos = p;
 						hit.materials = getMaterialVolume(hit.pos, radius, simulation.rendering.smoothingRadiusInCells);
@@ -889,7 +892,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 					state.exitLevels[currentLevel] = state.T[axis];
 				}
 				// Hit coarse geometry in QuadTree. Move to finer level.
-				ray.t.x = glm::max(ray.t.x, hit.t);
+				//ray.t.x = glm::max(ray.t.x, hit.t);
 				currentLevel--;
 				if (currentLevel >= 0) calculateDDAState(state, ray, currentLevel);
 				hit.hit = false;
@@ -914,7 +917,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 			}
 
 			if (currentLevel < 0) {
-				const float step = calculateSafeStep(hit.t, targetVolume, 2.f * radius);
+				const float step = calculateSafeStep(hit.t, targetVolume, 2.f * radius, rBoxSize2, boxSize3);
 				ray.t.x += step;
 				if (ray.t.y < ray.t.x) break;
 				if constexpr (std::is_same_v<State, DDAMissState>) {
@@ -971,10 +974,8 @@ __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& dire
 	}
 	else {
 		rHit = traceRaySmooth<State, true, WaterMode, false, SoftShadows>(ray, bias);
-		const float radius = simulation.rendering.smoothingRadiusInCells * simulation.gridScale;
 		if (SoftShadows) {
-			const float targetVolume = 8.f * radius * radius * radius;
-			shadow = /*rHit.hit ? 0.f :*/ glm::clamp(rHit.min_volume_diff / targetVolume, 0.f, 1.f);
+			shadow = /*rHit.hit ? 0.f :*/ glm::clamp(rHit.min_volume_diff * simulation.rendering.rBoxSize3, 0.f, 1.f);
 		}
 		else {
 			shadow = !rHit.hit;
@@ -1045,10 +1046,8 @@ __device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const 
 	float sAo = 1.f;
 	if (ao && ambient_weight > 0.f) {
 		const float radius = simulation.rendering.aoRadius;
-		const float iRadius = simulation.rendering.iAoRadius;
 		const float radiusG = radius * simulation.rGridScale;
-		const float iTargetVolume = 0.125f * iRadius * iRadius * iRadius;
-		const float volumePercent = 1.f - iTargetVolume * getVolume<true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG);
+		const float volumePercent = 1.f - simulation.rendering.rAoBoxSize3 * getVolume<true>(simulation.rendering.gridOffset + hit.pos + radius * hit.normal, radius, radiusG);
 		
 		sAo = volumePercent * volumePercent;
 	}
@@ -1109,7 +1108,7 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, bool weight
 		hit.materials.z = glm::min(hit.materials.z, 1.f);
 
 		brdf.F0 = glm::mix((WaterMode ? 0.009f : 0.04f), 0.02f, hit.hit_air ? 1.f : hit.materials.z);
-		brdf.roughness = 1.f - (WaterMode && !hit.hit_air ? 0.f : 0.95f * glm::pow(hit.materials.z, 0.25f));
+		brdf.roughness = 1.f - (WaterMode && !hit.hit_air ? 0.f : 0.95f * hit.materials.z);
 		auto F = hit.hit_air ? fresnelSchlickRoughness<WaterMode>(brdf.NdotV, brdf.F0, brdf.roughness) : fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
 		brdf.Fr = F.x;
 		brdf.F = F.y;
@@ -1326,12 +1325,8 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 					Ray uRay{ createRay(rHit.pos + 0.1f * glm::vec3(0.f,1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(rHit.pos.x) * 0.01f, 1.f, -glm::sign(rHit.pos.z) * 0.01f)))};
 					SmoothHit uHit{ traceRaySmooth<State, false, true>(uRay, 0.0f) };
 
-					// Todo: estimate actual water depth by shooting ray upward of rHit, instead of this hack
-					const float depthFactor1 = glm::exp(-(uHit.hit_air ? uHit.t : FLT_MAX) * 0.02f);
-					const float depthFactor2 = glm::exp(-(uHit.hit_air ? uHit.t : FLT_MAX) * 0.05f);
-
-					refraction = depthFactor1 * glm::mix(simulation.rendering.materialColors[WATER] * refraction, refraction, depthFactor2);
-					refraction = glm::mix(glm::vec3(0.f), refraction, glm::exp(-rHit.t * 0.02f));
+					const float d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
+					refraction *= glm::exp(d * glm::cuda_cast(WATER_ABSORPTION));
 				}
 			}
 			col = col + hit.materials.z * ((1.f - brdf.F) * refraction + brdf.F * reflection);
@@ -1381,7 +1376,9 @@ __global__ void raymarchSmoothKernel() {
 			const glm::vec3 roGrid = glm::vec3(ro.x - bmin.x, ro.y, ro.z - bmin.z);
 
 			const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
-			const float targetVolume = simulation.rendering.surfaceVolumePercentage * 8.f * radius * radius * radius;
+			const float rBoxSize2 = simulation.rendering.rBoxSize2;
+			const float boxSize3 = simulation.rendering.boxSize3;
+			const float targetVolume = simulation.rendering.surfaceVolumePercentage * simulation.rendering.boxSize3;
 
 			// raymarching with box-filter for implicit surface
 			while (t.x <= t.y) {
@@ -1404,7 +1401,7 @@ __global__ void raymarchSmoothKernel() {
 				}
 
 
-				const float step = calculateSafeStep(volume, targetVolume, 2.f * radius);
+				const float step = calculateSafeStep(volume, targetVolume, 2.f * radius, rBoxSize2, boxSize3);
 				t.x += step;
 			}
 		}
