@@ -1290,43 +1290,55 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		else if (!hit.hit_air) {
 			PbrBRDF brdf{ getBRDF(ray, hit, true) };
 
-			glm::vec3 reflection = glm::vec3(0.f);
-			if (hit.materials.z > 0.f) {
+			glm::vec3 reflection = hit.materials.z > 0.f ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
+			if (simulation.rendering.enableReflections && hit.materials.z > 0.f) {
 				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 				Ray rRay{ createRay(hit.pos, rDir) };
 				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
-				reflection = simulation.rendering.materialColors[AIR];
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true, 0.02f, 1.f - rHit.materials.z);
+					reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
 					reflection += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
-			glm::vec3 refraction = glm::vec3(0.f);
+			const bool refractionsEnabled = simulation.rendering.enableRefraction && hit.materials.z > 0.0f;
+			glm::vec3 refraction = refractionsEnabled  ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
 
-			col = shadePbrBRDF<State, SmoothHit, false, true>(brdf, ray, hit, true, true, 0.01f, 1.f - hit.materials.z);
+			if (!simulation.rendering.enableRefraction) {
+				brdf.diffuseReflectance += hit.materials.z * simulation.rendering.materialColors[WATER];
+			}
 
-			if (hit.materials.z > 0.0f) {
+			if(simulation.rendering.enableSoftShadows)
+				col = shadePbrBRDF<State, SmoothHit, false, true>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, 1.f - hit.materials.z);
+			else
+				col = shadePbrBRDF<State, SmoothHit, false, false>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, 1.f - hit.materials.z);
+
+			if (refractionsEnabled) {
 				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
 				Ray rRay{ createRay(hit.pos, rDir) };
 
 				SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay, 0.01f) };
-				refraction = simulation.rendering.materialColors[AIR];
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF<SmoothHit, true>(rRay, rHit, false, hit.normal) };
 
 					// Secondary reflections simply sample background
-					refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.02f, 1.f - rHit.materials.z);
+					refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
+					
 					if (rHit.hit_air) refraction += rHit.materials.z * (1.f - rBrdf.F) * simulation.rendering.materialColors[AIR];
 
-					Ray uRay{ createRay(rHit.pos + 0.1f * glm::vec3(0.f,1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(rHit.pos.x) * 0.01f, 1.f, -glm::sign(rHit.pos.z) * 0.01f)))};
-					SmoothHit uHit{ traceRaySmooth<State, false, true>(uRay, 0.0f) };
+					if (simulation.rendering.enableWaterAbsorption) {
+						float d = -2.f * rHit.t;
+						if (!simulation.rendering.useCheapAbsorption) {
+							Ray uRay{ createRay(rHit.pos + 0.1f * glm::vec3(0.f,1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(rHit.pos.x) * 0.01f, 1.f, -glm::sign(rHit.pos.z) * 0.01f))) };
+							SmoothHit uHit{ traceRaySmooth<State, false, true>(uRay, 0.0f) };
 
-					const float d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
-					refraction *= glm::exp(d * glm::cuda_cast(WATER_ABSORPTION));
+							d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
+						}
+						refraction *= glm::exp(d * glm::cuda_cast(WATER_ABSORPTION));
+					}
 				}
 			}
 			col = col + hit.materials.z * ((1.f - brdf.F) * refraction + brdf.F * reflection);

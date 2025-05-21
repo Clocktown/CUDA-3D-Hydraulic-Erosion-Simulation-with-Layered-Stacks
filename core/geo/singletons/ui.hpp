@@ -41,6 +41,19 @@ struct UI
 		int missCount{ 8 };
 		int fineMissCount{ 16 };
 		int debugLayer{ -2 };
+
+		bool enableWaterAbsorption{ true };
+		bool useCheapAbsorption{ false };
+		bool enableReflections{ true };
+		bool enableRefraction{ true };
+		bool enableShadows{ true };
+		bool enableSoftShadows{ true };
+		bool fixLightLeaks{ false };
+		bool enableAO{ true };
+		bool enableShadowsInReflection{ true };
+		bool enableShadowsInRefraction{ true };
+		bool enableAOInReflection{ true };
+		bool enableAOInRefraction{ true };
 	} rendering;
 
 	performance performance{};

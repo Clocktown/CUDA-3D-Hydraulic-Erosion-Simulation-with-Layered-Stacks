@@ -158,6 +158,18 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rendering.rBoxSize3 = 1.f / simulation.rendering.boxSize3;
 		simulation.rendering.rAoBoxSize3 = 0.125f / (simulation.rendering.aoRadius * simulation.rendering.aoRadius * simulation.rendering.aoRadius);
 
+		simulation.rendering.enableWaterAbsorption = ui->rendering.enableWaterAbsorption;
+		simulation.rendering.useCheapAbsorption = ui->rendering.useCheapAbsorption;
+		simulation.rendering.enableReflections = ui->rendering.enableReflections;
+		simulation.rendering.enableRefraction = ui->rendering.enableRefraction;
+		simulation.rendering.enableShadows = ui->rendering.enableShadows;
+		simulation.rendering.enableSoftShadows = ui->rendering.enableShadows && ui->rendering.enableSoftShadows;
+		simulation.rendering.fixLightLeaks = ui->rendering.fixLightLeaks;
+		simulation.rendering.enableAO = ui->rendering.enableAO;
+		simulation.rendering.enableShadowsInReflection = ui->rendering.enableShadows && ui->rendering.enableShadowsInReflection;
+		simulation.rendering.enableShadowsInRefraction = ui->rendering.enableShadows && ui->rendering.enableShadowsInRefraction;
+		simulation.rendering.enableAOInReflection = ui->rendering.enableAO && ui->rendering.enableAOInReflection;
+		simulation.rendering.enableAOInRefraction = ui->rendering.enableAO && ui->rendering.enableAOInRefraction;
 
 
 		simulation.rendering.i_scale = 1.f / world.getComponent<onec::Scale>(entity)->scale;

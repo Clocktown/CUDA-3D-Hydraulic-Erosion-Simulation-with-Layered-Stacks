@@ -81,6 +81,19 @@ struct Rendering {
 	float rBoxSize3;
 	float rAoBoxSize3;
 
+	bool enableWaterAbsorption;
+	bool useCheapAbsorption;
+	bool enableReflections;
+	bool enableRefraction;
+	bool enableShadows;
+	bool enableSoftShadows;
+	bool fixLightLeaks;
+	bool enableAO;
+	bool enableShadowsInReflection;
+	bool enableShadowsInRefraction;
+	bool enableAOInReflection;
+	bool enableAOInRefraction;
+
 	onec::RenderPipelineUniforms* uniforms;
 };
 
