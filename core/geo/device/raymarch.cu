@@ -412,7 +412,7 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 	}
 }
 
-template <class State, class Hit, bool Shadow = false, bool WaterMode = false, bool SoftShadows = false>
+template <class State, class Hit, bool Shadow = false, bool WaterMode = false>
 __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, Hit& hit, int currentLevel) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
 	const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
@@ -425,14 +425,14 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 	int layer{ 0 };
 	for (; layer < layerCount; ++layer, flatIndex += simulation.quadTree[currentLevel].layerStride)
 	{
-		auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
-		if constexpr (Shadow && SoftShadows) {
+		const auto terrainHeights = glm::cuda_cast(simulation.quadTree[currentLevel].heights[flatIndex]);
+		/*if constexpr (Shadow && SoftShadows) {
 			const float radius = simulation.rendering.smoothingRadiusInCells * simulation.gridScale;
 			terrainHeights[QFULLHEIGHT] += radius;
 			terrainHeights[QCEILING] -= radius;
 			terrainHeights[QSOLIDHEIGHT] += radius;
 			terrainHeights[QAIR] -= radius;
-		}
+		}*/
 		const float totalTerrainHeight = terrainHeights[WaterMode ? QSOLIDHEIGHT : QFULLHEIGHT];
 
 		glm::vec2 tempT;
@@ -882,7 +882,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 				hit.t = volume; // Remember volume for step
 			}
 			else {
-				intersectQuadTreeColumns<State, SmoothHit, Shadow, WaterMode, SoftShadows>(state, ray, hit, currentLevel);
+				intersectQuadTreeColumns<State, SmoothHit, Shadow, WaterMode>(state, ray, hit, currentLevel);
 			}
 
 			if (hit.hit && (currentLevel >= 0)) {
@@ -1442,6 +1442,52 @@ __device__ __forceinline__ Neighbor getNeighbor(const glm::ivec2& index, const g
 	return neigh;
 }
 
+__device__ __forceinline__ void mergeQuadTreeLayer(int treeLevel, int layerCount, int flatIndex) {
+	if (layerCount > 1) {
+		bool merge = false;
+		int merge_layer = layerCount - 1;
+		int write_offset = 0;
+		glm::vec4 currHeights;
+		for (int layer{ 0 }; layer < layerCount; ++layer) {
+			currHeights = glm::cuda_cast(simulation.quadTree[treeLevel].heights[flatIndex + layer * simulation.quadTree[treeLevel].layerStride]);
+			// 3 Intervals we care about: [CEILING - 1, FULLHEIGHT], [CEILING - 1, SOLIDHEIGHT], [AIR - 1, SOLIDHEIGHT]
+			// SOLIDHEIGHT <= FULLHEIGHT
+			// AIR <= CEILING
+			// AIR <= FULLHEIGHT
+
+			if (currHeights[QCEILING] <= currHeights[QSOLIDHEIGHT]) {
+				// All 3 Intervals have overlap in this case, so we merge => set all values to values in above column
+				if (!merge) {
+					// First mergepoint found, remember layer
+					merge_layer = layer;
+					merge = true;
+				} // else, no need to do anything, we are merging multiple layers consecutively
+				write_offset++;
+			}
+			else {
+				if (merge) {
+					printf("[Tree %i] Commiting merge to layer %i from layer %i\n", treeLevel, merge_layer, layer);
+					// Commit the merge
+					simulation.quadTree[treeLevel].heights[flatIndex + merge_layer * simulation.quadTree[treeLevel].layerStride] = glm::cuda_cast(currHeights);
+					merge = false;
+				}
+				else if (write_offset > 0) {
+					simulation.quadTree[treeLevel].heights[flatIndex + (layer - write_offset) * simulation.quadTree[treeLevel].layerStride] = glm::cuda_cast(currHeights);
+				}
+			}
+		}
+		simulation.quadTree[treeLevel].layerCounts[flatIndex] = glm::max(layerCount - write_offset, 1);
+		if (merge) {
+			printf("[Tree %i] Uncommited merge\n", treeLevel);
+			// Uncommited merge - should never happen if the basic datastructure rules aren't compromised somehow
+			simulation.quadTree[treeLevel].heights[flatIndex + merge_layer * simulation.quadTree[treeLevel].layerStride] = glm::cuda_cast(currHeights);
+		}
+	}
+	else {
+		simulation.quadTree[treeLevel].layerCounts[flatIndex] = layerCount;
+	}
+}
+
 __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 	const glm::ivec2 index{ getLaunchIndex() };
 
@@ -1453,20 +1499,23 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 	int flatIndex{ flattenIndex(index, simulation.quadTree[0].gridSize) };
 	int maxOLayers = 0;
 
-	Neighbor neighbors[4];
+	Neighbor neighbors[4]; // cache the 2x2 neighbors, the larger neighborhood is dynamic so not cached
 
-	for (int y = 0; y <= 1; ++y) {
-		for (int x = 0; x <= 1; ++x) {
+	int indexRadius = interpolation ? glm::ceil(simulation.rendering.smoothingRadiusInCells) : 0.f;
+	float radius = interpolation ? simulation.gridScale * simulation.rendering.smoothingRadiusInCells : 0.f;
+
+	for (int y = 0 - indexRadius; y <= 1 + indexRadius; ++y) {
+		for (int x = 0 - indexRadius; x <= 1 + indexRadius; ++x) {
 			const int oIndex = 2 * y + x;
+			const bool validIndex = interpolation ? (y >= 0 && x >= 0 && y <= 1 && x <= 1) : true;
+			const auto neigh = getNeighbor(index, glm::ivec2(x, y));
+			if (validIndex) neighbors[oIndex] = neigh;
 			
-			neighbors[oIndex] = getNeighbor(index, glm::ivec2(x, y));
-			
-			maxOLayers = glm::max(maxOLayers, neighbors[oIndex].layerCount);
+			maxOLayers = glm::max(maxOLayers, neigh.layerCount);
 		}
 	}
 	const char layerCount = glm::min(simulation.quadTree[0].maxLayerCount, maxOLayers);
 
-	int indexRadius = interpolation ? glm::ceil(simulation.rendering.smoothingRadiusInCells) : 0.f;
 
 	glm::vec4 heights;
 	// Merge layer by layer, bottom to top
@@ -1485,16 +1534,14 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 				// TODO: pad heights with smoothing radius? (splitting fullHeight to one padded up, one padded down as planned)
 				const float solidHeight = oTerrainHeights[BEDROCK] + oTerrainHeights[SAND];
 				const float fullHeight = solidHeight + oTerrainHeights[WATER];
-				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight);
-				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING]);
-				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight);
-				heights[QAIR] = glm::min(heights[QAIR], fullHeight);
+				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight + radius) ;
+				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING] - radius);
+				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight + radius);
+				heights[QAIR] = glm::min(heights[QAIR], fullHeight - radius);
 			}
 		}
 		simulation.quadTree[0].heights[flatIndex + simulation.quadTree[0].layerStride * layer] = glm::cuda_cast(heights);
 	}
-
-	simulation.quadTree[0].layerCounts[flatIndex] = layerCount;
 
 	// Merge remaining columns into topmost column
 	for (int layer{ simulation.quadTree[0].maxLayerCount - 1 }; layer < maxOLayers; ++layer) {
@@ -1512,10 +1559,10 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 				// TODO: pad heights with smoothing radius? (splitting fullHeight to one padded up, one padded down as planned)
 				const float solidHeight = oTerrainHeights[BEDROCK] + oTerrainHeights[SAND];
 				const float fullHeight = solidHeight + oTerrainHeights[WATER];
-				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight);
-				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING]);
-				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight);
-				heights[QAIR] = glm::min(heights[QAIR], fullHeight);
+				heights[QFULLHEIGHT] = glm::max(heights[QFULLHEIGHT], fullHeight + radius);
+				heights[QCEILING] = glm::min(heights[QCEILING], oTerrainHeights[CEILING] - radius);
+				heights[QSOLIDHEIGHT] = glm::max(heights[QSOLIDHEIGHT], solidHeight + radius);
+				heights[QAIR] = glm::min(heights[QAIR], fullHeight - radius);
 			}
 		}
 	}
@@ -1523,7 +1570,8 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 	if (maxOLayers > layerCount) {
 		simulation.quadTree[0].heights[flatIndex + simulation.quadTree[0].layerStride * (layerCount - 1)] = glm::cuda_cast(heights);
 	}
-	// TODO: Compact tree (merge overlapping columns)
+	// Compact tree (merge overlapping columns)
+	mergeQuadTreeLayer(0, layerCount, flatIndex);
 }
 
 __global__ void buildQuadTreeLayer(int i) {
@@ -1584,7 +1632,6 @@ __global__ void buildQuadTreeLayer(int i) {
 		}
 		simulation.quadTree[i].heights[flatIndex + simulation.quadTree[i].layerStride * layer] = glm::cuda_cast(heights);
 	}
-	simulation.quadTree[i].layerCounts[flatIndex] = layerCount;
 
 	// Merge remaining columns into topmost column
 	for (int layer{ simulation.quadTree[i].maxLayerCount - 1 }; layer < maxOLayers; ++layer) {
@@ -1609,7 +1656,8 @@ __global__ void buildQuadTreeLayer(int i) {
 	if (maxOLayers > layerCount) {
 		simulation.quadTree[i].heights[flatIndex + simulation.quadTree[i].layerStride * (layerCount - 1)] = glm::cuda_cast(heights);
 	}
-	// TODO: Compact tree (merge overlapping columns)
+	// Compact tree (merge overlapping columns)
+	mergeQuadTreeLayer(i, layerCount, flatIndex);
 }
 
 __device__ __forceinline__ float GeometrySchlickGGXIBL(float NdotV, float roughness)
