@@ -158,6 +158,11 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.rendering.rBoxSize3 = 1.f / simulation.rendering.boxSize3;
 		simulation.rendering.rAoBoxSize3 = 0.125f / (simulation.rendering.aoRadius * simulation.rendering.aoRadius * simulation.rendering.aoRadius);
 
+		simulation.rendering.softShadowScale = ui->rendering.softShadowScale;
+		simulation.rendering.maxSoftShadowDiv = ui->rendering.maxSoftShadowDiv;
+
+		simulation.rendering.accurateNormals = ui->rendering.accurateNormals;
+		simulation.rendering.useExpensiveNormals = ui->rendering.useExpensiveNormals;
 		simulation.rendering.enableWaterAbsorption = ui->rendering.enableWaterAbsorption;
 		simulation.rendering.useCheapAbsorption = ui->rendering.useCheapAbsorption;
 		simulation.rendering.enableReflections = ui->rendering.enableReflections;

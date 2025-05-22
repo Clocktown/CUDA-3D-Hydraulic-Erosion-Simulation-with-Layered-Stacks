@@ -81,6 +81,11 @@ struct Rendering {
 	float rBoxSize3;
 	float rAoBoxSize3;
 
+	float softShadowScale;
+	float maxSoftShadowDiv;
+
+	bool accurateNormals;
+	bool useExpensiveNormals;
 	bool enableWaterAbsorption;
 	bool useCheapAbsorption;
 	bool enableReflections;

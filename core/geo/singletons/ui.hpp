@@ -42,6 +42,11 @@ struct UI
 		int fineMissCount{ 16 };
 		int debugLayer{ -2 };
 
+		float softShadowScale{ 0.01f };
+		float maxSoftShadowDiv{ 0.4f };
+
+		bool accurateNormals{ false };
+		bool useExpensiveNormals{ false };
 		bool enableWaterAbsorption{ true };
 		bool useCheapAbsorption{ false };
 		bool enableReflections{ true };

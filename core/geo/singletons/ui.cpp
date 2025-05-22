@@ -561,36 +561,46 @@ void UI::updateRendering()
 		}
 
 		if (ImGui::TreeNode("Raymarching Quality")) {
-			ImGui::Checkbox("Water Absorption", &rendering.enableWaterAbsorption);
-			ImGui::BeginDisabled(!rendering.enableWaterAbsorption);
-			ImGui::Checkbox("Use Cheap Absorption", &rendering.useCheapAbsorption);
-			ImGui::EndDisabled();
-			ImGui::Checkbox("Enable Reflections", &rendering.enableReflections);
-			ImGui::Checkbox("Enable Refractions", &rendering.enableRefraction);
-			ImGui::Checkbox("Enable Shadows", &rendering.enableShadows);
-			ImGui::BeginDisabled(!rendering.enableShadows);
-			ImGui::Checkbox("Enable Shadows in Reflection", &rendering.enableShadowsInReflection);
-			ImGui::Checkbox("Enable Shadows in Refraction", &rendering.enableShadowsInRefraction);
-			ImGui::Checkbox("Enable Soft Shadows", &rendering.enableSoftShadows);
-			ImGui::BeginDisabled(!rendering.enableSoftShadows);
-			ImGui::Checkbox("Fix Light Leaks", &rendering.fixLightLeaks);
-			ImGui::EndDisabled();
-			ImGui::EndDisabled();
-			ImGui::Checkbox("Enable AO", &rendering.enableAO);
-			ImGui::BeginDisabled(!rendering.enableAO);
-			ImGui::Checkbox("Enable AO in Reflection", &rendering.enableAOInReflection);
-			ImGui::Checkbox("Enable AO in Refraction", &rendering.enableAOInRefraction);
-			ImGui::EndDisabled();
+			if (ImGui::TreeNode("Params")) {
+				ImGui::DragFloat("Volume Percentage", &rendering.surfaceVolumePercentage, 0.01f, 0.5f, 1.f);
+				if (ImGui::DragFloat("Smoothing Radius [cells]", &rendering.smoothingRadiusInCells, 0.01f, 0.1f, 2.f)) {
+					terrain.quadTreeDirty = true;
+				}
+				ImGui::DragFloat("Normal Smoothing Factor", &rendering.normalSmoothingFactor, 0.01f, 1.f, 4.f);
+				ImGui::DragFloat("AO Radius", &rendering.aoRadius, 0.01f, 0.01f, 3.f);
+				ImGui::DragFloat("Soft Shadow Scale", &rendering.softShadowScale, 0.001f, 0.001f, 1.f);
+				ImGui::DragFloat("Max Soft Shadow Div", &rendering.maxSoftShadowDiv, 0.01f, 0.01f, 1.f);
+				ImGui::TreePop();
+			}
+			if (ImGui::TreeNode("Toggles")) {
+				ImGui::Checkbox("Expensive Normals (central diff)", &rendering.useExpensiveNormals);
+				ImGui::Checkbox("Accurate Normals (half-offset)", &rendering.accurateNormals);
+				ImGui::Checkbox("Water Absorption", &rendering.enableWaterAbsorption);
+				ImGui::BeginDisabled(!rendering.enableWaterAbsorption);
+				ImGui::Checkbox("Use Cheap Absorption", &rendering.useCheapAbsorption);
+				ImGui::EndDisabled();
+				ImGui::Checkbox("Enable Reflections", &rendering.enableReflections);
+				ImGui::Checkbox("Enable Refractions", &rendering.enableRefraction);
+				ImGui::Checkbox("Enable Shadows", &rendering.enableShadows);
+				ImGui::BeginDisabled(!rendering.enableShadows);
+				ImGui::Checkbox("Enable Shadows in Reflection", &rendering.enableShadowsInReflection);
+				ImGui::Checkbox("Enable Shadows in Refraction", &rendering.enableShadowsInRefraction);
+				ImGui::Checkbox("Enable Soft Shadows", &rendering.enableSoftShadows);
+				ImGui::BeginDisabled(!rendering.enableSoftShadows);
+				ImGui::Checkbox("Fix Light Leaks", &rendering.fixLightLeaks);
+				ImGui::EndDisabled();
+				ImGui::EndDisabled();
+				ImGui::Checkbox("Enable AO", &rendering.enableAO);
+				ImGui::BeginDisabled(!rendering.enableAO);
+				ImGui::Checkbox("Enable AO in Reflection", &rendering.enableAOInReflection);
+				ImGui::Checkbox("Enable AO in Refraction", &rendering.enableAOInRefraction);
+				ImGui::EndDisabled();
+				ImGui::TreePop();
+			}
 			ImGui::TreePop();
 		}
 
 		if (ImGui::TreeNode("Raymarching Details")) {
-			ImGui::DragFloat("Volume Percentage", &rendering.surfaceVolumePercentage, 0.01f, 0.5f, 1.f);
-			if (ImGui::DragFloat("Smoothing Radius [cells]", &rendering.smoothingRadiusInCells, 0.01f, 0.1f, 2.f)) {
-				terrain.quadTreeDirty = true;
-			}
-			ImGui::DragFloat("Normal Smoothing Factor", &rendering.normalSmoothingFactor, 0.01f, 1.f, 4.f);
-			ImGui::DragFloat("AO Radius", &rendering.aoRadius, 0.01f, 0.01f, 3.f);
 			ImGui::DragInt("Miss Count", &rendering.missCount, 0.1f, 0, 20);
 			ImGui::DragInt("Fine Miss Count", &rendering.fineMissCount, 0.1f, 1, 50);
 			ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -2, geo::NUM_QUADTREE_LAYERS - 1);
