@@ -1320,6 +1320,17 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 					// Secondary reflections simply sample background
 					reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
 					if (rHit.hit_air) reflection += rHit.materials.z * simulation.rendering.materialColors[AIR];
+
+					if (simulation.rendering.enableWaterAbsorption) {
+						float d = -2.f * rHit.t;
+						if (!simulation.rendering.useCheapAbsorption) {
+							Ray uRay{ createRay(rHit.pos + 0.1f * glm::vec3(0.f,1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(rHit.pos.x) * 0.01f, 1.f, -glm::sign(rHit.pos.z) * 0.01f))) };
+							SmoothHit uHit{ traceRaySmooth<State, false, true>(uRay, 0.0f) };
+
+							d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
+						}
+					reflection *= glm::exp(d * 0.5f * glm::cuda_cast(WATER_ABSORPTION));
+				}
 				}
 			}
 			glm::vec3 refraction = hit.hit_air ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
@@ -1346,6 +1357,16 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 				}
 			}
 			col = col + hit.materials.z * ((1.f - brdf.F) * refraction + brdf.F * reflection);
+			if (simulation.rendering.enableWaterAbsorption) {
+				float d = -2.f * hit.t;
+				if (!simulation.rendering.useCheapAbsorption) {
+					Ray uRay{ createRay(hit.pos + 0.1f * glm::vec3(0.f, 1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(hit.pos.x) * 0.01f, 1.f, -glm::sign(hit.pos.z) * 0.01f))) };
+					SmoothHit uHit{ traceRaySmooth<State, false, true>(uRay, 0.0f) };
+
+					d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : hit.t) : 0.f) + hit.t, 2.f * hit.t);
+				}
+				col *= glm::exp(d * 0.5f * glm::cuda_cast(WATER_ABSORPTION));
+			}
 		}
 		else if (!hit.hit_air) {
 			PbrBRDF brdf{ getBRDF(ray, hit, true) };
@@ -1400,7 +1421,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 
 							d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
 						}
-						refraction *= glm::exp(d * glm::cuda_cast(WATER_ABSORPTION));
+						refraction *= glm::exp(d * 0.5f * glm::cuda_cast(WATER_ABSORPTION));
 					}
 				}
 			}
