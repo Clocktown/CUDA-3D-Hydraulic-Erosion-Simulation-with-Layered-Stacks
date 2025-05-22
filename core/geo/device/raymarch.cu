@@ -790,8 +790,13 @@ template <class State, bool Shadow = false, bool WaterMode = false, bool ForceNo
 __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) {
 	ray.o += simulation.rendering.gridOffset;
 
-	const glm::vec3 bmin = glm::vec3(0.f, -2000.f, 0.f);
-	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, 2000.f, 2.f * simulation.rendering.gridOffset.z);
+	// We slightly shrink the AABB to prevent rare outlier rays from massively impacting performance.
+	// These can happen if secondary rays that intersect air are generated at the very border with a bias > 0 with little or no xz component.
+	// Rays like that can be trapped in "void", never intersecting the air due to the small gap introduced by the bias.
+	// Depending on the Y-bounds, performance impact can be very large.
+	const float AABBShrink = 2.f * simulation.rendering.smoothingRadiusInCells * simulation.gridScale * bias;
+	const glm::vec3 bmin = glm::vec3(AABBShrink, -FLT_MAX, AABBShrink);
+	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x - AABBShrink, FLT_MAX, 2.f * simulation.rendering.gridOffset.z - AABBShrink);
 
 	glm::vec2 t;
 	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, t);
@@ -872,9 +877,9 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 							}
 							else {
 								hit.normal = glm::normalize(glm::vec3(
-									getVolume(p - glm::vec3(eO, 0.f, 0.f), e, eG) - getVolume<WaterMode>(p + glm::vec3(eO, 0.f, 0.f), e, eG),
-									getVolume(p - glm::vec3(0.f, eO, 0.f), e, eG) - getVolume<WaterMode>(p + glm::vec3(0.f, eO, 0.f), e, eG),
-									getVolume(p - glm::vec3(0.f, 0.f, eO), e, eG) - getVolume<WaterMode>(p + glm::vec3(0.f, 0.f, eO), e, eG)
+									getVolume<WaterMode>(p - glm::vec3(eO, 0.f, 0.f), e, eG) - getVolume<WaterMode>(p + glm::vec3(eO, 0.f, 0.f), e, eG),
+									getVolume<WaterMode>(p - glm::vec3(0.f, eO, 0.f), e, eG) - getVolume<WaterMode>(p + glm::vec3(0.f, eO, 0.f), e, eG),
+									getVolume<WaterMode>(p - glm::vec3(0.f, 0.f, eO), e, eG) - getVolume<WaterMode>(p + glm::vec3(0.f, 0.f, eO), e, eG)
 								));
 							}
 						}
@@ -945,6 +950,9 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 				}
 			}
 			else {
+				//if (glm::abs(ray.dir.y) == 1.f) {
+				//	break;
+				//}
 				if (advanceDDA(state, ray, currentLevel)) break;
 			}
 
@@ -1293,35 +1301,47 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 		if (waterRay) {
 			PbrBRDF brdf{ getBRDF<SmoothHit,true> (ray, hit) };
 
-			glm::vec3 reflection = glm::vec3(0.f);
-			if (hit.hit_air) {
+			const bool reflectionsEnabled = simulation.rendering.enableReflections && hit.hit_air;
+			glm::vec3 reflection = reflectionsEnabled ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
+			float aoWeight = 1.f - hit.materials.z;
+
+			if (!simulation.rendering.enableReflections && hit.hit_air) {
+				aoWeight = brdf.F;
+				brdf.diffuseReflectance += simulation.rendering.materialColors[WATER];
+			}
+
+			if (reflectionsEnabled) {
 				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 				Ray rRay{ createRay(hit.pos, rDir) };
 				SmoothHit rHit{ traceRaySmooth<State, false, true>(rRay, 0.01f) };
-				reflection = simulation.rendering.materialColors[AIR];
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF<SmoothHit, true>(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, true, true, 0.02f, 1.f - rHit.materials.z);
+					reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
 					if (rHit.hit_air) reflection += rHit.materials.z * simulation.rendering.materialColors[AIR];
 				}
 			}
-			glm::vec3 refraction = glm::vec3(0.f);
+			glm::vec3 refraction = hit.hit_air ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
 
-			col = shadePbrBRDF<State, SmoothHit, true, true>(brdf, ray, hit, true, true, 0.01f, 1.f - hit.materials.z);
+			if(simulation.rendering.enableSoftShadows)
+				if(simulation.rendering.fixLightLeaks)
+					col = shadePbrBRDF<State, SmoothHit, true, true, true>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, aoWeight);
+				else 
+					col = shadePbrBRDF<State, SmoothHit, true, true>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, aoWeight);
+			else
+				col = shadePbrBRDF<State, SmoothHit, true, false>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, aoWeight);
 
-			if (hit.hit_air) {
+			if (simulation.rendering.enableRefraction && hit.hit_air) {
 				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 1.33f));
 				Ray rRay{ createRay(hit.pos, rDir) };
 
 				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
-				refraction = simulation.rendering.materialColors[AIR];
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					refraction = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true, 0.02f, 1.f - rHit.materials.z);
+					refraction = shadePbrBRDF<State>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
 					refraction += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
