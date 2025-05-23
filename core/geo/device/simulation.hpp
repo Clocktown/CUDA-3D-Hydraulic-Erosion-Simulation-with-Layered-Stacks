@@ -178,9 +178,11 @@ struct Simulation
 };
 
 extern __constant__ Simulation simulation;
+extern __constant__ float2 sceneBounds;
 extern __constant__ int2 offsets[4];
 
 void setSimulation(const Simulation& simulation);
+void setSceneBounds(const float2& bounds);
 
 int fillIndices(const Launch& launch, int* atomicCounter, int* indices);
 char getMaxLayerCount(const char* layerCounts, std::ptrdiff_t count);
@@ -196,6 +198,6 @@ void endSupportCheck(const Launch& launch);
 
 void integrateBRDF(const Launch& launch, glm::ivec2 size);
 void raymarchTerrain(const Launch& launch, bool useInterpolation, int missCount = 8, int debugLayer = -2);
-void buildQuadTree(const std::vector<Launch>& launch, bool useInterpolation);
+void buildQuadTree(const std::vector<Launch>& launch, const Simulation& sim, bool useInterpolation);
 }
 }

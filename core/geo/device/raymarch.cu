@@ -4,6 +4,9 @@
 
 #include <cuda_fp16.h>
 
+#include <thrust/execution_policy.h>
+#include <thrust/extrema.h>
+
 namespace geo {
 	namespace device {
 
@@ -724,8 +727,8 @@ template <class State, bool Shadow, bool WaterMode = false, bool ForceNormal = f
 __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	BoxHit hit;
 	ray.o += simulation.rendering.gridOffset;
-	const glm::vec3 bmin = glm::vec3(0.f, -FLT_MAX, 0.f);
-	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, FLT_MAX, 2.f * simulation.rendering.gridOffset.z);
+	const glm::vec3 bmin = glm::vec3(0.f, sceneBounds.x, 0.f);
+	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x, sceneBounds.y, 2.f * simulation.rendering.gridOffset.z);
 
 	glm::vec2 t;
 	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, t);
@@ -822,8 +825,8 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 	// Rays like that can be trapped in "void", never intersecting the air due to the small gap introduced by the bias.
 	// Depending on the Y-bounds, performance impact can be very large.
 	const float AABBShrink = 2.f * simulation.rendering.smoothingRadiusInCells * simulation.gridScale * bias;
-	const glm::vec3 bmin = glm::vec3(AABBShrink, -FLT_MAX, AABBShrink);
-	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x - AABBShrink, FLT_MAX, 2.f * simulation.rendering.gridOffset.z - AABBShrink);
+	const glm::vec3 bmin = glm::vec3(AABBShrink, sceneBounds.x, AABBShrink);
+	const glm::vec3 bmax = glm::vec3(2.f * simulation.rendering.gridOffset.x - AABBShrink, sceneBounds.y, 2.f * simulation.rendering.gridOffset.z - AABBShrink);
 
 	glm::vec2 t;
 	bool intersect = intersection(bmin, bmax, ray.o, ray.i_dir, t);
@@ -1997,13 +2000,42 @@ void integrateBRDF(const Launch& launch, glm::ivec2 size) {
 	CU_CHECK_KERNEL(integrateBRDFKernel << <launch.gridSize, launch.blockSize >> > (size, 1.f / glm::vec2(size)));
 }
 
-void buildQuadTree(const std::vector<Launch>& launch, bool useInterpolation) {
+struct QuadTreeLowerBoundPredicate {
+	__host__ __device__
+    bool operator()(const float4& a, const float4& b) const
+    {
+        return a.z < b.z;
+    }
+};
+
+struct QuadTreeUpperBoundPredicate {
+	__host__ __device__
+    bool operator()(const float4& a, const float4& b) const
+    {
+        return a.x < b.x;
+    }
+};
+
+void buildQuadTree(const std::vector<Launch>& launch, const Simulation& sim, bool useInterpolation) {
 	// first layer (special)
 	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > (useInterpolation));
 	// remaining layers
 	for (int i = 1; i < launch.size(); ++i) {
 		CU_CHECK_KERNEL(buildQuadTreeLayer << <launch[i].gridSize, launch[i].blockSize >> > (i));
 	}
+	const auto& lastLevel = sim.quadTree[launch.size() - 1];
+	const auto minEle = thrust::min_element(thrust::device, lastLevel.heights, lastLevel.heights + (lastLevel.layerStride * lastLevel.maxLayerCount), QuadTreeLowerBoundPredicate());
+	const auto maxEle = thrust::max_element(thrust::device, lastLevel.heights, lastLevel.heights + (lastLevel.layerStride * lastLevel.maxLayerCount), QuadTreeUpperBoundPredicate());
+
+	float4 minVal, maxVal;
+	cudaMemcpy(&minVal, minEle, sizeof(float4), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&maxVal, maxEle, sizeof(float4), cudaMemcpyDeviceToHost);
+
+	float2 bounds{ glm::min(minVal.z, minVal.w), maxVal.x };
+
+	bounds = { bounds.x - glm::max(50.f, 0.5f * (bounds.y - bounds.x)), bounds.y + 10.f };
+
+	setSceneBounds(bounds);
 }
 
 void raymarchTerrain(const Launch& launch, bool useInterpolation, int missCount, int debugLayer) {
