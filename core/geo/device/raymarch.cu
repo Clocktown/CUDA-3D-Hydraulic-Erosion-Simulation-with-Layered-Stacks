@@ -368,7 +368,7 @@ __device__ __forceinline__ void intersectColumnsAny(const State& state, const Ra
 	}
 }
 
-template <class State, bool WaterMode = false>
+template <class State, bool Shadow = false, bool WaterMode = false>
 // Intersects with Air but not Water in WaterMode
 __device__ __forceinline__ void intersectColumns(const State& state, const Ray& ray, BoxHit& hit) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
@@ -391,15 +391,15 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 			hit.boxHeights = glm::vec2(floor, totalTerrainHeight);
 			hit.t = tempT.x;
 			const float height = ray.o.y + hit.t * ray.dir.y;
-			hit.material = WaterMode ? AIR : WATER;
+			hit.material = WaterMode ? (Shadow ? SAND : AIR) : WATER;
 			for (int i = SAND; i >= BEDROCK; --i) {
 				if (height <= terrainHeights[i] + bigEpsilon) hit.material = i;
 			}
 		}
 
-		floor = terrainHeights[WaterMode ? WATER : CEILING];
+		floor = terrainHeights[(WaterMode && !Shadow) ? WATER : CEILING];
 	}
-	if constexpr (WaterMode) {
+	if constexpr (!Shadow && WaterMode) {
 		glm::vec2 tempT;
 		bool intersect = intersection(glm::vec3(state.bmin2D.x, floor, state.bmin2D.y), glm::vec3(state.bmax2D.x, FLT_MAX, state.bmax2D.y), ray.o, ray.i_dir, tempT);
 		if (intersect && tempT.x < hit.t) {
@@ -459,15 +459,15 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 	}
 }
 
-template <class State, bool WaterMode = false>
+template <class State, bool Shadow = false, bool WaterMode = false>
 __device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	if (currentLevel < 0) {
 		// Terrain column intersection
-		intersectColumns<State, WaterMode>(state, ray, hit);
+		intersectColumns<State, Shadow, WaterMode>(state, ray, hit);
 	}
 	else {
 		// QuadTree Column Intersection
-		intersectQuadTreeColumns<State, BoxHit, false, WaterMode>(state, ray, hit, currentLevel);
+		intersectQuadTreeColumns<State, BoxHit, Shadow, WaterMode>(state, ray, hit, currentLevel);
 	}
 }
 
@@ -519,6 +519,24 @@ __device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, c
 		hit.normal.y = (diffMin.y < diffMax.y) ? -1.0f : 1.0f;
 	} else {
 		hit.normal.z = (diffMin.z < diffMax.z) ? -1.0f : 1.0f;
+	}
+}
+
+__device__ __forceinline__ void resolveBoxHitOOB(BoxHit& hit, const Ray& ray) {
+	hit.pos = ray.o + hit.t * ray.dir;
+	glm::vec3 bmin = glm::vec3(0.f, hit.boxHeights.x, 0.f);
+	glm::vec3 bmax = glm::vec3(simulation.gridScale * simulation.gridSize.x, hit.boxHeights.y, simulation.gridScale * simulation.gridSize.y);
+	glm::vec3 diffMin = glm::abs(hit.pos - bmin);
+	glm::vec3 diffMax = glm::abs(hit.pos - bmax);
+	glm::vec3 distances = glm::min(glm::abs(diffMin), glm::abs(diffMax));
+
+	// Determine the closest face based on the minimum distance
+	if (distances.x <= distances.y && distances.x <= distances.z) {
+		hit.normal.x = (diffMin.x < diffMax.x) ? 1.0f : -1.0f;
+	} else if (distances.y <= distances.x && distances.y <= distances.z) {
+		hit.normal.y = (diffMin.y < diffMax.y) ? 1.0f : -1.0f;
+	} else {
+		hit.normal.z = (diffMin.z < diffMax.z) ? 1.0f : -1.0f;
 	}
 }
 
@@ -702,7 +720,7 @@ __device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const
 	return glm::vec3(i_sum2 * volume.x, i_sum2 * volume.y, i_sum * volume.z);
 }
 
-template <class State, bool Shadow, bool WaterMode = false>
+template <class State, bool Shadow, bool WaterMode = false, bool ForceNormal = false>
 __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	BoxHit hit;
 	ray.o += simulation.rendering.gridOffset;
@@ -734,16 +752,16 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 			}
 
 			hit.t = FLT_MAX;
-			if constexpr (Shadow) {
+			if constexpr (Shadow && !ForceNormal) {
 				intersectSceneAsBoxesAny<State, WaterMode>(state, ray, hit, currentLevel);
 			}
 			else {
-				intersectSceneAsBoxes<State, WaterMode>(state, ray, hit, currentLevel);
+				intersectSceneAsBoxes<State, Shadow, WaterMode>(state, ray, hit, currentLevel);
 			}
 
 			if (hit.hit && (currentLevel < 0)) {
 				// Hit actual terrain geometry
-				if constexpr (!Shadow) resolveBoxHit(hit, state, ray);
+				if constexpr (!Shadow || ForceNormal) resolveBoxHit(hit, state, ray);
 				break;
 			}
 			else if (hit.hit) {
@@ -778,6 +796,15 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 			}
 				
 			if (advanceDDA(state, ray, currentLevel)) break;
+		}
+		if constexpr (!Shadow || ForceNormal) {
+			if (!hit.hit) {
+				hit.material = AIR;
+				hit.t = ray.t.y;
+				hit.boxHeights = { -FLT_MAX, FLT_MAX };
+				hit.hit = true;
+				resolveBoxHitOOB(hit, ray);
+			}
 		}
 	}
 	ray.o -= simulation.rendering.gridOffset;
@@ -1137,11 +1164,11 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, bool weight
 
 	if constexpr (std::is_same_v<Hit, BoxHit>) {
 		brdf.F0 = (hit.material == WATER || hit.material == AIR) ? 0.02f : (WaterMode ? 0.009f : 0.04f);
-		brdf.roughness = (hit.material == WATER) ? 0.05f : 1.f;
+		brdf.roughness = (hit.material == WATER || hit.material == AIR) ? 0.05f : 1.f;
 		auto F = (WaterMode && hit.material == AIR) ? fresnelSchlickRoughness<WaterMode>(brdf.NdotV, brdf.F0, brdf.roughness) : fresnelSchlickRoughness(brdf.NdotV, brdf.F0, brdf.roughness);
 		brdf.Fr = F.x;
 		brdf.F = F.y;
-		brdf.diffuseReflectance = (hit.material == WATER) ? glm::vec3(0.f) : simulation.rendering.materialColors[hit.material];
+		brdf.diffuseReflectance = (hit.material == WATER || hit.material == AIR) ? glm::vec3(0.f) : simulation.rendering.materialColors[hit.material];
 	}
 	else {
 		// if materials.z is exactly 1, some shading gets disabled for performance, this ensures it works properly
@@ -1164,53 +1191,155 @@ __device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, bool weight
 
 template <class State>
 __global__ void raymarchDDAQuadTreeKernel() {
-		const glm::ivec2 index{ getLaunchIndex() };
+	const glm::ivec2 index{ getLaunchIndex() };
 
-		if (isOutside(index, simulation.rendering.windowSize))
-		{
-			return;
-		}
+	if (isOutside(index, simulation.rendering.windowSize))
+	{
+		return;
+	}
 
-		Ray ray{ createRay(index) };
-		BoxHit hit{ traceRayBoxes<State, false>(ray) };
+	Ray ray{ createRay(index) };
+	bool waterRay = false;
 
-		glm::vec3 col = simulation.rendering.materialColors[hit.material];
+	auto originMats = getMaterialVolume(ray.o + simulation.rendering.gridOffset, 0.1f * simulation.gridScale, 0.1f);
+	if (originMats.z > 1.f - bigEpsilon) waterRay = true;
 
-		if (hit.hit) {
-			PbrBRDF brdf{ getBRDF(ray, hit) };
+	BoxHit hit = 
+		waterRay ? 
+			traceRayBoxes<State, false, true>(ray) : 
+			traceRayBoxes<State, false>(ray);
 
-			glm::vec3 reflection = glm::vec3(0.f);
-			if (hit.material == WATER) {
+	glm::vec3 col = simulation.rendering.materialColors[AIR];
+
+	if (hit.hit) {
+		/*if (waterRay) {
+			PbrBRDF brdf{ getBRDF<BoxHit,true> (ray, hit) };
+
+			const bool reflectionsEnabled = simulation.rendering.enableReflections && hit.hit_air;
+			glm::vec3 reflection = reflectionsEnabled ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
+			float aoWeight = 1.f - hit.materials.z;
+
+			if (!simulation.rendering.enableReflections && hit.hit_air) {
+				aoWeight = brdf.F;
+				brdf.diffuseReflectance += simulation.rendering.materialColors[WATER];
+			}
+
+			if (reflectionsEnabled) {
 				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
-				Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
-				BoxHit rHit{ traceRayBoxes<State, false>(rRay) };
-				reflection = simulation.rendering.materialColors[rHit.material];
+				Ray rRay{ createRay(hit.pos, rDir) };
+				BoxHit rHit{ traceRayBoxes<State, false, true>(rRay, 0.01f) };
+
+				if (rHit.hit) {
+					PbrBRDF rBrdf{ getBRDF<BoxHit, true>(rRay, rHit) };
+					// Secondary reflections simply sample background
+					reflection = shadePbrBRDF<State, BoxHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
+					if (rHit.hit_air) reflection += rHit.materials.z * simulation.rendering.materialColors[AIR];
+
+					if (simulation.rendering.enableWaterAbsorption) {
+						float d = -2.f * rHit.t;
+						if (!simulation.rendering.useCheapAbsorption) {
+							Ray uRay{ createRay(rHit.pos + 0.1f * glm::vec3(0.f,1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(rHit.pos.x) * 0.01f, 1.f, -glm::sign(rHit.pos.z) * 0.01f))) };
+							BoxHit uHit{ traceRayBoxes<State, false, true>(uRay, 0.0f) };
+
+							d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
+						}
+					reflection *= glm::exp(d * 0.5f * glm::cuda_cast(WATER_ABSORPTION));
+				}
+				}
+			}
+			glm::vec3 refraction = hit.hit_air ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
+
+			if(simulation.rendering.enableSoftShadows)
+				if(simulation.rendering.fixLightLeaks)
+					col = shadePbrBRDF<State, BoxHit, true, true, true>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, aoWeight);
+				else 
+					col = shadePbrBRDF<State, BoxHit, true, true>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, aoWeight);
+			else
+				col = shadePbrBRDF<State, BoxHit, true, false>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, aoWeight);
+
+			if (simulation.rendering.enableRefraction && hit.hit_air) {
+				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 1.33f));
+				Ray rRay{ createRay(hit.pos, rDir) };
+
+				BoxHit rHit{ traceRayBoxes<State, true, true, true>(rRay, 0.01f) };
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, true, true);
+					refraction = shadePbrBRDF<State>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
+					refraction += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
-			glm::vec3 refraction = glm::vec3(0.f);
-			if (hit.material == WATER) {
-				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
-				Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
-				BoxHit rHit{ traceRayBoxes<State, false, true>(rRay) };
-				refraction = simulation.rendering.materialColors[rHit.material];
+			col = col + hit.materials.z * ((1.f - brdf.F) * refraction + brdf.F * reflection);
+			if (simulation.rendering.enableWaterAbsorption) {
+				float d = -2.f * hit.t;
+				if (!simulation.rendering.useCheapAbsorption) {
+					Ray uRay{ createRay(hit.pos + 0.1f * glm::vec3(0.f, 1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(hit.pos.x) * 0.01f, 1.f, -glm::sign(hit.pos.z) * 0.01f))) };
+					BoxHit uHit{ traceRayBoxes<State, false, true>(uRay, 0.0f) };
+
+					d = -glm::min((uHit.hit ? (uHit.hit_air ? uHit.t : hit.t) : 0.f) + hit.t, 2.f * hit.t);
+				}
+				col *= glm::exp(d * 0.5f * glm::cuda_cast(WATER_ABSORPTION));
+			}
+		}
+		else*/ if (hit.material != AIR) {
+			PbrBRDF brdf{ getBRDF(ray, hit, true) };
+
+			glm::vec3 reflection = hit.material == WATER ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
+			if (simulation.rendering.enableReflections && hit.material == WATER) {
+				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
+				Ray rRay{ createRay(hit.pos, rDir) };
+				BoxHit rHit{ traceRayBoxes<State, true, true, true>(rRay) };
 
 				if (rHit.hit && rHit.material != AIR) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					refraction = shadePbrBRDF<State, BoxHit, true>(rBrdf, rRay, rHit, true, true);
+					reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, rHit.material != WATER);
+					reflection += (rHit.material == WATER) * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
-			col = shadePbrBRDF<State>(brdf, ray, hit, true, true) + glm::mix(refraction, reflection, brdf.F);
-		}
+			const bool refractionsEnabled = simulation.rendering.enableRefraction && (hit.material == WATER);
+			glm::vec3 refraction = refractionsEnabled  ? simulation.rendering.materialColors[AIR] : glm::vec3(0.f);
 
-		col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
-		uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
-		surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
+			if (!simulation.rendering.enableRefraction) {
+				brdf.diffuseReflectance += float(hit.material == WATER) * simulation.rendering.materialColors[WATER];
+			}
+
+			col = shadePbrBRDF<State, BoxHit, false, false>(brdf, ray, hit, simulation.rendering.enableShadows, simulation.rendering.enableAO, 0.01f, hit.material != WATER);
+
+			if (refractionsEnabled) {
+				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 0.75f));
+				Ray rRay{ createRay(hit.pos + bigEpsilon * rDir, rDir) };
+
+				BoxHit rHit{ rDir.y > 0.f ? traceRayBoxes<State, false, true>(rRay) : traceRayBoxes<State, true, true, true>(rRay) };
+
+				if (rHit.hit) {
+					PbrBRDF rBrdf{ getBRDF<BoxHit, true>(rRay, rHit, false, hit.normal) };
+
+					// Secondary reflections simply sample background
+					refraction = shadePbrBRDF<State, BoxHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.f, rHit.material != AIR);
+					
+					if (rHit.material == AIR) refraction += (1.f - rBrdf.F) * simulation.rendering.materialColors[AIR];
+
+					if (simulation.rendering.enableWaterAbsorption) {
+						float d = -2.f * rHit.t;
+						if (!simulation.rendering.useCheapAbsorption) {
+							Ray uRay{ createRay(rHit.pos + bigEpsilon * glm::vec3(0.f,1.f, 0.f), glm::normalize(glm::vec3(-glm::sign(rHit.pos.x) * 0.01f, 1.f, -glm::sign(rHit.pos.z) * 0.01f))) };
+							BoxHit uHit{ traceRayBoxes<State, false, true>(uRay) };
+
+							d = -glm::min((uHit.hit ? ((uHit.material == AIR) ? uHit.t : rHit.t) : 0.f) + rHit.t, 2.f * rHit.t);
+						}
+						refraction *= glm::exp(d * 0.5f * glm::cuda_cast(WATER_ABSORPTION));
+					}
+				}
+			}
+			col = col + float(hit.material == WATER) * ((1.f - brdf.F) * refraction + brdf.F * reflection);
+		}
+	}
+
+	col = glm::clamp(linearToSRGB(applyReinhardToneMap(simulation.rendering.uniforms->exposure * col)), 0.f, 1.f);
+	uchar4 val = uchar4(col.x * 255u, col.y * 255u, col.z * 255u, 255u);
+	surf2Dwrite(val, simulation.rendering.screenSurface, index.x * 4, index.y, cudaBoundaryModeTrap);
 }
 
 __global__ void raymarchDDAQuadTreeLevelKernel(int level) {
@@ -1375,6 +1504,7 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 			if (simulation.rendering.enableReflections && hit.materials.z > 0.f) {
 				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 				Ray rRay{ createRay(hit.pos, rDir) };
+				// TODO: This ignores water. Change?
 				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
 
 				if (rHit.hit) {
