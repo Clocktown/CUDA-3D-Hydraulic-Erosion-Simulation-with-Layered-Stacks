@@ -743,6 +743,29 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/SmoothingRadiusInCells"] = rendering.smoothingRadiusInCells;
 	json["Rendering/NormalSmoothingFactor"] = rendering.normalSmoothingFactor;
 
+	json["Rendering/AoRadius"] = rendering.aoRadius;
+	json["Rendering/MissCount"] = rendering.missCount;
+	json["Rendering/FineMissCount"] = rendering.fineMissCount;
+	json["Rendering/DebugLayer"] = rendering.debugLayer;
+
+	json["Rendering/SoftShadowScale"] = rendering.softShadowScale;
+	json["Rendering/MaxSoftShadowDiv"] = rendering.maxSoftShadowDiv;
+
+	json["Rendering/AccurateNormals"] = rendering.accurateNormals;
+	json["Rendering/UseExpensiveNormals"] = rendering.useExpensiveNormals;
+	json["Rendering/EnableWaterAbsorption"] = rendering.enableWaterAbsorption;
+	json["Rendering/UseCheapAbsorption"] = rendering.useCheapAbsorption;
+	json["Rendering/EnableReflections"] = rendering.enableReflections;
+	json["Rendering/EnableRefraction"] = rendering.enableRefraction;
+	json["Rendering/EnableShadows"] = rendering.enableShadows;
+	json["Rendering/EnableSoftShadows"] = rendering.enableSoftShadows;
+	json["Rendering/FixLightLeaks"] = rendering.fixLightLeaks;
+	json["Rendering/EnableAO"] = rendering.enableAO;
+	json["Rendering/EnableShadowsInReflection"] = rendering.enableShadowsInReflection;
+	json["Rendering/EnableShadowsInRefraction"] = rendering.enableShadowsInRefraction;
+	json["Rendering/EnableAOInReflection"] = rendering.enableAOInReflection;
+	json["Rendering/EnableAOInRefraction"] = rendering.enableAOInRefraction;
+
 	onec::writeFile(file, json.dump(1));
 	onec::writeFile(file.parent_path() / file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
 }
@@ -911,6 +934,30 @@ void UI::loadFromFile(const std::filesystem::path& file)
 		rendering.smoothingRadiusInCells = 1.f;
 		rendering.normalSmoothingFactor = 1.f;
 	}
+
+	if(json.contains("Rendering/AoRadius")) rendering.aoRadius = json["Rendering/AoRadius"];
+	if(json.contains("Rendering/MissCount")) rendering.missCount = json["Rendering/MissCount"];
+	if(json.contains("Rendering/FineMissCount")) rendering.fineMissCount = json["Rendering/FineMissCount"];
+	if(json.contains("Rendering/DebugLayer")) rendering.debugLayer = json["Rendering/DebugLayer"];
+
+	if(json.contains("Rendering/SoftShadowScale")) rendering.softShadowScale = json["Rendering/SoftShadowScale"];
+	if(json.contains("Rendering/MaxSoftShadowDiv")) rendering.maxSoftShadowDiv = json["Rendering/MaxSoftShadowDiv"];
+
+	if(json.contains("Rendering/AccurateNormals")) rendering.accurateNormals = json["Rendering/AccurateNormals"];
+	if(json.contains("Rendering/UseExpensiveNormals")) rendering.useExpensiveNormals = json["Rendering/UseExpensiveNormals"];
+	if(json.contains("Rendering/EnableWaterAbsorption")) rendering.enableWaterAbsorption = json["Rendering/EnableWaterAbsorption"];
+	if(json.contains("Rendering/UseCheapAbsorption")) rendering.useCheapAbsorption = json["Rendering/UseCheapAbsorption"];
+	if(json.contains("Rendering/EnableReflections")) rendering.enableReflections = json["Rendering/EnableReflections"];
+	if(json.contains("Rendering/EnableRefraction")) rendering.enableRefraction = json["Rendering/EnableRefraction"];
+	if(json.contains("Rendering/EnableShadows")) rendering.enableShadows = json["Rendering/EnableShadows"];
+	if(json.contains("Rendering/EnableSoftShadows")) rendering.enableSoftShadows = json["Rendering/EnableSoftShadows"];
+	if(json.contains("Rendering/FixLightLeaks")) rendering.fixLightLeaks = json["Rendering/FixLightLeaks"];
+	if(json.contains("Rendering/EnableAO")) rendering.enableAO = json["Rendering/EnableAO"];
+	if(json.contains("Rendering/EnableShadowsInReflection")) rendering.enableShadowsInReflection = json["Rendering/EnableShadowsInReflection"];
+	if(json.contains("Rendering/EnableShadowsInRefraction")) rendering.enableShadowsInRefraction = json["Rendering/EnableShadowsInRefraction"];
+	if(json.contains("Rendering/EnableAOInReflection")) rendering.enableAOInReflection = json["Rendering/EnableAOInReflection"];
+	if(json.contains("Rendering/EnableAOInRefraction")) rendering.enableAOInRefraction = json["Rendering/EnableAOInRefraction"];
+
 
     PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(this->terrain.entity) };
 	ScreenTextureRenderer& screenTextureRenderer{ *onec::getWorld().getComponent<ScreenTextureRenderer>(this->terrain.entity) };
