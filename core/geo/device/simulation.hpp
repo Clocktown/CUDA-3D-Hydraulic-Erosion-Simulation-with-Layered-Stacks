@@ -174,7 +174,8 @@ struct Simulation
 	float* sedimentFluxScale;
 
 	Rendering rendering;
-	QuadTreeEntry quadTree[geo::NUM_QUADTREE_LAYERS];
+	int maxQuadTreeLevels;
+	QuadTreeEntry quadTree[geo::MAX_NUM_QUADTREE_LEVELS];
 };
 
 extern __constant__ Simulation simulation;

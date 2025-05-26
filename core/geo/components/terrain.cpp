@@ -46,12 +46,15 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 	glm::ivec2 currentSize = gridSize;
 	float currentScale = gridScale;
 	int currentMaxLayerCount = maxLayerCount;
-	for (int i = 0; i < NUM_QUADTREE_LAYERS; ++i) {
+	maxQuadTreeLevels = glm::clamp(int(glm::ceil(glm::max(glm::log2(float(gridSize.x)), glm::log2(float(gridSize.y))))) - 2, 1, MAX_NUM_QUADTREE_LEVELS);
+	printf("[QuadTree] Max Levels: %i\n", maxQuadTreeLevels);
+	for (int i = 0; i < maxQuadTreeLevels; ++i) {
 		currentSize = glm::ceil(0.5f * glm::vec2(currentSize));
 		currentScale *= 2.f;
 		if ((i % 2) == 0) {
 			currentMaxLayerCount = glm::ceil(0.5f * currentMaxLayerCount);
 		}
+		printf("[QuadTree] Level %i: %i x %i x %i\n", i, currentSize.x, currentSize.y, currentMaxLayerCount);
 
 		const int cellCount{ currentSize.x * currentSize.y };
 		const int columnCount{ cellCount * currentMaxLayerCount };

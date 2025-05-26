@@ -1,5 +1,5 @@
 #pragma once
 
 namespace geo {
-	constexpr int NUM_QUADTREE_LAYERS = 6;
+	constexpr int MAX_NUM_QUADTREE_LEVELS = 10;
 }

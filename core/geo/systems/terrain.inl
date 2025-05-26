@@ -105,9 +105,10 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
 
-		std::vector<geo::device::Launch> treeLaunch(geo::NUM_QUADTREE_LAYERS);
+		std::vector<geo::device::Launch> treeLaunch(terrain.maxQuadTreeLevels);
 
-		for (int i = 0; i < geo::NUM_QUADTREE_LAYERS; ++i) {
+		simulation.maxQuadTreeLevels = terrain.maxQuadTreeLevels;
+		for (int i = 0; i < terrain.maxQuadTreeLevels; ++i) {
 			simulation.quadTree[i].gridScale = terrain.quadTree[i].gridScale;
 			simulation.quadTree[i].gridSize = terrain.quadTree[i].gridSize;
 			simulation.quadTree[i].heights = reinterpret_cast<float4*>(terrain.quadTree[i].heightBuffer.getData());

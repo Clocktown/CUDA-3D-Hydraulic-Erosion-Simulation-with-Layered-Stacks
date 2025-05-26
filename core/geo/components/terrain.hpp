@@ -106,7 +106,8 @@ struct Terrain
 	onec::Buffer velocityBuffer;
 	onec::Buffer damageBuffer;
 	onec::Buffer sedimentFluxScaleBuffer;
-	QuadTreeEntry quadTree[NUM_QUADTREE_LAYERS];
+	int maxQuadTreeLevels;
+	QuadTreeEntry quadTree[MAX_NUM_QUADTREE_LEVELS];
 	Simulation simulation;
 };
 

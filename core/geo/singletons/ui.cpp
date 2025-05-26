@@ -603,7 +603,7 @@ void UI::updateRendering()
 		if (ImGui::TreeNode("Raymarching Details")) {
 			ImGui::DragInt("Miss Count", &rendering.missCount, 0.1f, 0, 20);
 			ImGui::DragInt("Fine Miss Count", &rendering.fineMissCount, 0.1f, 1, 50);
-			ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -2, geo::NUM_QUADTREE_LAYERS - 1);
+			ImGui::DragInt("Debug Layer", &rendering.debugLayer, 0.1f, -2, terrain.maxQuadTreeLevels - 1);
 			ImGui::TreePop();
 		}
 

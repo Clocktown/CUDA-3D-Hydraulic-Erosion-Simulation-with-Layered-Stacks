@@ -10,7 +10,6 @@
 namespace geo {
 	namespace device {
 
-constexpr int MAX_QUADTREE_LAYER = geo::NUM_QUADTREE_LAYERS - 1;
 constexpr int AIR = CEILING;
 
 constexpr float3 WATER_ABSORPTION{ 0.2f, 0.15f, 0.1f };
@@ -53,7 +52,7 @@ struct DDAExitLevelState {
 	glm::vec2 bmin2D;
 	glm::vec2 bmax2D;
 
-	float exitLevels[geo::NUM_QUADTREE_LAYERS];
+	float exitLevels[geo::MAX_NUM_QUADTREE_LEVELS];
 };
 
 struct DDAMissState {
@@ -736,7 +735,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 	ray.t.y = glm::min(ray.t.y, t.y);
 	if (ray.t.y <= ray.t.x) intersect = false;
 
-	int currentLevel = MAX_QUADTREE_LAYER;
+	int currentLevel = simulation.maxQuadTreeLevels - 1;
 
 	if (intersect) {
 		// DDA prep
@@ -747,7 +746,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 
 			// Simpler alternative to backtracking, no stack in state needed, has better performance
 			if constexpr (std::is_same_v<State, DDAMissState>) {
-				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == simulation.rendering.missCount) {
+				if ((currentLevel < (simulation.maxQuadTreeLevels - 1)) && state.miss == simulation.rendering.missCount) {
 					currentLevel++;
 					calculateDDAState(state, ray, currentLevel);
 					continue;
@@ -784,7 +783,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 			// Backtracking - very delicate, easy to implement wrong
 			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
 				bool movedUp = false;
-				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
+				while ((currentLevel < (simulation.maxQuadTreeLevels - 1)) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
 					currentLevel++;
 					movedUp = true;
 				}
@@ -836,7 +835,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 
 	SmoothHit hit{};
 
-	int currentLevel = MAX_QUADTREE_LAYER;
+	int currentLevel = simulation.maxQuadTreeLevels - 1;
 	const float radius = simulation.gridScale * simulation.rendering.smoothingRadiusInCells;
 	const float rBoxSize2 = simulation.rendering.rBoxSize2;
 	const float boxSize3 = simulation.rendering.boxSize3;
@@ -853,7 +852,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 			// Simpler alternative to backtracking, no stack in state needed, has better performance
 			if constexpr (std::is_same_v<State, DDAMissState>) {
 				const int currentMissCount = currentLevel >= 0 ? simulation.rendering.missCount : simulation.rendering.fineMissCount;
-				if ((currentLevel < MAX_QUADTREE_LAYER) && state.miss == currentMissCount) {
+				if ((currentLevel < (simulation.maxQuadTreeLevels - 1)) && state.miss == currentMissCount) {
 					currentLevel++;
 					calculateDDAState(state, ray, currentLevel);
 					continue;
@@ -957,7 +956,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 			// Backtracking - very delicate, easy to implement wrong
 			if constexpr (std::is_same_v<State, DDAExitLevelState>) {
 				bool movedUp = false;
-				while ((currentLevel < MAX_QUADTREE_LAYER) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
+				while ((currentLevel < (simulation.maxQuadTreeLevels - 1)) && (ray.t.x >= state.exitLevels[currentLevel + 1] - bigEpsilon)) {
 					currentLevel++;
 					movedUp = true;
 				}
@@ -1030,9 +1029,9 @@ template<class State, class Hit, bool WaterMode = false, bool SoftShadows = fals
 __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance, float bias = 0.f) {
 
 	Ray ray{ createRay(hit.pos, direction) };
-	if constexpr (std::is_same_v<Hit, BoxHit>) {
+	//if constexpr (std::is_same_v<Hit, BoxHit>) {
 		ray.o += bigEpsilon * direction;
-	}
+	//}
 	ray.t.y = lightDistance;
 	Hit rHit;
 	float shadow = 0.f;
@@ -1042,7 +1041,7 @@ __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& dire
 	}
 	else {
 		rHit = traceRaySmooth<State, true, WaterMode, false, SoftShadows>(ray, bias);
-		if (SoftShadows) {
+		if constexpr (SoftShadows) {
 			shadow = glm::clamp(rHit.min_volume_diff, 0.f, 1.f);
 			if constexpr (FixLightLeaks) {
 				shadow = glm::min(float(!rHit.hit), shadow);
@@ -1473,12 +1472,12 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 				const glm::vec3 rDir = glm::normalize(glm::refract(ray.dir, hit.normal, 1.33f));
 				Ray rRay{ createRay(hit.pos, rDir) };
 
-				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
+				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.0f) };
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					refraction = shadePbrBRDF<State>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
+					refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.01f, 1.f - rHit.materials.z);
 					refraction += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
@@ -1502,12 +1501,12 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 				const glm::vec3 rDir = glm::normalize(glm::reflect(ray.dir, hit.normal));
 				Ray rRay{ createRay(hit.pos, rDir) };
 				// TODO: This ignores water. Change?
-				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.01f) };
+				SmoothHit rHit{ traceRaySmooth<State, true, true, true>(rRay, 0.0f) };
 
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePbrBRDF<State>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
+					reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.01f, 1.f - rHit.materials.z);
 					reflection += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
