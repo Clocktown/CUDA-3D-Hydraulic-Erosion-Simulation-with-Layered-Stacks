@@ -240,6 +240,26 @@ __device__ __forceinline__ float intersectionVolume(const glm::vec3& b_min0, con
 	return d.x * d.y * d.z;
 }
 
+__device__ __forceinline__ float intersectionVolumeNormal(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1, glm::vec3& n) {
+	const glm::vec3 b_min = glm::max(b_min0, b_min1);
+	const glm::vec3 b_max = glm::min(b_max0, b_max1);
+	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
+
+	constexpr int otherAxes[3][2] = {{1, 2}, {0, 2}, {0, 1}};
+
+	for (int axis = 0; axis < 3; ++axis) {
+		if (d[axis] > 0.f) {
+			float overlapOtherAxes = d[otherAxes[axis][0]] * d[otherAxes[axis][1]]; // product of lengths along other 2 axes
+			float dir = 0.f;
+			if (b_max1[axis] < b_max0[axis]) dir += 1.f;
+			if (b_min1[axis] > b_min0[axis]) dir -= 1.f;
+			n[axis] += dir * overlapOtherAxes;
+		}
+	}
+
+	return d.x * d.y * d.z;
+}
+
 __device__ __forceinline__ glm::vec3 intersectionVolumeBounds(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
 	const glm::vec3 b_min = glm::max(b_min0, b_min1);
 	const glm::vec3 b_max = glm::min(b_max0, b_max1);
@@ -604,6 +624,54 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 				}
 
 				volume += intersectionVolume(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
+
+				floor = terrainHeights[CEILING];
+				if (floor >= boxBmax.y) break;
+			}
+		}
+	}
+	return volume;
+}
+
+template<bool WaterMode = false>
+__device__ __forceinline__ float getVolumeNormal(const glm::vec3& p, const float radius, const float radiusG, glm::vec3& n) {
+	
+	n = glm::vec3(0);
+	const glm::vec3 boxBmin = p - radius;
+	const glm::vec3 boxBmax = p + radius;
+
+	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
+
+	float volume = 0.f;
+
+	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
+	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
+	const float endX = glm::clamp(pG.x + radiusG, 0.f, float(simulation.gridSize.x));
+	for (; y < endY; ++y) {
+		int x = glm::clamp(pG.x - radiusG, 0.f, float(simulation.gridSize.x));
+		for (; x < endX; ++x) {
+			glm::ivec2 currentCell = glm::ivec2(x, y);
+
+			int flatIndex{ flattenIndex(currentCell, simulation.gridSize) };
+			const int layerCount{ simulation.layerCounts[flatIndex] };
+						
+			float floor = -FLT_MAX;
+
+			const glm::vec2 bmin2D = glm::vec2(currentCell) * simulation.gridScale;
+			const glm::vec2 bmax2D = bmin2D + simulation.gridScale;
+
+			int layer{ 0 };
+			for (; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
+			{
+				const auto terrainHeights = glm::cuda_cast(simulation.heights[flatIndex]);
+				const float totalTerrainHeight = terrainHeights[BEDROCK] + terrainHeights[SAND] + (WaterMode ? 0.f : terrainHeights[WATER]);
+
+				if (totalTerrainHeight <= boxBmin.y) {
+					floor = terrainHeights[CEILING];
+					continue;
+				}
+
+				volume += intersectionVolumeNormal(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax, n);
 
 				floor = terrainHeights[CEILING];
 				if (floor >= boxBmax.y) break;
