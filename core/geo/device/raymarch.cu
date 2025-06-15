@@ -583,8 +583,8 @@ __device__ __forceinline__ float calculateSafeStep(float volume, float targetVol
 	const float d1 = requiredVolumeGain * rBoxSize2;
 	//return d1;
 	constexpr float sqrt3 = std::numbers::sqrt3_v<float>;
-	const float d2 = 2.f * boxSize * sqrt3 - sqrt3 * (boxSize + pow(boxSize3 - requiredVolumeGain, 1.f / 3.f));
-	return glm::min(d1, d2);
+	const float d2 = boxSize - pow(boxSize3 - requiredVolumeGain, 1.f / 3.f);
+	return glm::min(d1, sqrt3 * d2);
 }
 
 template<bool WaterMode = false>
