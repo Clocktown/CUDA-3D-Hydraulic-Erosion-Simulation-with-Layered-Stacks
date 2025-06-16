@@ -67,6 +67,9 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 		quadTree[i].layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)));
 		quadTree[i].heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
 	}
+
+	// DEBUG
+	intersectionCountBuffer.initialize(static_cast<std::ptrdiff_t>(8 * sizeof(int)));
 }
 
 }

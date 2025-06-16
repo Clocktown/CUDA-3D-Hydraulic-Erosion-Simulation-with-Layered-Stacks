@@ -109,6 +109,9 @@ struct Terrain
 	int maxQuadTreeLevels;
 	QuadTreeEntry quadTree[MAX_NUM_QUADTREE_LEVELS];
 	Simulation simulation;
+
+	// DEBUG
+	onec::Buffer intersectionCountBuffer;
 };
 
 }

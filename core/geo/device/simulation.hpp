@@ -176,6 +176,9 @@ struct Simulation
 	Rendering rendering;
 	int maxQuadTreeLevels;
 	QuadTreeEntry quadTree[geo::MAX_NUM_QUADTREE_LEVELS];
+
+	// DEBUG
+	unsigned int* intersectionCounts;
 };
 
 extern __constant__ Simulation simulation;

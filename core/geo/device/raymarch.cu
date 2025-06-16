@@ -435,7 +435,10 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 }
 
 template <class State, class Hit, bool Shadow = false, bool WaterMode = false>
-__device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, Hit& hit, int currentLevel) {
+__device__ __forceinline__ int intersectQuadTreeColumns(const State& state, const Ray& ray, Hit& hit, int currentLevel) {
+	// DEBUG
+	int num_intersections = 0;
+	// END DEBUG
 	int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
 	const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
 
@@ -458,6 +461,9 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 		const float totalTerrainHeight = terrainHeights[WaterMode ? QSOLIDHEIGHT : QFULLHEIGHT];
 
 		glm::vec2 tempT;
+		// DEBUG
+		num_intersections++;
+		// END DEBUG
 		bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), ray.o, ray.i_dir, tempT);
 		if (intersect && (tempT.y > ray.t.x)) {
 			hit.hit = true;
@@ -471,6 +477,9 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 	if constexpr (WaterMode && !Shadow) {
 		if (layer == layerCount) {
 			glm::vec2 tempT;
+			// DEBUG
+			num_intersections++;
+			// END DEBUG
 			bool intersect = intersection(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, FLT_MAX, bmax2D.y), ray.o, ray.i_dir, tempT);
 			if (intersect && (tempT.y > ray.t.x)) {
 				hit.hit = true;
@@ -479,6 +488,9 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 			}
 		}
 	}
+	// DEBUG
+	return num_intersections;
+	// END DEBUG
 }
 
 template <class State, bool Shadow = false, bool WaterMode = false>
@@ -909,6 +921,11 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 	const float boxSize3 = simulation.rendering.boxSize3;
 	const float targetVolume = (simulation.rendering.surfaceVolumePercentage + bias) * simulation.rendering.boxSize3;
 
+	// DEBUG
+	int num_intersections = 1;
+	int num_volume_measures = 0;
+	// END DEBUG
+
 	if (intersect) {
 		// DDA prep
 		State state;
@@ -928,6 +945,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 			}
 
 			if (currentLevel < 0) {
+				num_volume_measures++;
 				glm::vec3 p = ray.o + ray.t.x * ray.dir;// glm::max(ray.t.x - radius, 0.f)* ray.dir;
 				float volume;
 				bool air_hit = false;
@@ -1004,7 +1022,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 				hit.t = volume; // Remember volume for step
 			}
 			else {
-				intersectQuadTreeColumns<State, SmoothHit, Shadow, WaterMode>(state, ray, hit, currentLevel);
+				num_intersections += intersectQuadTreeColumns<State, SmoothHit, Shadow, WaterMode>(state, ray, hit, currentLevel);
 			}
 
 			if (hit.hit && (currentLevel >= 0)) {
@@ -1060,6 +1078,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 			const glm::vec3 p = ray.o + ray.t.y * ray.dir;
 			const float e = simulation.rendering.normalSmoothingFactor * radius;
 			const float eG = simulation.rendering.normalSmoothingFactor * simulation.rendering.smoothingRadiusInCells;
+			num_volume_measures++;
 			const float volumeN = getVolume(p, e, eG);
 
 			if (volumeN > 0.f) {
@@ -1089,6 +1108,17 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 	}
 	ray.o -= simulation.rendering.gridOffset;
 	hit.pos -= simulation.rendering.gridOffset;
+
+	// DEBUG
+	atomicMin(&simulation.intersectionCounts[0], num_intersections);
+	atomicMax(&simulation.intersectionCounts[1], num_intersections);
+	atomicAdd(&simulation.intersectionCounts[2], num_intersections);
+	atomicAdd(&simulation.intersectionCounts[3], 1);
+	atomicMin(&simulation.intersectionCounts[4], num_volume_measures);
+	atomicMax(&simulation.intersectionCounts[5], num_volume_measures);
+	atomicAdd(&simulation.intersectionCounts[6], num_volume_measures);
+	atomicAdd(&simulation.intersectionCounts[7], 1);
+	// END DEBUG
 
 	return hit;
 }

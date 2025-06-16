@@ -105,6 +105,10 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
 
+		// DEBUG
+		simulation.intersectionCounts = reinterpret_cast<unsigned int*>(terrain.intersectionCountBuffer.getData());
+		// END DEBUG
+
 		std::vector<geo::device::Launch> treeLaunch(terrain.maxQuadTreeLevels);
 
 		simulation.maxQuadTreeLevels = terrain.maxQuadTreeLevels;
@@ -287,7 +291,24 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			screenLaunch.gridSize.x = (terrain.windowSize.x + screenLaunch.blockSize.x - 1) / screenLaunch.blockSize.x;
 			screenLaunch.gridSize.y = (terrain.windowSize.y + screenLaunch.blockSize.y - 1) / screenLaunch.blockSize.y;
 			screenLaunch.gridSize.z = 1;
+			// DEBUG
+			cudaMemset(simulation.intersectionCounts, 0, 8*sizeof(int));
+			cudaMemset(simulation.intersectionCounts, 0xFF, sizeof(int));
+			cudaMemset(&simulation.intersectionCounts[4], 0xFF, sizeof(int));
+			// END DEBUG
 			device::raymarchTerrain(screenLaunch, ui->rendering.useInterpolation, ui->rendering.missCount, ui->rendering.debugLayer);
+			// DEBUG
+			std::array<unsigned int, 8> intersectionCounts;
+			cudaMemcpy(intersectionCounts.data(), simulation.intersectionCounts, 8 * sizeof(int), cudaMemcpyDeviceToHost);
+			std::cout <<
+				//"" << intersectionCounts[0] <<
+				"" << intersectionCounts[1] <<
+				", " << float(intersectionCounts[2]) / float(intersectionCounts[3]) <<
+				//", " << intersectionCounts[4] <<
+				", " << intersectionCounts[5] <<
+				", " << float(intersectionCounts[6]) / float(intersectionCounts[7]) <<
+				std::endl;
+			// END DEBUG
 			if (perf.measureRendering) perf.measurements["Raymarching"].stop();
 		}
 		else {
