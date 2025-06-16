@@ -220,6 +220,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 
 		if (!terrain.simulation.paused)
 		{
+			ui->lastFile = std::filesystem::path{};
 			terrain.quadTreeDirty = true;
 			if (perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].start();
 

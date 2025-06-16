@@ -61,6 +61,8 @@ struct UI
 		bool enableAOInRefraction{ true };
 	} rendering;
 
+
+	std::filesystem::path lastFile{};
 	performance performance{};
 
 	bool visable{ true };

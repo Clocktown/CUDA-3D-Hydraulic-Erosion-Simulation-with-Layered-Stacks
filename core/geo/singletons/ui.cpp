@@ -223,7 +223,7 @@ void UI::updateFile()
 		if (ImGui::Button("Open"))
 		{
 			char const* filterPatterns[1] = { "*.json" };
-			auto input = tinyfd_openFileDialog("Save JSON", "./scene.json", 1, filterPatterns, "JSON (.json)", 0);
+			auto input = tinyfd_openFileDialog("Open JSON", "./scene.json", 1, filterPatterns, "JSON (.json)", 0);
 
 			if (input != nullptr)
 			{
@@ -240,6 +240,19 @@ void UI::updateFile()
 			if (output != nullptr)
 			{
 				auto path = std::filesystem::absolute(std::filesystem::path(output));
+				saveToFile(path);
+			}
+		}
+
+		if (ImGui::Button("Save (Force Write)"))
+		{
+			char const* filterPatterns[1] = { "*.json" };
+			auto output = tinyfd_saveFileDialog("Save JSON", "./scene.json", 1, filterPatterns, "JSON (.json)");
+
+			if (output != nullptr)
+			{
+				auto path = std::filesystem::absolute(std::filesystem::path(output));
+				lastFile = std::filesystem::path{};
 				saveToFile(path);
 			}
 		}
@@ -305,6 +318,7 @@ void UI::updateTerrain()
 	{
 		if (ImGui::Button("Reset"))
 		{
+			lastFile = std::filesystem::path{};
 			onec::World& world{ onec::getWorld() };
 			const entt::entity entity{ terrain.entity };
 
@@ -766,8 +780,12 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/EnableAOInReflection"] = rendering.enableAOInReflection;
 	json["Rendering/EnableAOInRefraction"] = rendering.enableAOInRefraction;
 
+	auto fileP = lastFile.empty() ? file.stem().concat(".dat") : lastFile;
+	json["Terrain/File"] = fileP;
+	lastFile = fileP;
+
 	onec::writeFile(file, json.dump(1));
-	onec::writeFile(file.parent_path() / file.stem().concat(".dat"), std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
+	onec::writeFile(file.parent_path() / fileP, std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
 }
 
 void UI::loadFromFile(const std::filesystem::path& file)
@@ -795,8 +813,13 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	this->terrain.gridScale = json["Terrain/GridScale"];
 	this->terrain.maxLayerCount = json["Terrain/MaxLayerCount"];
 
+	auto path = file.parent_path() / file.stem().concat(".dat");
+	if (json.contains("Terrain/File")) {
+		path = file.parent_path() / json["Terrain/File"];
+	}
+	lastFile = path;
 	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
-	std::string compressed{ onec::readFile(file.parent_path() / file.stem().concat(".dat"))};
+	std::string compressed{ onec::readFile(path)};
 
 	const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
 	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
