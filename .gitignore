@@ -5,6 +5,7 @@
 
 vcpkg_installed
 scenes/*
+rendering_scenes/*
 screenshots/*
 
 # User-specific files
