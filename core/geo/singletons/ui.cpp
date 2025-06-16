@@ -36,6 +36,24 @@ void UI::update()
 
 	ImGui::Begin("UI", &this->visable);
 
+	if (ImGui::Button("Toggle Fullscreen")) {
+		GLFWmonitor* monitor = glfwGetWindowMonitor(window.getHandle());
+		static int xpos = 0, ypos = 0, width = 0, height = 0;
+		if (monitor) {
+			glfwSetWindowMonitor(window.getHandle(), NULL, xpos, ypos, width, height, 0);
+		}
+		else {
+			int count;
+			monitor = glfwGetMonitors(&count)[0];
+			const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+			glfwGetWindowSize(window.getHandle(), &width, &height);
+			glfwGetWindowPos(window.getHandle(), &xpos, &ypos);
+ 
+			glfwSetWindowMonitor(window.getHandle(), monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+		}
+
+	}
+
 	updatePerformance();
 	updateFile();
 	updateApplication();
