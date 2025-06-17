@@ -1745,7 +1745,7 @@ __device__ __forceinline__ void mergeQuadTreeLayer(int treeLevel, int layerCount
 			// AIR <= CEILING
 			// AIR <= FULLHEIGHT
 
-			if (currHeights[QCEILING] <= currHeights[QSOLIDHEIGHT]) {
+			if (currHeights[QCEILING] <= glm::min(currHeights[QSOLIDHEIGHT], currHeights[QAIR])) {
 				// All 3 Intervals have overlap in this case, so we merge => set all values to values in above column
 				if (!merge) {
 					// First mergepoint found, remember layer
@@ -1834,7 +1834,7 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 	}
 
 	// Merge remaining columns into topmost column
-	for (int layer{ simulation.quadTree[0].maxLayerCount - 1 }; layer < maxOLayers; ++layer) {
+	for (int layer{ simulation.quadTree[0].maxLayerCount }; layer < maxOLayers; ++layer) {
 		for (int y = 0 - indexRadius; y <= 1 + indexRadius; ++y) {
 			for (int x = 0 - indexRadius; x <= 1 + indexRadius; ++x) {
 				const int oIndex = 2 * y + x;
@@ -1861,6 +1861,7 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 		simulation.quadTree[0].heights[flatIndex + simulation.quadTree[0].layerStride * (layerCount - 1)] = glm::cuda_cast(heights);
 	}
 	// Compact tree (merge overlapping columns)
+	//simulation.quadTree[0].layerCounts[flatIndex] = layerCount;
 	mergeQuadTreeLayer(0, layerCount, flatIndex);
 }
 
@@ -1924,7 +1925,7 @@ __global__ void buildQuadTreeLayer(int i) {
 	}
 
 	// Merge remaining columns into topmost column
-	for (int layer{ simulation.quadTree[i].maxLayerCount - 1 }; layer < maxOLayers; ++layer) {
+	for (int layer{ simulation.quadTree[i].maxLayerCount }; layer < maxOLayers; ++layer) {
 		for (int y = 0; y <= 1; ++y) {
 			for (int x = 0; x <= 1; ++x) {
 				const int oIndex = 2 * y + x;
@@ -1947,6 +1948,7 @@ __global__ void buildQuadTreeLayer(int i) {
 		simulation.quadTree[i].heights[flatIndex + simulation.quadTree[i].layerStride * (layerCount - 1)] = glm::cuda_cast(heights);
 	}
 	// Compact tree (merge overlapping columns)
+	//simulation.quadTree[i].layerCounts[flatIndex] = layerCount;
 	mergeQuadTreeLayer(i, layerCount, flatIndex);
 }
 
