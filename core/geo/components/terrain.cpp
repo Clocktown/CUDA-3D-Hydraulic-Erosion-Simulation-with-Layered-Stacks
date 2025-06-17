@@ -46,12 +46,10 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 	glm::ivec2 currentSize = gridSize;
 	float currentScale = gridScale;
 	int currentMaxLayerCount = maxLayerCount;
-	maxQuadTreeLevels = glm::clamp(int(glm::ceil(glm::max(glm::log2(float(gridSize.x)), glm::log2(float(gridSize.y))))) - 2, 1, MAX_NUM_QUADTREE_LEVELS);
+	maxQuadTreeLevels = glm::clamp(1 + int(glm::ceil(glm::max(glm::log2(float(gridSize.x)), glm::log2(float(gridSize.y))))) - 2, 1, MAX_NUM_QUADTREE_LEVELS);
 	printf("[QuadTree] Max Levels: %i\n", maxQuadTreeLevels);
 	for (int i = 0; i < maxQuadTreeLevels; ++i) {
-		currentSize = glm::ceil(0.5f * glm::vec2(currentSize));
-		currentScale *= 2.f;
-		if ((i % 2) == 0) {
+		if ((i % 2) == 1) {
 			currentMaxLayerCount = glm::ceil(0.5f * currentMaxLayerCount);
 		}
 		printf("[QuadTree] Level %i: %i x %i x %i\n", i, currentSize.x, currentSize.y, currentMaxLayerCount);
@@ -65,7 +63,10 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 		quadTree[i].rGridScale = 1.f / currentScale;
 		quadTree[i].layerStride = cellCount;
 		quadTree[i].layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)));
-		quadTree[i].heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
+		quadTree[i].heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
+
+		currentSize = glm::ceil(0.5f * glm::vec2(currentSize));
+		currentScale *= 2.f;
 	}
 }
 

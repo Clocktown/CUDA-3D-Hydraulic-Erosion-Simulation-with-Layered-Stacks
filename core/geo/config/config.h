@@ -1,5 +1,5 @@
 #pragma once
 
 namespace geo {
-	constexpr int MAX_NUM_QUADTREE_LEVELS = 10;
+	constexpr int MAX_NUM_QUADTREE_LEVELS = 11;
 }

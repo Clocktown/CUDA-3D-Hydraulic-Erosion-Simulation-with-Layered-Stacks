@@ -111,7 +111,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		for (int i = 0; i < terrain.maxQuadTreeLevels; ++i) {
 			simulation.quadTree[i].gridScale = terrain.quadTree[i].gridScale;
 			simulation.quadTree[i].gridSize = terrain.quadTree[i].gridSize;
-			simulation.quadTree[i].heights = reinterpret_cast<float4*>(terrain.quadTree[i].heightBuffer.getData());
+			simulation.quadTree[i].heights = reinterpret_cast<half4*>(terrain.quadTree[i].heightBuffer.getData());
 			simulation.quadTree[i].layerCounts = reinterpret_cast<char*>(terrain.quadTree[i].layerCountBuffer.getData());
 			simulation.quadTree[i].layerStride = terrain.quadTree[i].layerStride;
 			simulation.quadTree[i].maxLayerCount = terrain.quadTree[i].maxLayerCount;

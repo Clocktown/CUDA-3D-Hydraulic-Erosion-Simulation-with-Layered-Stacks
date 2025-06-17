@@ -14,6 +14,8 @@
 
 #include <vector>
 
+#include <cuda_fp16.h>
+
 //#include "../components/terrain.hpp"
 
 #define BEDROCK 0
@@ -30,6 +32,11 @@
 #define UP 1
 #define LEFT 2
 #define DOWN 3
+
+struct alignas(alignof(float2)) half4 {
+	half2 a;
+	half2 b;
+};
 
 namespace geo
 {
@@ -51,7 +58,7 @@ struct QuadTreeEntry {
 	float rGridScale;
 	int maxLayerCount;
 	int layerStride;
-	float4* heights; // Different format: 2 floats for Solid + Water, excluding air, 2 floats for Solid + Air, excluding water. All Absolute.
+	half4* heights; // Different format: 2 floats for Solid + Water, excluding air, 2 floats for Solid + Air, excluding water. All Absolute.
 	char* layerCounts;
 };
 

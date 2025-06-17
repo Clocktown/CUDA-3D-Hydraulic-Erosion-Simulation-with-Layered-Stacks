@@ -168,6 +168,7 @@
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <AdditionalOptions>--std c++20 %(AdditionalOptions)</AdditionalOptions>
       <SplitCompile>MaxThreads</SplitCompile>
+      <CodeGeneration>compute_75,sm_75;compute_86,sm_86;compute_89,sm_89</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
