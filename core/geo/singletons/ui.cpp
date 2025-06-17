@@ -762,13 +762,14 @@ void UI::saveToFile(const std::filesystem::path& file, bool jsonOnly)
 
 	const glm::vec3 cameraPosition{ world.getComponent<onec::Position>(this->camera.entity)->position };
 	const glm::quat cameraRotation{ world.getComponent<onec::Rotation>(this->camera.entity)->rotation };
+	const glm::vec3 target{ world.getComponent<onec::Trackball>(this->camera.entity)->target };
 	json["Camera/Position"] = { cameraPosition.x, cameraPosition.y, cameraPosition.z };
 	json["Camera/Rotation"] = { cameraRotation.x, cameraRotation.y, cameraRotation.z, cameraRotation.w };
 	json["Camera/FieldOfView"] = camera.fieldOfView;
 	json["Camera/NearPlane"] = camera.nearPlane;
 	json["Camera/FarPlane"] = camera.farPlane;
 	json["Camera/Exposure"] = world.getComponent<onec::Exposure>(this->camera.entity)->exposure;
-
+	json["Camera/Target"] = { target.x, target.y, target.z };
 
 	onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
 	const int usedLayerCount{ device::getMaxLayerCount(reinterpret_cast<char*>(layerCountBuffer.getData()), layerCountBuffer.getCount()) };
@@ -934,6 +935,12 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	camera.nearPlane = json["Camera/NearPlane"];
 	camera.farPlane = json["Camera/FarPlane"];
 	world.getComponent<onec::Exposure>(this->camera.entity)->exposure = json["Camera/Exposure"];
+	if (json.contains("Camera/Target")) {
+		world.getComponent<onec::Trackball>(this->camera.entity)->target = glm::vec3{ json["Camera/Target"][0], json["Camera/Target"][1] , json["Camera/Target"][2] };
+	}
+	else {
+		world.getComponent<onec::Trackball>(this->camera.entity)->target = glm::vec3(0.f);
+	}
 	
 	this->terrain.gridSize = glm::ivec2{ json["Terrain/GridSize"][0], json["Terrain/GridSize"][1] };
 	this->terrain.gridScale = json["Terrain/GridScale"];
@@ -1140,9 +1147,9 @@ void UI::loadFromFile(const std::filesystem::path& file)
 		uniforms.useInterpolation = rendering.useInterpolation;
 		uniforms.renderSand = rendering.renderSand;
 		uniforms.renderWater = rendering.renderWater;
-		uniforms.gridSize = terrain.gridSize;
-		uniforms.gridScale = terrain.gridScale;
-		uniforms.maxLayerCount = terrain.maxLayerCount;
+		uniforms.gridSize = this->terrain.gridSize;
+		uniforms.gridScale = this->terrain.gridScale;
+		uniforms.maxLayerCount = this->terrain.maxLayerCount;
 
 		terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, static_cast<char>(uniforms.maxLayerCount), terrain.simulation };
 		terrain.simulation.init = true;
@@ -1156,6 +1163,7 @@ void UI::loadFromFile(const std::filesystem::path& file)
 
 		pointRenderer.material->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
 		pointRenderer.count = terrain.numValidColumns;
+		std::cout << "Bla" << uniforms.gridSize.x << std::endl;
 	}
 }
 
