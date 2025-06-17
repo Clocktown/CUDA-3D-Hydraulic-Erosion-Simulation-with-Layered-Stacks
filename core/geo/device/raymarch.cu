@@ -689,8 +689,6 @@ __device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, con
 	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
 
 	glm::vec2 volume = glm::vec2(0.f);
-	//volume.y = 8.f * radius * radius * radius;
-	//volume.y -= intersectionVolume(glm::vec3(0.f, boxBmin.y, 0.f), glm::vec3(simulation.gridScale * simulation.gridSize.x, boxBmax.y, simulation.gridScale * simulation.gridSize.y), boxBmin, boxBmax);
 
 	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
 	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
@@ -731,15 +729,13 @@ __device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, con
 	return volume;
 }
 
-__device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG, const glm::vec3& weight = glm::vec3(1.f)) {
+__device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG) {
 	const glm::vec3 boxBmin = p - radius;
 	const glm::vec3 boxBmax = p + radius;
 
 	const glm::vec2 pG = glm::vec2(p.x * simulation.rGridScale, p.z * simulation.rGridScale);
 
-	const glm::vec3 vWeight = weight;
-
-	glm::vec4 volume = glm::vec4(0.f);
+	glm::vec3 volume = glm::vec3(0.f);
 
 	int y = glm::clamp(pG.y - radiusG, 0.f, float(simulation.gridSize.y));
 	const float endY = glm::clamp(pG.y + radiusG, 0.f, float(simulation.gridSize.y));
@@ -774,11 +770,13 @@ __device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const
 
 				glm::vec3 intersection = intersectionVolumeBounds(glm::vec3(bmin2D.x, floor, bmin2D.y), glm::vec3(bmax2D.x, totalTerrainHeight, bmax2D.y), boxBmin, boxBmax);
 				const float interval = intersection.z - intersection.y;
-				materials = glm::clamp((materials - intersection.y) / interval, 0.f, 1.f);
-				materials.z -= materials.y;
-				materials.y -= materials.x;
-				volume += glm::vec4(vWeight * materials * intersection.x, intersection.x);
+				if (intersection.x > 0.f) {
+					materials = glm::clamp((materials - intersection.y) / interval, 0.f, 1.f);
+					materials.z -= materials.y;
+					materials.y -= materials.x;
 
+					volume += glm::vec3(materials * intersection.x);
+				}
 				floor = terrainHeights[CEILING];
 				if (floor >= boxBmax.y) break;
 			}
