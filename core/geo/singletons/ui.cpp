@@ -592,6 +592,96 @@ void UI::updateRendering()
 			screenTextureRenderer.enabled = rendering.useRaymarching;
 		}
 
+		if (ImGui::TreeNode("Raymarching Presets")) {
+			if (ImGui::Button("Low")) {
+				rendering.missCount = 0;
+				rendering.surfaceVolumePercentage = 0.5f;
+				rendering.smoothingRadiusInCells = 1.f;
+				rendering.normalSmoothingFactor = 1.f;
+				rendering.aoRadius = 1.f;
+
+				rendering.accurateNormals = false;
+				rendering.useExpensiveNormals = false;
+				rendering.enableWaterAbsorption = false;
+				rendering.useCheapAbsorption = true;
+				rendering.enableReflections = false;
+				rendering.enableRefraction = false;
+				rendering.enableShadows = false;
+				rendering.enableSoftShadows = false;
+				rendering.fixLightLeaks = false;
+				rendering.enableAO = false;
+				rendering.enableShadowsInReflection = false;
+				rendering.enableShadowsInRefraction = false;
+				rendering.enableAOInReflection = false;
+				rendering.enableAOInRefraction = false;
+			}
+			if (ImGui::Button("Mid")) {
+				rendering.missCount = 0;
+				rendering.surfaceVolumePercentage = 0.5f;
+				rendering.smoothingRadiusInCells = 1.f;
+				rendering.normalSmoothingFactor = 1.f;
+				rendering.aoRadius = 1.f;
+
+				rendering.accurateNormals = false;
+				rendering.useExpensiveNormals = false;
+				rendering.enableWaterAbsorption = true;
+				rendering.useCheapAbsorption = true;
+				rendering.enableReflections = true;
+				rendering.enableRefraction = true;
+				rendering.enableShadows = true;
+				rendering.enableSoftShadows = true;
+				rendering.fixLightLeaks = true;
+				rendering.enableAO = true;
+				rendering.enableShadowsInReflection = false;
+				rendering.enableShadowsInRefraction = false;
+				rendering.enableAOInReflection = false;
+				rendering.enableAOInRefraction = false;
+			}
+			if (ImGui::Button("High")) {
+				rendering.missCount = 0;
+				rendering.surfaceVolumePercentage = 0.5f;
+				rendering.smoothingRadiusInCells = 1.f;
+				rendering.normalSmoothingFactor = 1.f;
+				rendering.aoRadius = 1.f;
+
+				rendering.accurateNormals = false;
+				rendering.useExpensiveNormals = false;
+				rendering.enableWaterAbsorption = true;
+				rendering.useCheapAbsorption = false;
+				rendering.enableReflections = true;
+				rendering.enableRefraction = true;
+				rendering.enableShadows = true;
+				rendering.enableSoftShadows = true;
+				rendering.fixLightLeaks = true;
+				rendering.enableAO = true;
+				rendering.enableShadowsInReflection = true;
+				rendering.enableShadowsInRefraction = true;
+				rendering.enableAOInReflection = true;
+				rendering.enableAOInRefraction = true;
+			}
+			if (ImGui::Button("Max")) {
+				rendering.missCount = 0;
+				rendering.surfaceVolumePercentage = 0.5f;
+				rendering.smoothingRadiusInCells = 1.f;
+				rendering.normalSmoothingFactor = 1.f;
+				rendering.aoRadius = 2.f;
+
+				rendering.accurateNormals = false;
+				rendering.useExpensiveNormals = true;
+				rendering.enableWaterAbsorption = true;
+				rendering.useCheapAbsorption = false;
+				rendering.enableReflections = true;
+				rendering.enableRefraction = true;
+				rendering.enableShadows = true;
+				rendering.enableSoftShadows = true;
+				rendering.fixLightLeaks = true;
+				rendering.enableAO = true;
+				rendering.enableShadowsInReflection = true;
+				rendering.enableShadowsInRefraction = true;
+				rendering.enableAOInReflection = true;
+				rendering.enableAOInRefraction = true;
+			}
+		}
 		if (ImGui::TreeNode("Raymarching Quality")) {
 			if (ImGui::TreeNode("Params")) {
 				ImGui::DragFloat("Volume Percentage", &rendering.surfaceVolumePercentage, 0.01f, 0.5f, 1.f);
