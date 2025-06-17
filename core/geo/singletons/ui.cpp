@@ -250,6 +250,18 @@ void UI::updateFile()
 			}
 		}
 
+		if (ImGui::Button("Save (JSON only)"))
+		{
+			char const* filterPatterns[1] = { "*.json" };
+			auto output = tinyfd_saveFileDialog("Save JSON", "./scene.json", 1, filterPatterns, "JSON (.json)");
+
+			if (output != nullptr)
+			{
+				auto path = std::filesystem::absolute(std::filesystem::path(output));
+				saveToFile(path, true);
+			}
+		}
+
 		if (ImGui::Button("Save"))
 		{
 			char const* filterPatterns[1] = { "*.json" };
@@ -733,7 +745,7 @@ void UI::updateRendering()
 	}
 }
 
-void UI::saveToFile(const std::filesystem::path& file)
+void UI::saveToFile(const std::filesystem::path& file, bool jsonOnly)
 {
 	const onec::Application& application{ onec::getApplication() };
 	onec::Window& window{ onec::getWindow() };
@@ -757,42 +769,45 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Camera/FarPlane"] = camera.farPlane;
 	json["Camera/Exposure"] = world.getComponent<onec::Exposure>(this->camera.entity)->exposure;
 
+
 	onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
 	const int usedLayerCount{ device::getMaxLayerCount(reinterpret_cast<char*>(layerCountBuffer.getData()), layerCountBuffer.getCount()) };
-	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
-	const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
-	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
-	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
-	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
-	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
-	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
-	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
-	layerCountBuffer.release();
+	std::vector<std::byte> compressed;
+	if (lastFile.empty() && !jsonOnly) {
+		const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
+		const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
+		const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
+		const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
+		const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
+		const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
+		const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
+		const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+		layerCountBuffer.release();
 
-	uLongf bytes{ 0 };
-	bytes += layerCountBytes;
-	bytes += heightBytes;
-	bytes += fluxBytes;
-	bytes += stabilityBytes;
-	bytes += sedimentBytes;
-	bytes += damageBytes;
+		uLongf bytes{ 0 };
+		bytes += layerCountBytes;
+		bytes += heightBytes;
+		bytes += fluxBytes;
+		bytes += stabilityBytes;
+		bytes += sedimentBytes;
+		bytes += damageBytes;
 
-	std::vector<std::byte> uncompressed(bytes);
-	std::ptrdiff_t i{ 0 };
+		std::vector<std::byte> uncompressed(bytes);
+		std::ptrdiff_t i{ 0 };
 
-	terrain.layerCountBuffer.download({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
-	terrain.heightBuffer.download({ uncompressed.data() + i, heightBytes }); i += heightBytes;
-	terrain.fluxBuffer.download({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
-	terrain.stabilityBuffer.download({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
-	terrain.sedimentBuffer.download({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
-	terrain.damageBuffer.download({ uncompressed.data() + i, damageBytes }); i += damageBytes;
+		terrain.layerCountBuffer.download({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
+		terrain.heightBuffer.download({ uncompressed.data() + i, heightBytes }); i += heightBytes;
+		terrain.fluxBuffer.download({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
+		terrain.stabilityBuffer.download({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
+		terrain.sedimentBuffer.download({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
+		terrain.damageBuffer.download({ uncompressed.data() + i, damageBytes }); i += damageBytes;
 
-	uLongf compressedSize{ compressBound(bytes) };
-	std::vector<std::byte> compressed(compressedSize);
-	const int status{ compress(reinterpret_cast<Bytef*>(compressed.data()), &compressedSize, reinterpret_cast<Bytef*>(uncompressed.data()), uncompressed.size()) };
+		uLongf compressedSize{ compressBound(bytes) };
+		compressed.resize(compressedSize);
+		const int status{ compress(reinterpret_cast<Bytef*>(compressed.data()), &compressedSize, reinterpret_cast<Bytef*>(uncompressed.data()), uncompressed.size()) };
 
-	ONEC_ASSERT(status == Z_OK, "Failed to compress data");
-
+		ONEC_ASSERT(status == Z_OK, "Failed to compress data");
+	}
 	json["Terrain/GridSize"] = { terrain.gridSize.x, terrain.gridSize.y };
 	json["Terrain/GridScale"] = terrain.gridScale;
 	json["Terrain/MaxLayerCount"] = terrain.maxLayerCount;
@@ -888,12 +903,15 @@ void UI::saveToFile(const std::filesystem::path& file)
 	json["Rendering/EnableAOInReflection"] = rendering.enableAOInReflection;
 	json["Rendering/EnableAOInRefraction"] = rendering.enableAOInRefraction;
 
-	auto fileP = lastFile.empty() ? file.stem().concat(".dat") : lastFile;
+	auto fileP = jsonOnly ? std::filesystem::path{} : (lastFile.empty() ? file.stem().concat(".dat") : lastFile);
 	json["Terrain/File"] = fileP;
+	if (lastFile.empty()) {
+		onec::writeFile(file.parent_path() / fileP, std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
+	}
+
 	lastFile = fileP;
 
 	onec::writeFile(file, json.dump(1));
-	onec::writeFile(file.parent_path() / fileP, std::string_view{ reinterpret_cast<char*>(compressed.data()), compressed.size() });
 }
 
 void UI::loadFromFile(const std::filesystem::path& file)
@@ -925,41 +943,42 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	if (json.contains("Terrain/File")) {
 		path = file.parent_path() / json["Terrain/File"];
 	}
-	lastFile = path;
-	terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
-	std::string compressed{ onec::readFile(path)};
+	if (std::filesystem::is_regular_file(path)) {
+		lastFile = path;
+		terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
+		std::string compressed{ onec::readFile(path) };
 
-	const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
-	const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
-	const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
-	const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
-	const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
-	const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
-	const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
-	const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
-	const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+		const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
+		const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
+		const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
+		const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
+		const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
+		const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
+		const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
+		const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
+		const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
 
-	uLongf bytes{ 0 };
-	bytes += layerCountBytes;
-	bytes += heightBytes;
-	bytes += fluxBytes;
-	bytes += stabilityBytes;
-	bytes += sedimentBytes;
-	bytes += damageBytes;
+		uLongf bytes{ 0 };
+		bytes += layerCountBytes;
+		bytes += heightBytes;
+		bytes += fluxBytes;
+		bytes += stabilityBytes;
+		bytes += sedimentBytes;
+		bytes += damageBytes;
 
-	std::vector<std::byte> uncompressed(bytes);
-	const int status{ uncompress(reinterpret_cast<Bytef*>(uncompressed.data()), &bytes, reinterpret_cast<const Bytef*>(compressed.data()), compressed.size()) };
+		std::vector<std::byte> uncompressed(bytes);
+		const int status{ uncompress(reinterpret_cast<Bytef*>(uncompressed.data()), &bytes, reinterpret_cast<const Bytef*>(compressed.data()), compressed.size()) };
 
-	ONEC_ASSERT(status == Z_OK, "Failed to uncompress data");
-	
-	std::ptrdiff_t i{ 0 };
-	terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes}); i += layerCountBytes;
-	terrain.heightBuffer.upload({ uncompressed.data() + i, heightBytes }); i += heightBytes;
-	terrain.fluxBuffer.upload({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
-	terrain.stabilityBuffer.upload({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
-	terrain.sedimentBuffer.upload({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
-	terrain.damageBuffer.upload({ uncompressed.data() + i, damageBytes }); i += damageBytes;
+		ONEC_ASSERT(status == Z_OK, "Failed to uncompress data");
 
+		std::ptrdiff_t i{ 0 };
+		terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
+		terrain.heightBuffer.upload({ uncompressed.data() + i, heightBytes }); i += heightBytes;
+		terrain.fluxBuffer.upload({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
+		terrain.stabilityBuffer.upload({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
+		terrain.sedimentBuffer.upload({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
+		terrain.damageBuffer.upload({ uncompressed.data() + i, damageBytes }); i += damageBytes;
+	}
 	Simulation& simulation{ terrain.simulation };
 	simulation.useOutflowBorders = json["Simulation/UseOutflowBorders"];
 	if (json.contains("Simulation/UseSlippageOutflowBorders")) {
@@ -1109,6 +1128,35 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	pointRenderer.material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
 	pointRenderer.enabled = !rendering.useRaymarching;
 	screenTextureRenderer.enabled = rendering.useRaymarching;
+
+	if (!std::filesystem::is_regular_file(path)) {
+		lastFile = std::filesystem::path{};
+		onec::World& world{ onec::getWorld() };
+
+		geo::SimpleMaterialUniforms uniforms;
+		uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
+		uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
+		uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
+		uniforms.useInterpolation = rendering.useInterpolation;
+		uniforms.renderSand = rendering.renderSand;
+		uniforms.renderWater = rendering.renderWater;
+		uniforms.gridSize = terrain.gridSize;
+		uniforms.gridScale = terrain.gridScale;
+		uniforms.maxLayerCount = terrain.maxLayerCount;
+
+		terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, static_cast<char>(uniforms.maxLayerCount), terrain.simulation };
+		terrain.simulation.init = true;
+
+		uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
+		uniforms.heights = terrain.heightBuffer.getBindlessHandle();
+		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
+		uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
+
+		world.setComponent<onec::Position>(this->terrain.entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(this->terrain.entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
+
+		pointRenderer.material->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
+		pointRenderer.count = terrain.numValidColumns;
+	}
 }
 
 }

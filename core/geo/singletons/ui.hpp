@@ -74,7 +74,7 @@ private:
 	void updateTerrain();
 	void updateSimulation();
 	void updateRendering();
-	void saveToFile(const std::filesystem::path& file);
+	void saveToFile(const std::filesystem::path& file, bool jsonOnly = false);
 	void loadFromFile(const std::filesystem::path& file);
 };
 
