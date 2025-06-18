@@ -1549,7 +1549,13 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF<SmoothHit, true>(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
+					if(simulation.rendering.enableSoftShadows)
+						if(simulation.rendering.fixLightLeaks)
+							reflection = shadePbrBRDF<State, SmoothHit, true, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
+						else
+							reflection = shadePbrBRDF<State, SmoothHit, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
+					else
+						reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.02f, 1.f - rHit.materials.z);
 					if (rHit.hit_air) reflection += rHit.materials.z * simulation.rendering.materialColors[AIR];
 
 					if (simulation.rendering.enableWaterAbsorption) {
@@ -1583,7 +1589,13 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.01f, 1.f - rHit.materials.z);
+					if(simulation.rendering.enableSoftShadows)
+						if(simulation.rendering.fixLightLeaks)
+							refraction = shadePbrBRDF<State, SmoothHit, true, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.01f, 1.f - rHit.materials.z);
+						else
+							refraction = shadePbrBRDF<State, SmoothHit, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.01f, 1.f - rHit.materials.z);
+					else
+						refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.01f, 1.f - rHit.materials.z);
 					refraction += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
@@ -1612,7 +1624,13 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 				if (rHit.hit) {
 					PbrBRDF rBrdf{ getBRDF(rRay, rHit) };
 					// Secondary reflections simply sample background
-					reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.01f, 1.f - rHit.materials.z);
+					if(simulation.rendering.enableSoftShadows)
+						if(simulation.rendering.fixLightLeaks)
+							reflection = shadePbrBRDF<State, SmoothHit, true, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.01f, 1.f - rHit.materials.z);
+						else
+							reflection = shadePbrBRDF<State, SmoothHit, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.01f, 1.f - rHit.materials.z);
+					else
+						reflection = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInReflection, simulation.rendering.enableAOInReflection, 0.01f, 1.f - rHit.materials.z);
 					reflection += rHit.materials.z * rBrdf.F * simulation.rendering.materialColors[AIR];
 				}
 			}
@@ -1641,7 +1659,13 @@ __global__ void raymarchDDAQuadTreeSmoothKernel() {
 					PbrBRDF rBrdf{ getBRDF<SmoothHit, true>(rRay, rHit, false, hit.normal) };
 
 					// Secondary reflections simply sample background
-					refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
+					if(simulation.rendering.enableSoftShadows)
+						if(simulation.rendering.fixLightLeaks)
+							refraction = shadePbrBRDF<State, SmoothHit, true, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
+						else
+							refraction = shadePbrBRDF<State, SmoothHit, true, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
+					else
+						refraction = shadePbrBRDF<State, SmoothHit, true>(rBrdf, rRay, rHit, simulation.rendering.enableShadowsInRefraction, simulation.rendering.enableAOInRefraction, 0.02f, 1.f - rHit.materials.z);
 					
 					if (rHit.hit_air) refraction += rHit.materials.z * (1.f - rBrdf.F) * simulation.rendering.materialColors[AIR];
 

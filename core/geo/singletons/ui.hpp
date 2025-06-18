@@ -43,7 +43,7 @@ struct UI
 		int debugLayer{ -2 };
 
 		float softShadowScale{ 0.01f };
-		float maxSoftShadowDiv{ 0.4f };
+		float maxSoftShadowDiv{ 0.5f };
 
 		bool accurateNormals{ false };
 		bool useExpensiveNormals{ false };

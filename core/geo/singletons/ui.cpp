@@ -946,12 +946,13 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	this->terrain.gridScale = json["Terrain/GridScale"];
 	this->terrain.maxLayerCount = json["Terrain/MaxLayerCount"];
 
-	auto path = file.parent_path() / file.stem().concat(".dat");
+	std::string basePath = file.stem().concat(".dat").string();
 	if (json.contains("Terrain/File")) {
-		path = file.parent_path() / json["Terrain/File"];
+		basePath = json["Terrain/File"];
 	}
+	auto path = file.parent_path() / basePath;
 	if (std::filesystem::is_regular_file(path)) {
-		lastFile = path;
+		lastFile = basePath;
 		terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
 		std::string compressed{ onec::readFile(path) };
 
