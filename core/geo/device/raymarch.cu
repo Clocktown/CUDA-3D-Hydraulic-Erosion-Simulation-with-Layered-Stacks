@@ -1803,6 +1803,8 @@ __device__ __forceinline__ void mergeQuadTreeLayer(int treeLevel, int layerCount
 		for (int layer{ 0 }; layer < layerCount; ++layer) {
 			currHeights = half4toVec4(simulation.quadTree[treeLevel].heights[flatIndex + layer * simulation.quadTree[treeLevel].layerStride]);
 			// 3 Intervals we care about: [CEILING - 1, FULLHEIGHT], [CEILING - 1, SOLIDHEIGHT], [AIR - 1, SOLIDHEIGHT]
+			// CEILING, AIR: min
+			// SOLIDHEIGHT, FULLHEIGHT: max
 			// SOLIDHEIGHT <= FULLHEIGHT
 			// AIR <= CEILING
 			// AIR <= FULLHEIGHT
@@ -1939,8 +1941,8 @@ __global__ void buildQuadTreeFirstLayer(bool interpolation) {
 		simulation.quadTree[1].heights[flatIndex + simulation.quadTree[1].layerStride * (layerCount - 1)] = toHalf4(heights);
 	}
 	// Compact tree (merge overlapping columns)
-	//simulation.quadTree[1].layerCounts[flatIndex] = layerCount;
-	mergeQuadTreeLayer(1, layerCount, flatIndex);
+	simulation.quadTree[1].layerCounts[flatIndex] = layerCount;
+	//mergeQuadTreeLayer(1, layerCount, flatIndex);
 }
 
 __global__ void buildQuadTreeLayer(int i) {
@@ -2026,8 +2028,8 @@ __global__ void buildQuadTreeLayer(int i) {
 		simulation.quadTree[i].heights[flatIndex + simulation.quadTree[i].layerStride * (layerCount - 1)] = toHalf4(heights);
 	}
 	// Compact tree (merge overlapping columns)
-	//simulation.quadTree[i].layerCounts[flatIndex] = layerCount;
-	mergeQuadTreeLayer(i, layerCount, flatIndex);
+	simulation.quadTree[i].layerCounts[flatIndex] = layerCount;
+	//mergeQuadTreeLayer(i, layerCount, flatIndex);
 }
 
 __device__ __forceinline__ float GeometrySchlickGGXIBL(float NdotV, float roughness)
