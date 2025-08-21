@@ -1,5 +1,12 @@
-# CUDA 3D Hydraulic Erosion Simulation with layered stacks
-This repository contains the full source code of our VMV 2024 paper **3D Real-Time Hydraulic Erosion Simulation using Multi-Layered Heightmaps**
+# Fast Rendering of Large-Scale Dynamic Multi-Layered Height Maps 
+This repository contains the source code of our VMV 2025 paper, which built on top of a simulation we published in VMV 2024.
+
+Click the image vor a video:
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/p6o6HiPflGM/0.jpg)](https://www.youtube.com/watch?v=p6o6HiPflGM)
+
+# Old Videos
+These videos reflect our VMV 2024 paper **3D Real-Time Hydraulic Erosion Simulation using Multi-Layered Heightmaps**, which was focused on simulation only and featured worse rendering/visualization. The respective state of the source code can be found in the corresponding tag.
 
 https://github.com/user-attachments/assets/01f3300f-136c-45f1-a7f6-2575fb5c327e
 
