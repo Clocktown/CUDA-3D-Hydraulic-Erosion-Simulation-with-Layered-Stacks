@@ -1,7 +1,7 @@
 # Fast Rendering of Large-Scale Dynamic Multi-Layered Height Maps 
 This repository contains the source code of our VMV 2025 paper, which built on top of a simulation we published in VMV 2024.
 
-Click the image vor a video:
+Click the image for a video:
 
 [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/p6o6HiPflGM/0.jpg)](https://www.youtube.com/watch?v=p6o6HiPflGM)
 
