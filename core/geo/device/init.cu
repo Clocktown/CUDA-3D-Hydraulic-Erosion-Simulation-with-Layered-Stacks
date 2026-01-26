@@ -11,15 +11,15 @@ namespace device
 
 __device__ float fbm(glm::vec2 st, int octaves, float scale, int seed) {
 	// Initial values
-	float value = 0.0;
-	float amplitude = .5;
-	float frequency = 0.;
+	float value = 0.0f;
+	float amplitude = .5f;
+	float frequency = 0.f;
 	//
 	// Loop of octaves
 	for (int i = 0; i < octaves; i++) {
 		value += amplitude * initNoise::cudaNoise::simplexNoise(make_float3(st.x, st.y, 0), scale, seed);
-		scale *= 2.;
-		amplitude *= .5;
+		scale *= 2.f;
+		amplitude *= .5f;
 	}
 	return value;
 }
