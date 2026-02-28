@@ -1,4 +1,4 @@
-#include "simulation.hpp"
+#include "simulation.cuh"
 
 namespace geo
 {
@@ -48,8 +48,8 @@ namespace geo
 
 			for (int layer{ layerCount - 1 }; layer >= 0; --layer, itFlatIndex -= simulation.layerStride)
 			{
-				auto heights = glm::cuda_cast(simulation.heights[itFlatIndex]);
-				float sediment = simulation.sediments[itFlatIndex];
+				auto heights = half4toVec4(simulation.heights[itFlatIndex]);
+				float sediment = __half2float(simulation.sediments[itFlatIndex]);
 
 				//heights[BEDROCK] += collapsedBedrock;
 				if (isTooClose) {
@@ -72,9 +72,9 @@ namespace geo
 				collapsedWater = 0.f;
 				collapsedSediment = 0.f;
 
-				float stability = simulation.stability[itFlatIndex];
-				const float floor = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING];
-				const float bedrockBelow = (layer == 0) ? -FLT_MAX : ((float*)(simulation.heights + itFlatIndex - simulation.layerStride))[BEDROCK];
+				float stability = __half2float(simulation.stability[itFlatIndex]);
+				const float floor = (layer == 0) ? -FLT_MAX : __half2float(((half*)(simulation.heights + itFlatIndex - simulation.layerStride))[CEILING]);
+				const float bedrockBelow = (layer == 0) ? -FLT_MAX : __half2float(((half*)(simulation.heights + itFlatIndex - simulation.layerStride))[BEDROCK]);
 				isTooClose = (layer > 0) && ((floor - bedrockBelow) < 0.05f * simulation.splitSize);
 				const bool isTooThin = heights[BEDROCK] - floor <= simulation.minBedrockThickness;
 				stability = (isTooThin || isTooClose) ? 0.f : stability;
@@ -83,13 +83,13 @@ namespace geo
 					collapsedSand += heights[SAND];
 					collapsedBedrock += heights[BEDROCK] - floor;
 					// if a damaged column collapses, the damage has been converted to sand already but not yet been removed from the bedrock
-					float damage = glm::min(simulation.damages[itFlatIndex], collapsedBedrock);
+					float damage = glm::min(__half2float(simulation.damages[itFlatIndex]), collapsedBedrock);
 					collapsedBedrock -= damage;
 					collapsedSediment += sediment;
 					previousCeiling = heights[CEILING];
 					heights = glm::vec4(0);
 					sediment = 0.f;
-					simulation.fluxes[itFlatIndex] = float4(0.f);
+					simulation.fluxes[itFlatIndex] = half4{{CUDART_ZERO_FP16, CUDART_ZERO_FP16}, {CUDART_ZERO_FP16, CUDART_ZERO_FP16}};
 					previousCollapsed = true;
 					newLayerCount--;
 				}
@@ -97,9 +97,9 @@ namespace geo
 					previousCollapsed = false;
 				}
 
-				simulation.heights[itFlatIndex] = glm::cuda_cast(heights);
-				simulation.sediments[itFlatIndex] = sediment;
-				simulation.stability[itFlatIndex] = stability;
+				simulation.heights[itFlatIndex] = toHalf4(heights);
+				simulation.sediments[itFlatIndex] = __float2half(sediment);
+				simulation.stability[itFlatIndex] = __float2half(stability);
 			}
 
 			itFlatIndex = flatIndex + simulation.layerStride; // set index to layer 1
@@ -108,12 +108,11 @@ namespace geo
 
 			for (int layer{ 1 }; layer < layerCount; ++layer, itFlatIndex += simulation.layerStride)
 			{
-				float stability = simulation.stability[itFlatIndex];
-				if (stability > 0.f) {
+				if (simulation.stability[itFlatIndex] > CUDART_ZERO_FP16) {
 					if (tgtIndex != itFlatIndex) {
 						simulation.heights[tgtIndex] = simulation.heights[itFlatIndex];
 						simulation.fluxes[tgtIndex] = simulation.fluxes[itFlatIndex];
-						simulation.stability[tgtIndex] = stability;
+						simulation.stability[tgtIndex] = simulation.stability[itFlatIndex];
 						simulation.sediments[tgtIndex] = simulation.sediments[itFlatIndex];
 						simulation.damages[tgtIndex] = simulation.damages[itFlatIndex];
 					}
@@ -141,14 +140,14 @@ namespace geo
 			int flatIndex{ flattenIndex(index, simulation.gridSize) };
 			const int layerCount{ simulation.layerCounts[flatIndex] };
 
-			float bedrockMin = ((float*)(simulation.heights + flatIndex))[CEILING];
+			float bedrockMin = __half2float(((half*)(simulation.heights + flatIndex))[CEILING]);
 			flatIndex += simulation.layerStride; // Bottom layer is always stable, so skip
 
 			for (int layer{ 1 }; layer < layerCount; ++layer, flatIndex += simulation.layerStride)
 			{
-				glm::vec4 heights = glm::cuda_cast(simulation.heights[flatIndex]);
+				glm::vec4 heights = half4toVec4(simulation.heights[flatIndex]);
 				float bedrockMax = heights[BEDROCK];
-				float oldStability = simulation.stability[flatIndex];
+				float oldStability = __half2float(simulation.stability[flatIndex]);
 				oldStability = (oldStability == FLT_MAX) ? 0.f : oldStability; // If layer 0 is split in horizontal Erosion, layer 1 can have FLT_MAX as stability. Check might not really be necessary though
 				float stability = 0.f;
 
@@ -194,9 +193,9 @@ namespace geo
 
 					for (neighbor.layer = 0; neighbor.layer < neighbor.layerCount; ++neighbor.layer, neighbor.flatIndex += simulation.layerStride)
 					{
-						auto heights = glm::cuda_cast(simulation.heights[neighbor.flatIndex]);
-						neighbor.stability = simulation.stability[neighbor.flatIndex];
-						neighbor.bedrockMax = ((float*)(simulation.heights + neighbor.flatIndex))[BEDROCK];
+						auto heights = half4toVec4(simulation.heights[neighbor.flatIndex]);
+						neighbor.stability = __half2float(simulation.stability[neighbor.flatIndex]);
+						neighbor.bedrockMax = __half2float(((half*)(simulation.heights + neighbor.flatIndex))[BEDROCK]);
 
 						float overlap = fminf(neighbor.bedrockMax, bedrockMax) - fmaxf(neighbor.bedrockMin, bedrockMin);
 						if (overlap > 0.f) {
@@ -204,7 +203,7 @@ namespace geo
 							support = fmaxf(fminf(oSupport, neighbor.stability), support);
 						}
 
-						neighbor.bedrockMin = ((float*)(simulation.heights + neighbor.flatIndex))[CEILING];
+						neighbor.bedrockMin = __half2float(((half*)(simulation.heights + neighbor.flatIndex))[CEILING]);
 					}
 				}
 
@@ -217,7 +216,7 @@ namespace geo
 				}
 
 				bedrockMin = heights[CEILING];
-				simulation.stability[flatIndex] = stability;
+				simulation.stability[flatIndex] = __float2half(stability);
 			}
 		}
 

@@ -1,4 +1,4 @@
-#include "simulation.hpp"
+#include "simulation.cuh"
 
 namespace rainNoise {
 #include "cuda_noise.cuh"
@@ -24,9 +24,9 @@ __global__ void rainKernel()
 	const int topLayer{ simulation.layerCounts[flatIndex] - 1 };
 	flatIndex += topLayer * simulation.layerStride;
 
-	float water = simulation.heights[flatIndex].z;
+	float water = __float2half(simulation.heights[flatIndex].b.x);
 
-	glm::vec4 flux{ glm::cuda_cast(simulation.fluxes[flatIndex]) };
+	glm::vec4 flux{ half4toVec4(simulation.fluxes[flatIndex]) };
 
 	for (int i = 0; i < 4; ++i) {
 		const glm::vec2 dVec = simulation.sourceLocations[i] - glm::vec2(index) * simulation.gridScale;
@@ -40,10 +40,10 @@ __global__ void rainKernel()
 
 	water += 2.f * noiseVal * simulation.rain * simulation.deltaTime;
 
-	simulation.heights[flatIndex].z = water;
+	simulation.heights[flatIndex].b.x = __float2half(water);
 
 	//if (glm::dot(flux, flux) > 0.f) {
-		simulation.fluxes[flatIndex] = glm::cuda_cast(flux);
+		simulation.fluxes[flatIndex] = toHalf4(flux);
 	//}
 }
 

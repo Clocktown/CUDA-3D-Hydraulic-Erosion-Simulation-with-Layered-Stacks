@@ -5,9 +5,9 @@
 namespace onec {
 	struct RenderPipelineUniforms
 	{
-		static constexpr int maxPointLightCount{ 256 };
-		static constexpr int maxSpotLightCount{ 256 };
-		static constexpr int maxDirectionalLightCount{ 256 };
+		static constexpr int maxPointLightCount{ 1 };
+		static constexpr int maxSpotLightCount{ 1 };
+		static constexpr int maxDirectionalLightCount{ 1 };
 
 		glm::mat4 worldToView;
 		glm::mat4 viewToWorld;

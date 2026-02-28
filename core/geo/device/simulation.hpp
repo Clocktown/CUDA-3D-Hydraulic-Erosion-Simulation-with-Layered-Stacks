@@ -158,27 +158,25 @@ struct Simulation
 	int step; 
 
 	char* layerCounts;
-	float4* heights;
-	float* sediments;
-	int* indices;
+	half4* heights;
+	half* sediments;
 
-	int* atomicCounter;
 	char4* pipes;
-	float* slopes; // sin(alpha)
-	float4* fluxes;
+	half* slopes; // sin(alpha)
+	half4* fluxes;
 
 	union
 	{
-		float4* slippages;
-		float2* splits; 
+		half4* slippages;
+		half2* splits; 
 	};
 	
-	float2* velocities;
-	float* stability;
-	float* damages;
+	half2* velocities;
+	half* stability;
+	half* damages;
 
 
-	float* sedimentFluxScale;
+	half* sedimentFluxScale;
 
 	Rendering rendering;
 	int maxQuadTreeLevels;

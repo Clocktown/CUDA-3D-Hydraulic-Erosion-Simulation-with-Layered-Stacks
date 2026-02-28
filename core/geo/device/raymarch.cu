@@ -1,4 +1,4 @@
-#include "simulation.hpp"
+#include "simulation.cuh"
 
 #include <numbers>
 
@@ -95,55 +95,27 @@ constexpr float epsilon = 1.192092896e-07f;
 constexpr float bigEpsilon = 1e-4f;
 constexpr float rPi = 0.318309886f;
 
-
-
-__device__ __forceinline__ half4 toHalf4(const float4& v) {
-	auto v2 = reinterpret_cast<const float2*>(&v);
-	half4 res;
-	res.a = __float22half2_rn(v2[0]);
-	res.b = __float22half2_rn(v2[1]);
-	return res;
-}
-
-__device__ __forceinline__ half4 toHalf4(const glm::vec4& v) {
-	return toHalf4(glm::cuda_cast(v));
-}
-
-__device__ __forceinline__ float4 half4toFloat4(const half4& v) {
-	float4 res;
-	auto res2 = reinterpret_cast<float2*>(&res);
-	res2[0] = __half22float2(v.a);
-	res2[1] = __half22float2(v.b);
-	return res;
-}
-
-__device__ __forceinline__ glm::vec4 half4toVec4(const half4& v) {
-	return glm::cuda_cast(half4toFloat4(v));
-}
-
-
-
-__device__ __forceinline__ glm::vec3 adjustGamma(const glm::vec3 color, const float gamma)
+__forceinline__ __device__  glm::vec3 adjustGamma(const glm::vec3 color, const float gamma)
 {
 	return pow(color, glm::vec3(gamma));
 }
 
-__device__ __forceinline__ glm::vec3 sRGBToLinear(const glm::vec3 color)
+__forceinline__ __device__  glm::vec3 sRGBToLinear(const glm::vec3 color)
 {
 	return adjustGamma(color, 2.2f);
 }
 
-__device__ __forceinline__ glm::vec3 linearToSRGB(const glm::vec3 color)
+__forceinline__ __device__  glm::vec3 linearToSRGB(const glm::vec3 color)
 {
 	return adjustGamma(color, 1.0f / 2.2f);
 }
 
-__device__ __forceinline__ glm::vec3 applyReinhardToneMap(const glm::vec3 luminance)
+__forceinline__ __device__  glm::vec3 applyReinhardToneMap(const glm::vec3 luminance)
 {
 	return luminance / (luminance + 1.0f);
 }
 
-__device__ __forceinline__ float DistributionGGX(const glm::vec3 &N, const glm::vec3& H, float roughness)
+__forceinline__ __device__  float DistributionGGX(const glm::vec3 &N, const glm::vec3& H, float roughness)
 {
 	float a = roughness * roughness;
 	float a2 = a * a;
@@ -157,7 +129,7 @@ __device__ __forceinline__ float DistributionGGX(const glm::vec3 &N, const glm::
 	return num / denom;
 }
 
-__device__ __forceinline__ float GeometrySchlickGGX(float NdotV, float roughness)
+__forceinline__ __device__  float GeometrySchlickGGX(float NdotV, float roughness)
 {
 	float r = (roughness + 1.0f);
 	float k = (r * r) / 8.0f;
@@ -168,7 +140,7 @@ __device__ __forceinline__ float GeometrySchlickGGX(float NdotV, float roughness
 	return num / denom;
 }
 
-__device__ __forceinline__ float GeometrySmith(const glm::vec3& N, const glm::vec3& V, const glm::vec3& L, float roughness)
+__forceinline__ __device__  float GeometrySmith(const glm::vec3& N, const glm::vec3& V, const glm::vec3& L, float roughness)
 {
 	float NdotV = glm::max(dot(N, V), 0.0f);
 	float NdotL = glm::max(dot(N, L), 0.0f);
@@ -178,18 +150,18 @@ __device__ __forceinline__ float GeometrySmith(const glm::vec3& N, const glm::ve
 	return ggx1 * ggx2;
 }
 
-__device__ __forceinline__ float getAttenuation(const float distance, const float range)
+__forceinline__ __device__  float getAttenuation(const float distance, const float range)
 {
 	float ratio = distance / range;
 	return 1.f / (ratio * ratio + 1.0f);
 }
 
-__device__ __forceinline__ glm::vec3 getPointLightRadiance(const onec::RenderPipelineUniforms::PointLight pointLight, const glm::vec3 direction, const float distance)
+__forceinline__ __device__  glm::vec3 getPointLightRadiance(const onec::RenderPipelineUniforms::PointLight pointLight, const glm::vec3 direction, const float distance)
 {
 	return getAttenuation(distance, pointLight.range) * pointLight.intensity;
 }
 
-__device__ __forceinline__ glm::vec3 getSpotLightRadiance(const onec::RenderPipelineUniforms::SpotLight spotLight, const glm::vec3 direction, const float distance)
+__forceinline__ __device__  glm::vec3 getSpotLightRadiance(const onec::RenderPipelineUniforms::SpotLight spotLight, const glm::vec3 direction, const float distance)
 {
 	const float cutOff = glm::dot(spotLight.direction, direction);
 
@@ -203,18 +175,18 @@ __device__ __forceinline__ glm::vec3 getSpotLightRadiance(const onec::RenderPipe
 	return attenuation * spotLight.intensity;
 }
 
-__device__ __forceinline__ glm::vec3 getDirectionalLightRadiance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const glm::vec3 direction)
+__forceinline__ __device__  glm::vec3 getDirectionalLightRadiance(const onec::RenderPipelineUniforms::DirectionalLight directionalLight, const glm::vec3 direction)
 {
 	return directionalLight.luminance;
 }
 
-__device__ __forceinline__ float fresnelSchlick(float cosTheta, float F0)
+__forceinline__ __device__  float fresnelSchlick(float cosTheta, float F0)
 {
 	return F0 + (1.0f - F0) * glm::pow(glm::clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
 }
 
 template<bool WaterMode = false>
-__device__ __forceinline__ glm::vec2 fresnelSchlickRoughness(float cosTheta, float F0, float roughness)
+__forceinline__ __device__ glm::vec2 fresnelSchlickRoughness(float cosTheta, float F0, float roughness)
 {
 	if (WaterMode) 
 	{
@@ -232,7 +204,7 @@ __device__ __forceinline__ glm::vec2 fresnelSchlickRoughness(float cosTheta, flo
 }  
 
 template<class Hit>
-__device__ __forceinline__ glm::vec3 evaluatePbrBRDF(const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& L, const glm::vec3& V)
+__forceinline__ __device__ glm::vec3 evaluatePbrBRDF(const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& L, const glm::vec3& V)
 {
 	const glm::vec3 H = normalize(V + L);
 	float F  = fresnelSchlick(glm::max(dot(H, V), 0.0f), pbrBRDF.F0);
@@ -247,7 +219,7 @@ __device__ __forceinline__ glm::vec3 evaluatePbrBRDF(const PbrBRDF& pbrBRDF, con
 }
 
 // 1D "AABB" Intersection on just heights is sufficient, because we know entry/exit of the 2D AABB from DDA already (passed in as tRef)
-__device__ __forceinline__ bool intersectionOpt(const float& b_min, const float& b_max, const float& r_o, const float& inv_r_dir, glm::vec2& t, const glm::vec2& tRef) {
+__forceinline__ __device__ bool intersectionOpt(const float& b_min, const float& b_max, const float& r_o, const float& inv_r_dir, glm::vec2& t, const glm::vec2& tRef) {
     float t1 = (b_min - r_o) * inv_r_dir;
     float t2 = (b_max - r_o) * inv_r_dir;
 
@@ -257,7 +229,7 @@ __device__ __forceinline__ bool intersectionOpt(const float& b_min, const float&
 	return t.y >= t.x && t.y >= 0.f;
 }
 
-__device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::vec3& b_max, const glm::vec3& r_o, const glm::vec3& inv_r_dir, glm::vec2& t) {
+__forceinline__ __device__ bool intersection(const glm::vec3& b_min, const glm::vec3& b_max, const glm::vec3& r_o, const glm::vec3& inv_r_dir, glm::vec2& t) {
     glm::vec3 t1 = (b_min - r_o) * inv_r_dir;
     glm::vec3 t2 = (b_max - r_o) * inv_r_dir;
 
@@ -270,7 +242,7 @@ __device__ __forceinline__ bool intersection(const glm::vec3& b_min, const glm::
 	return t.y >= t.x && t.y >= 0.f;
 }
 
-__device__ __forceinline__ float intersectionVolume(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
+__forceinline__ __device__ float intersectionVolume(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
 	const glm::vec3 b_min = glm::max(b_min0, b_min1);
 	const glm::vec3 b_max = glm::min(b_max0, b_max1);
 	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
@@ -278,7 +250,7 @@ __device__ __forceinline__ float intersectionVolume(const glm::vec3& b_min0, con
 	return d.x * d.y * d.z;
 }
 
-__device__ __forceinline__ float intersectionVolumeNormal(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1, glm::vec3& n) {
+__forceinline__ __device__ float intersectionVolumeNormal(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1, glm::vec3& n) {
 	const glm::vec3 b_min = glm::max(b_min0, b_min1);
 	const glm::vec3 b_max = glm::min(b_max0, b_max1);
 	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
@@ -298,7 +270,7 @@ __device__ __forceinline__ float intersectionVolumeNormal(const glm::vec3& b_min
 	return d.x * d.y * d.z;
 }
 
-__device__ __forceinline__ glm::vec3 intersectionVolumeBounds(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
+__forceinline__ __device__ glm::vec3 intersectionVolumeBounds(const glm::vec3& b_min0, const glm::vec3& b_max0, const glm::vec3& b_min1, const glm::vec3& b_max1) {
 	const glm::vec3 b_min = glm::max(b_min0, b_min1);
 	const glm::vec3 b_max = glm::min(b_max0, b_max1);
 	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
@@ -306,7 +278,7 @@ __device__ __forceinline__ glm::vec3 intersectionVolumeBounds(const glm::vec3& b
 	return glm::vec3(d.x * d.y * d.z, b_min.y, b_max.y);
 }
 
-__device__ __forceinline__ float intersectionVolumeFullBounds(glm::vec3& b_min, glm::vec3& b_max, const glm::vec3& b_min1, const glm::vec3& b_max1) {
+__forceinline__ __device__ float intersectionVolumeFullBounds(glm::vec3& b_min, glm::vec3& b_max, const glm::vec3& b_min1, const glm::vec3& b_max1) {
 	b_min = glm::max(b_min, b_min1);
 	b_max = glm::min(b_max, b_max1);
 	const glm::vec3 d = glm::max(b_max - b_min, glm::vec3(0));
@@ -315,18 +287,18 @@ __device__ __forceinline__ float intersectionVolumeFullBounds(glm::vec3& b_min, 
 }
 
 template <class State>
-__device__ __forceinline__ void updateStateAABB(State& state, float gridScale) {
+__forceinline__ __device__ void updateStateAABB(State& state, float gridScale) {
 	state.bmin2D = glm::vec2(state.currentCell) * gridScale;
 	state.bmax2D = state.bmin2D + gridScale;
 }
 
 template <class State>
-__device__ __forceinline__ void updateStateAABB(State& state, int currentLevel) {
+__forceinline__ __device__ void updateStateAABB(State& state, int currentLevel) {
 	return updateStateAABB(state, simulation.quadTree[currentLevel].gridScale);
 }
 
 template <class State>
-__device__ __forceinline__ void calculateDDAState(State& state, const Ray& ray, const glm::ivec2& gridSize, float gridScale, float rGridScale) {
+__forceinline__ __device__ void calculateDDAState(State& state, const Ray& ray, const glm::ivec2& gridSize, float gridScale, float rGridScale) {
 	const glm::vec3 rayStart = ray.o + ray.t.x * ray.dir;
 
 	state.currentCell = glm::clamp(
@@ -359,17 +331,17 @@ __device__ __forceinline__ void calculateDDAState(State& state, const Ray& ray, 
 
 
 template <class State>
-__device__ __forceinline__ void calculateDDAState(State& state, const Ray& ray, int currentLevel) {
+__forceinline__ __device__ void calculateDDAState(State& state, const Ray& ray, int currentLevel) {
 	return calculateDDAState(state, ray, simulation.quadTree[currentLevel].gridSize, simulation.quadTree[currentLevel].gridScale, simulation.quadTree[currentLevel].rGridScale);
 }
 
 
 template <class State>
-__device__ __forceinline__ void calculateDDAState(State& state, const Ray& ray) {
+__forceinline__ __device__ void calculateDDAState(State& state, const Ray& ray) {
 	return calculateDDAState(state, ray, simulation.gridSize, simulation.gridScale, simulation.rGridScale);
 }
 
-__device__ __forceinline__ Ray createRay(const glm::vec3& o, const glm::vec3& dir) {
+__forceinline__ __device__ Ray createRay(const glm::vec3& o, const glm::vec3& dir) {
 	Ray ray;
 	ray.o = o;
 	ray.dir = dir;
@@ -387,7 +359,7 @@ __device__ __forceinline__ Ray createRay(const glm::vec3& o, const glm::vec3& di
 	return ray;
 }
 
-__device__ __forceinline__ Ray createRay(const glm::ivec2& index) {
+__forceinline__ __device__ Ray createRay(const glm::ivec2& index) {
 	const glm::vec3 o = simulation.rendering.i_scale * simulation.rendering.camPos;
 	const glm::vec3 pW = simulation.rendering.i_scale * (simulation.rendering.lowerLeft + (index.x + 0.5f) * simulation.rendering.rightVec + (index.y + 0.5f) * simulation.rendering.upVec);
 
@@ -399,7 +371,7 @@ __device__ __forceinline__ Ray createRay(const glm::ivec2& index) {
 
 template <class State, bool WaterMode = false>
 // Ignores Water AND Air in WaterMode
-__device__ __forceinline__ void intersectColumnsAny(const State& state, const Ray& ray, BoxHit& hit) {
+__forceinline__ __device__ void intersectColumnsAny(const State& state, const Ray& ray, BoxHit& hit) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
 
@@ -426,7 +398,7 @@ __device__ __forceinline__ void intersectColumnsAny(const State& state, const Ra
 
 template <class State, bool Shadow = false, bool WaterMode = false>
 // Intersects with Air but not Water in WaterMode
-__device__ __forceinline__ void intersectColumns(const State& state, const Ray& ray, BoxHit& hit) {
+__forceinline__ __device__ void intersectColumns(const State& state, const Ray& ray, BoxHit& hit) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.gridSize) };
 	const int layerCount{ simulation.layerCounts[flatIndex] };
 
@@ -472,7 +444,7 @@ __device__ __forceinline__ void intersectColumns(const State& state, const Ray& 
 }
 
 template <class State, class Hit, bool Shadow = false, bool WaterMode = false>
-__device__ __forceinline__ void intersectQuadTreeColumns(const State& state, const Ray& ray, Hit& hit, int currentLevel) {
+__forceinline__ __device__ void intersectQuadTreeColumns(const State& state, const Ray& ray, Hit& hit, int currentLevel) {
 	int flatIndex{ flattenIndex(state.currentCell, simulation.quadTree[currentLevel].gridSize) };
 	const int layerCount{ simulation.quadTree[currentLevel].layerCounts[flatIndex] };
 
@@ -522,7 +494,7 @@ __device__ __forceinline__ void intersectQuadTreeColumns(const State& state, con
 }
 
 template <class State, bool Shadow = false, bool WaterMode = false>
-__device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
+__forceinline__ __device__ void intersectSceneAsBoxes(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	if (currentLevel == 0) {
 		// Terrain column intersection
 		intersectColumns<State, Shadow, WaterMode>(state, ray, hit);
@@ -534,7 +506,7 @@ __device__ __forceinline__ void intersectSceneAsBoxes(const State& state, const 
 }
 
 template <class State, bool WaterMode = false>
-__device__ __forceinline__ void intersectSceneAsBoxesAny(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
+__forceinline__ __device__ void intersectSceneAsBoxesAny(const State& state, const Ray& ray, BoxHit& hit, int currentLevel) {
 	if (currentLevel == 0) {
 		// Terrain column intersection
 		intersectColumnsAny<State, WaterMode>(state, ray, hit);
@@ -546,7 +518,7 @@ __device__ __forceinline__ void intersectSceneAsBoxesAny(const State& state, con
 }
 
 template <class State>
-__device__ __forceinline__ bool advanceDDA(State& state, Ray& ray, int currentLevel) {
+__forceinline__ __device__ bool advanceDDA(State& state, Ray& ray, int currentLevel) {
 	if constexpr (std::is_same_v<State, DDAMissState>) {
 		state.miss++;
 	}
@@ -566,7 +538,7 @@ __device__ __forceinline__ bool advanceDDA(State& state, Ray& ray, int currentLe
 }
 
 template <class State>
-__device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, const Ray& ray) {
+__forceinline__ __device__ void resolveBoxHit(BoxHit& hit, const State& state, const Ray& ray) {
 	hit.pos = ray.o + hit.t * ray.dir;
 	glm::vec3 bmin = glm::vec3(state.bmin2D.x, hit.boxHeights.x, state.bmin2D.y);
 	glm::vec3 bmax = glm::vec3(state.bmax2D.x, hit.boxHeights.y, state.bmax2D.y);
@@ -584,7 +556,7 @@ __device__ __forceinline__ void resolveBoxHit(BoxHit& hit, const State& state, c
 	}
 }
 
-__device__ __forceinline__ void resolveBoxHitOOB(BoxHit& hit, const Ray& ray) {
+__forceinline__ __device__ void resolveBoxHitOOB(BoxHit& hit, const Ray& ray) {
 	hit.pos = ray.o + hit.t * ray.dir;
 	glm::vec3 bmin = glm::vec3(0.f, hit.boxHeights.x, 0.f);
 	glm::vec3 bmax = glm::vec3(simulation.gridScale * simulation.gridSize.x, hit.boxHeights.y, simulation.gridScale * simulation.gridSize.y);
@@ -616,7 +588,7 @@ __device__ __forceinline__ void resolveBoxHitOOB(BoxHit& hit, const Ray& ray) {
 // since f(p) = (2*i(p)/(s^3)) - 1, where i(p) is the volume overlap, given current volume X with f(p) > 0
 // then the required volume Y is 0.5s^3, so the new volume gained is simply |X - (0.5s^3)|
 
-__device__ __forceinline__ float calculateSafeStep(float volume, float targetVolume, float boxSize, float rBoxSize2, float boxSize3) {
+__forceinline__ __device__ float calculateSafeStep(float volume, float targetVolume, float boxSize, float rBoxSize2, float boxSize3) {
 	// TODO Precompute boxsize values?
 	const float requiredVolumeGain = glm::abs(volume - targetVolume);
 	//const float d1 = min_step + factor * requiredVolumeGain * simulation.rendering.rBoxSize2;// / boxSize2;
@@ -628,7 +600,7 @@ __device__ __forceinline__ float calculateSafeStep(float volume, float targetVol
 }
 
 template<bool WaterMode = false>
-__device__ __forceinline__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
+__forceinline__ __device__ float getVolume(const glm::vec3& p, const float radius, const float radiusG) {
 	const glm::vec3 boxBmin = p - radius;
 	const glm::vec3 boxBmax = p + radius;
 
@@ -674,7 +646,7 @@ __device__ __forceinline__ float getVolume(const glm::vec3& p, const float radiu
 }
 
 template<bool WaterMode = false>
-__device__ __forceinline__ float getVolumeNormal(const glm::vec3& p, const float radius, const float radiusG, glm::vec3& n) {
+__forceinline__ __device__ float getVolumeNormal(const glm::vec3& p, const float radius, const float radiusG, glm::vec3& n) {
 	
 	n = glm::vec3(0);
 	const glm::vec3 boxBmin = p - radius;
@@ -722,7 +694,7 @@ __device__ __forceinline__ float getVolumeNormal(const glm::vec3& p, const float
 }
 
 //template<bool Shadow = false, bool WaterMode = false>
-__device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, const float radius, const float radiusG) {
+__forceinline__ __device__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, const float radius, const float radiusG) {
 	const glm::vec3 boxBmin = p - radius;
 	const glm::vec3 boxBmax = p + radius;
 
@@ -769,7 +741,7 @@ __device__ __forceinline__ glm::vec2 getTerrainAirVolume(const glm::vec3& p, con
 	return volume;
 }
 
-__device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG) {
+__forceinline__ __device__ glm::vec3 getMaterialVolume(const glm::vec3& p, const float radius, const float radiusG) {
 	const glm::vec3 boxBmin = p - radius;
 	const glm::vec3 boxBmax = p + radius;
 
@@ -829,7 +801,7 @@ __device__ __forceinline__ glm::vec3 getMaterialVolume(const glm::vec3& p, const
 }
 
 template <class State, bool Shadow, bool WaterMode = false, bool ForceNormal = false>
-__device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
+__forceinline__ __device__ BoxHit traceRayBoxes(Ray& ray) {
 	BoxHit hit;
 	ray.o += simulation.rendering.gridOffset;
 	const glm::vec3 bmin = glm::vec3(0.f, sceneBounds.x, 0.f);
@@ -922,7 +894,7 @@ __device__ __forceinline__ BoxHit traceRayBoxes(Ray& ray) {
 }
 
 template <class State, bool Shadow = false, bool WaterMode = false, bool ForceNormal = false, bool SoftShadows = false, bool ExpensiveNormal = false>
-__device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) {
+__forceinline__ __device__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) {
 	ray.o += simulation.rendering.gridOffset;
 
 	// We slightly shrink the AABB to prevent rare outlier rays from massively impacting performance.
@@ -1132,7 +1104,7 @@ __device__ __forceinline__ SmoothHit traceRaySmooth(Ray& ray, float bias = 0.f) 
 }
 
 template<class State, class Hit, bool WaterMode = false, bool SoftShadows = false, bool FixLightLeaks = false>
-__device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance, float bias = 0.f) {
+__forceinline__ __device__ float getShadow(const Hit& hit, const glm::vec3& direction, float lightDistance, float bias = 0.f) {
 
 	Ray ray{ createRay(hit.pos, direction) };
 	//if constexpr (std::is_same_v<Hit, BoxHit>) {
@@ -1160,13 +1132,13 @@ __device__ __forceinline__ float getShadow(const Hit& hit, const glm::vec3& dire
 	return shadow;
 }
 
-__device__ __forceinline__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PbrBRDF& pbrBRDF)
+__forceinline__ __device__ glm::vec3 getAmbientLightLuminance(const onec::RenderPipelineUniforms::AmbientLight& ambientLight, const PbrBRDF& pbrBRDF)
 {
 	return (rPi * pbrBRDF.diffuseReflectance) * ambientLight.luminance;
 }
 
 template<class State, class Hit, bool WaterMode = false, bool SoftShadows = false, bool FixLightLeaks = false>
-__device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
+__forceinline__ __device__ glm::vec3 getPointLightLuminance(const onec::RenderPipelineUniforms::PointLight& pointLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
 {
 	const glm::vec3 lightVector = pointLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
@@ -1183,7 +1155,7 @@ __device__ __forceinline__ glm::vec3 getPointLightLuminance(const onec::RenderPi
 }
 
 template<class State, class Hit, bool WaterMode = false, bool SoftShadows = false, bool FixLightLeaks = false>
-__device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
+__forceinline__ __device__ glm::vec3 getSpotLightLuminance(const onec::RenderPipelineUniforms::SpotLight& spotLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
 {
 	const glm::vec3 lightVector = spotLight.position - hit.pos;
 	const float lightDistance = length(lightVector);
@@ -1200,7 +1172,7 @@ __device__ __forceinline__ glm::vec3 getSpotLightLuminance(const onec::RenderPip
 }
 
 template<class State, class Hit, bool WaterMode = false, bool SoftShadows = false, bool FixLightLeaks = false>
-__device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
+__forceinline__ __device__ glm::vec3 getDirectionalLightLuminance(const onec::RenderPipelineUniforms::DirectionalLight& directionalLight, const PbrBRDF& pbrBRDF, const Hit& hit, const glm::vec3& direction, bool shadow, float bias = 0.f)
 {
 	const glm::vec3 L = -directionalLight.direction;
 
@@ -1215,7 +1187,7 @@ __device__ __forceinline__ glm::vec3 getDirectionalLightLuminance(const onec::Re
 }
 
 template <class State, class Hit, bool WaterMode = false, bool SoftShadows = false, bool FixLightLeaks = false>
-__device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f, float ambient_weight = 1.f)
+__forceinline__ __device__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const Ray& ray, const Hit& hit, bool shadow, bool ao, float bias = 0.f, float ambient_weight = 1.f)
 {
 	const glm::vec3 viewDirection = -ray.dir;
 
@@ -1261,7 +1233,7 @@ __device__ __forceinline__ glm::vec3 shadePbrBRDF(const PbrBRDF& pbrBRDF, const 
 // nt for basic dielectric: 1.5 => R0 of 0.04 in Air; in Water: 0.009
 // nt for water: 1.33 => R0 of 0.02 in Air; in Water when we hit Air: 0.02
 template <class Hit, bool WaterMode = false>
-__device__ __forceinline__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, bool weight_diffuse = false, const glm::vec3& fallbackNormal = glm::vec3(0.f,1.f,0.f)) {
+__forceinline__ __device__ PbrBRDF getBRDF(const Ray& ray, Hit& hit, bool weight_diffuse = false, const glm::vec3& fallbackNormal = glm::vec3(0.f,1.f,0.f)) {
 	PbrBRDF brdf;
 
 	if (glm::any(glm::isnan(hit.normal))) {
@@ -1779,7 +1751,7 @@ struct Neighbor {
 	bool outside;
 };
 
-__device__ __forceinline__ Neighbor getNeighbor(const glm::ivec2& index, const glm::ivec2& offset) {
+__forceinline__ __device__ Neighbor getNeighbor(const glm::ivec2& index, const glm::ivec2& offset) {
 	Neighbor neigh;
 	neigh.index = 2 * index + offset;
 	neigh.outside = isOutside(neigh.index, simulation.quadTree[0].gridSize);
@@ -1794,7 +1766,7 @@ __device__ __forceinline__ Neighbor getNeighbor(const glm::ivec2& index, const g
 	return neigh;
 }
 
-__device__ __forceinline__ void mergeQuadTreeLayer(int treeLevel, int layerCount, int flatIndex) {
+__forceinline__ __device__ void mergeQuadTreeLayer(int treeLevel, int layerCount, int flatIndex) {
 	if (layerCount > 1) {
 		bool merge = false;
 		int merge_layer = layerCount - 1;
@@ -1840,22 +1812,6 @@ __device__ __forceinline__ void mergeQuadTreeLayer(int treeLevel, int layerCount
 	else {
 		simulation.quadTree[treeLevel].layerCounts[flatIndex] = layerCount;
 	}
-}
-
-__global__ void buildQuadTreeBase() {
-	const glm::ivec2 index{ getLaunchIndex() };
-
-	if (isOutside(index, simulation.gridSize))
-	{
-		return;
-	}
-	int flatIndex{ flattenIndex(index, simulation.gridSize) };
-	auto layerCount = simulation.layerCounts[flatIndex];
-
-	for (int layer = 0; layer < layerCount; ++layer) {
-		simulation.quadTree[0].heights[flatIndex + simulation.quadTree[0].layerStride * layer] = toHalf4(simulation.heights[flatIndex + simulation.layerStride * layer]);
-	}
-	simulation.quadTree[0].layerCounts[flatIndex] = layerCount;
 }
 
 __global__ void buildQuadTreeFirstLayer(bool interpolation) {
@@ -2032,7 +1988,7 @@ __global__ void buildQuadTreeLayer(int i) {
 	//mergeQuadTreeLayer(i, layerCount, flatIndex);
 }
 
-__device__ __forceinline__ float GeometrySchlickGGXIBL(float NdotV, float roughness)
+__forceinline__ __device__ float GeometrySchlickGGXIBL(float NdotV, float roughness)
 {
     float a = roughness;
     float k = (a * a) / 2.0f;
@@ -2043,7 +1999,7 @@ __device__ __forceinline__ float GeometrySchlickGGXIBL(float NdotV, float roughn
     return nom / denom;
 }
 // ----------------------------------------------------------------------------
-__device__ __forceinline__ float GeometrySmithIBL(glm::vec3 N, glm::vec3 V, glm::vec3 L, float roughness)
+__forceinline__ __device__ float GeometrySmithIBL(glm::vec3 N, glm::vec3 V, glm::vec3 L, float roughness)
 {
     float NdotV = glm::max(dot(N, V), 0.0f);
     float NdotL = glm::max(dot(N, L), 0.0f);
@@ -2053,7 +2009,7 @@ __device__ __forceinline__ float GeometrySmithIBL(glm::vec3 N, glm::vec3 V, glm:
     return ggx1 * ggx2;
 }  
 
-__device__ __forceinline__ glm::vec3 ImportanceSampleGGX(glm::vec2 Xi, glm::vec3 N, float roughness)
+__forceinline__ __device__ glm::vec3 ImportanceSampleGGX(glm::vec2 Xi, glm::vec3 N, float roughness)
 {
     float a = roughness*roughness;
 	
@@ -2076,7 +2032,7 @@ __device__ __forceinline__ glm::vec3 ImportanceSampleGGX(glm::vec2 Xi, glm::vec3
     return glm::normalize(sampleVec);
 }  
 
-__device__ __forceinline__ float RadicalInverse_VdC(unsigned int bits) 
+__forceinline__ __device__ float RadicalInverse_VdC(unsigned int bits) 
 {
     bits = (bits << 16u) | (bits >> 16u);
     bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
@@ -2086,12 +2042,12 @@ __device__ __forceinline__ float RadicalInverse_VdC(unsigned int bits)
     return float(bits) * 2.3283064365386963e-10f; // / 0x100000000
 }
 // ----------------------------------------------------------------------------
-__device__ __forceinline__ glm::vec2 Hammersley(unsigned int i, unsigned int N)
+__forceinline__ __device__ glm::vec2 Hammersley(unsigned int i, unsigned int N)
 {
     return glm::vec2(float(i)/float(N), RadicalInverse_VdC(i));
 }  
 
-__device__ __forceinline__ glm::vec2 IntegrateBRDF(float NdotV, float roughness)
+__forceinline__ __device__ glm::vec2 IntegrateBRDF(float NdotV, float roughness)
 {
     glm::vec3 V;
     V.x = sqrt(1.0f - NdotV*NdotV);
@@ -2167,7 +2123,6 @@ struct QuadTreeUpperBoundPredicate {
 
 void buildQuadTree(const std::vector<Launch>& launch, const Simulation& sim, bool useInterpolation) {
 	// first layer (special)
-	CU_CHECK_KERNEL(buildQuadTreeBase << <launch[0].gridSize, launch[0].blockSize >> > ());
 	CU_CHECK_KERNEL(buildQuadTreeFirstLayer << <launch[0].gridSize, launch[0].blockSize >> > (useInterpolation));
 	// remaining layers
 	for (int i = 2; i < launch.size(); ++i) {

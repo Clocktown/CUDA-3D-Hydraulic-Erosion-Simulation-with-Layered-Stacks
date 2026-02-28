@@ -1,9 +1,7 @@
 #include "ui.hpp"
 #include "imgui.h"
 #include "../components/terrain.hpp"
-#include "../components/point_renderer.hpp"
 #include "../components/screen_texture_renderer.hpp"
-#include "../resources/simple_material.hpp"
 #include "../device/simulation.hpp"
 #include <onec/onec.hpp>
 #include <tinyfiledialogs/tinyfiledialogs.h>
@@ -196,10 +194,10 @@ void UI::updatePerformance() {
 		}
 
 		ImGui::LabelText("Total Rendering", "%f / %f / %f / %f [ms]", 
-			performance.measurements["Rendering"].last + performance.measurements["Build Draw List"].last + performance.measurements["Build Quad Tree"].last + performance.measurements["Raymarching"].last,
-			performance.measurements["Rendering"].mean + performance.measurements["Build Draw List"].mean + performance.measurements["Build Quad Tree"].mean + performance.measurements["Raymarching"].mean,
-			performance.measurements["Rendering"].minimum + performance.measurements["Build Draw List"].minimum + performance.measurements["Build Quad Tree"].minimum + performance.measurements["Raymarching"].minimum,
-			performance.measurements["Rendering"].maximum + performance.measurements["Build Draw List"].maximum + performance.measurements["Build Quad Tree"].maximum + performance.measurements["Raymarching"].maximum
+			performance.measurements["Rendering"].last + performance.measurements["Build Quad Tree"].last + performance.measurements["Raymarching"].last,
+			performance.measurements["Rendering"].mean + performance.measurements["Build Quad Tree"].mean + performance.measurements["Raymarching"].mean,
+			performance.measurements["Rendering"].minimum + performance.measurements["Build Quad Tree"].minimum + performance.measurements["Raymarching"].minimum,
+			performance.measurements["Rendering"].maximum + performance.measurements["Build Quad Tree"].maximum + performance.measurements["Raymarching"].maximum
 		);
 		if (ImGui::TreeNode("Rendering Details")) {
 			ImGui::LabelText("Draw Call", "%f / %f / %f / %f [ms]", 
@@ -207,12 +205,6 @@ void UI::updatePerformance() {
 				performance.measurements["Rendering"].mean,
 				performance.measurements["Rendering"].minimum,
 				performance.measurements["Rendering"].maximum
-			);
-			ImGui::LabelText("Build Draw List", "%f / %f / %f / %f [ms]", 
-				performance.measurements["Build Draw List"].last,
-				performance.measurements["Build Draw List"].mean,
-				performance.measurements["Build Draw List"].minimum,
-				performance.measurements["Build Draw List"].maximum
 			);
 			ImGui::LabelText("Build Quad Tree", "%f / %f / %f / %f [ms]", 
 				performance.measurements["Build Quad Tree"].last,
@@ -352,31 +344,11 @@ void UI::updateTerrain()
 			onec::World& world{ onec::getWorld() };
 			const entt::entity entity{ terrain.entity };
 
-			geo::SimpleMaterialUniforms uniforms;
-			uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
-			uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
-			uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
-			uniforms.useInterpolation = rendering.useInterpolation;
-			uniforms.renderSand = rendering.renderSand;
-			uniforms.renderWater = rendering.renderWater;
-			uniforms.gridSize = terrain.gridSize;
-			uniforms.gridScale = terrain.gridScale;
-			uniforms.maxLayerCount = terrain.maxLayerCount;
-
 			Terrain& terrain{ *world.getComponent<Terrain>(entity) };
-			terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, static_cast<char>(uniforms.maxLayerCount), terrain.simulation };
+			terrain = Terrain{ terrain.gridSize, terrain.gridScale, static_cast<char>(terrain.maxLayerCount), terrain.simulation };
 			terrain.simulation.init = true;
 
-			uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
-			uniforms.heights = terrain.heightBuffer.getBindlessHandle();
-			uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
-			uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
-
-			world.setComponent<onec::Position>(entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
-
-			PointRenderer& pointRenderer{ *world.getComponent<PointRenderer>(entity) };
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
-			pointRenderer.count = terrain.numValidColumns;
+			world.setComponent<onec::Position>(entity, -0.5f * terrain.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ terrain.gridSize.x, 0.0f, terrain.gridSize.y });
 		}
 
 		ImGui::DragInt2("Grid Size", &terrain.gridSize.x, 0.5f, 16, 4096);
@@ -535,21 +507,11 @@ void UI::updateRendering()
 	ImGui::SameLine();
 	if (ImGui::TreeNode("Rendering"))
 	{
-		if (ImGui::Button("Reload Shaders")) {
-			const std::filesystem::path assets{ onec::getApplication().getDirectory() / "assets" };
-			const std::array<std::filesystem::path, 3> shaders{ assets / "shaders/point_terrain/simple_terrain.vert",
-																assets / "shaders/point_terrain/simple_terrain.geom",
-																assets / "shaders/point_terrain/simple_terrain.frag" };
-
-			PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(terrain.entity)};
-			pointRenderer.material->program = std::make_shared<onec::Program>(shaders);
-		}
 		onec::World& world{ onec::getWorld() };
 		const entt::entity entity{ terrain.entity };
 
 		Terrain& terrain{ *world.getComponent<Terrain>(entity) };
 		float& scale{ world.getComponent<onec::Scale>(entity)->scale };
-		PointRenderer& pointRenderer{ *world.getComponent<PointRenderer>(entity) };
 		ScreenTextureRenderer& screenTextureRenderer{ *world.getComponent<ScreenTextureRenderer>(entity) };
 
 		if (ImGui::DragFloat("Visual Scale", &scale, 0.1f, 0.001f, std::numeric_limits<float>::max()))
@@ -563,45 +525,34 @@ void UI::updateRendering()
 		if (ImGui::ColorEdit3("Bedrock Color", &rendering.bedrockColor.x))
 		{
 			const glm::vec3 bedrockColor{ onec::sRGBToLinear(rendering.bedrockColor) };
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&bedrockColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, bedrockColor)), sizeof(glm::vec3));
 		}
 
 		if (ImGui::ColorEdit3("Sand Color", &rendering.sandColor.x))
 		{
 			const glm::vec3 sandColor{ onec::sRGBToLinear(rendering.sandColor) };
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&sandColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, sandColor)), sizeof(glm::vec3));
 		}
 
 		if (ImGui::ColorEdit3("Water Color", &rendering.waterColor.x))
 		{
 			const glm::vec3 waterColor{ onec::sRGBToLinear(rendering.waterColor) };
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&waterColor, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, waterColor)), sizeof(glm::vec3));
 		}
 
 		bool useInterpolation = bool(rendering.useInterpolation);
 		if (ImGui::Checkbox("Use Interpolation", &useInterpolation)) {
 			rendering.useInterpolation = int(useInterpolation);
 			terrain.quadTreeDirty = true;
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.useInterpolation, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, useInterpolation)), sizeof(int));
 		}
 
 		bool renderSand = bool(rendering.renderSand);
 		if (ImGui::Checkbox("Render Sand", &renderSand)) {
 			rendering.renderSand = int(renderSand);
 			terrain.quadTreeDirty = true;
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.renderSand, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, renderSand)), sizeof(int));
 		}
 
 		bool renderWater = bool(rendering.renderWater);
 		if (ImGui::Checkbox("Render Water", &renderWater)) {
 			rendering.renderWater = int(renderWater);
 			terrain.quadTreeDirty = true;
-			pointRenderer.material->uniformBuffer.upload(onec::asBytes(&rendering.renderWater, 1), static_cast<std::ptrdiff_t>(offsetof(SimpleMaterialUniforms, renderWater)), sizeof(int));
-		}
-
-		if (ImGui::Checkbox("Use Raymarching", &rendering.useRaymarching)) {
-			pointRenderer.enabled = !rendering.useRaymarching;
-			screenTextureRenderer.enabled = rendering.useRaymarching;
 		}
 
 		if (ImGui::TreeNode("Raymarching Presets")) {
@@ -771,7 +722,7 @@ void UI::saveToFile(const std::filesystem::path& file, bool jsonOnly)
 	json["Camera/Exposure"] = world.getComponent<onec::Exposure>(this->camera.entity)->exposure;
 	json["Camera/Target"] = { target.x, target.y, target.z };
 
-	onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
+	onec::Buffer& layerCountBuffer{ terrain.layerCountBuffer };
 	const int usedLayerCount{ device::getMaxLayerCount(reinterpret_cast<char*>(layerCountBuffer.getData()), layerCountBuffer.getCount()) };
 	std::vector<std::byte> compressed;
 	if (lastFile.empty() && !jsonOnly) {
@@ -783,7 +734,6 @@ void UI::saveToFile(const std::filesystem::path& file, bool jsonOnly)
 		const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
 		const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
 		const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
-		layerCountBuffer.release();
 
 		uLongf bytes{ 0 };
 		bytes += layerCountBytes;
@@ -809,6 +759,7 @@ void UI::saveToFile(const std::filesystem::path& file, bool jsonOnly)
 
 		ONEC_ASSERT(status == Z_OK, "Failed to compress data");
 	}
+	json["Terrain/IsHalfPrecision"] = true;
 	json["Terrain/GridSize"] = { terrain.gridSize.x, terrain.gridSize.y };
 	json["Terrain/GridScale"] = terrain.gridScale;
 	json["Terrain/MaxLayerCount"] = terrain.maxLayerCount;
@@ -876,7 +827,6 @@ void UI::saveToFile(const std::filesystem::path& file, bool jsonOnly)
 	json["Rendering/UseInterpolation"] = rendering.useInterpolation;
 	json["Rendering/RenderSand"] = rendering.renderSand;
 	json["Rendering/RenderWater"] = rendering.renderWater;
-	json["Rendering/UseRaymarching"] = rendering.useRaymarching;
 	json["Rendering/SurfaceVolumePercentage"] = rendering.surfaceVolumePercentage;
 	json["Rendering/SmoothingRadiusInCells"] = rendering.smoothingRadiusInCells;
 	json["Rendering/NormalSmoothingFactor"] = rendering.normalSmoothingFactor;
@@ -951,20 +901,22 @@ void UI::loadFromFile(const std::filesystem::path& file)
 		basePath = json["Terrain/File"];
 	}
 	auto path = file.parent_path() / basePath;
+	bool isHalfPrecision = json.contains("Terrain/IsHalfPrecision");
 	if (std::filesystem::is_regular_file(path)) {
 		lastFile = basePath;
 		terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(terrain.maxLayerCount) };
 		std::string compressed{ onec::readFile(path) };
+		const int byteScale = isHalfPrecision ? 1 : 2;
 
 		const int usedLayerCount{ json["Terrain/UsedLayerCount"] };
 		const std::ptrdiff_t cellCount{ terrain.gridSize.x * terrain.gridSize.y };
 		const std::ptrdiff_t columnCount{ cellCount * usedLayerCount };
 		const std::ptrdiff_t layerCountBytes{ cellCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::layerCounts)) };
-		const std::ptrdiff_t heightBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
-		const std::ptrdiff_t fluxBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
-		const std::ptrdiff_t stabilityBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
-		const std::ptrdiff_t sedimentBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
-		const std::ptrdiff_t damageBytes{ columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
+		const std::ptrdiff_t heightBytes{ byteScale * columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::heights)) };
+		const std::ptrdiff_t fluxBytes{ byteScale * columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::fluxes)) };
+		const std::ptrdiff_t stabilityBytes{ byteScale * columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::stability)) };
+		const std::ptrdiff_t sedimentBytes{ byteScale * columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::sediments)) };
+		const std::ptrdiff_t damageBytes{ byteScale * columnCount * static_cast<std::ptrdiff_t>(sizeof(*device::Simulation::damages)) };
 
 		uLongf bytes{ 0 };
 		bytes += layerCountBytes;
@@ -979,13 +931,36 @@ void UI::loadFromFile(const std::filesystem::path& file)
 
 		ONEC_ASSERT(status == Z_OK, "Failed to uncompress data");
 
-		std::ptrdiff_t i{ 0 };
-		terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
-		terrain.heightBuffer.upload({ uncompressed.data() + i, heightBytes }); i += heightBytes;
-		terrain.fluxBuffer.upload({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
-		terrain.stabilityBuffer.upload({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
-		terrain.sedimentBuffer.upload({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
-		terrain.damageBuffer.upload({ uncompressed.data() + i, damageBytes }); i += damageBytes;
+		if(isHalfPrecision) {
+			std::ptrdiff_t i{ 0 };
+			terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
+			terrain.heightBuffer.upload({ uncompressed.data() + i, heightBytes }); i += heightBytes;
+			terrain.fluxBuffer.upload({ uncompressed.data() + i, fluxBytes }); i += fluxBytes;
+			terrain.stabilityBuffer.upload({ uncompressed.data() + i, stabilityBytes }); i += stabilityBytes;
+			terrain.sedimentBuffer.upload({ uncompressed.data() + i, sedimentBytes }); i += sedimentBytes;
+			terrain.damageBuffer.upload({ uncompressed.data() + i, damageBytes }); i += damageBytes;
+		} else {
+			std::ptrdiff_t i{ 0 };
+			terrain.layerCountBuffer.upload({ uncompressed.data() + i, layerCountBytes }); i += layerCountBytes;
+
+			auto uploadToHalf = [&](std::ptrdiff_t bytes, onec::Buffer& target){
+				std::ptrdiff_t realBytes = bytes / 2;
+				std::vector<std::byte> converted(realBytes);
+				float* heights = reinterpret_cast<float*>(uncompressed.data() + i);
+				half* cHeights = reinterpret_cast<half*> (converted.data());
+				for(int j = 0; j < bytes / sizeof(float); ++j) {
+					cHeights[j] = heights[j];
+				}
+				target.upload({ converted.data(), realBytes });
+				i += bytes;
+			};
+			
+			uploadToHalf(heightBytes, terrain.heightBuffer);
+			uploadToHalf(fluxBytes, terrain.fluxBuffer);
+			uploadToHalf(stabilityBytes, terrain.stabilityBuffer);
+			uploadToHalf(sedimentBytes, terrain.sedimentBuffer);
+			uploadToHalf(damageBytes, terrain.damageBuffer);
+		}
 	}
 	Simulation& simulation{ terrain.simulation };
 	simulation.useOutflowBorders = json["Simulation/UseOutflowBorders"];
@@ -1075,12 +1050,6 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	rendering.useInterpolation = json["Rendering/UseInterpolation"];
 	rendering.renderSand = json["Rendering/RenderSand"];
 	rendering.renderWater = json["Rendering/RenderWater"];
-	if (json.contains("Rendering/UseRaymarching")) {
-		rendering.useRaymarching = json["Rendering/UseRaymarching"];
-	}
-	else {
-		rendering.useRaymarching = false;
-	}
 
 	if (json.contains("Rendering/SurfaceVolumePercentage")) {
 		rendering.surfaceVolumePercentage = json["Rendering/SurfaceVolumePercentage"];
@@ -1117,54 +1086,16 @@ void UI::loadFromFile(const std::filesystem::path& file)
 	if(json.contains("Rendering/EnableAOInRefraction")) rendering.enableAOInRefraction = json["Rendering/EnableAOInRefraction"];
 
 
-    PointRenderer& pointRenderer{ *onec::getWorld().getComponent<PointRenderer>(this->terrain.entity) };
 	ScreenTextureRenderer& screenTextureRenderer{ *onec::getWorld().getComponent<ScreenTextureRenderer>(this->terrain.entity) };
-	geo::SimpleMaterialUniforms uniforms;
-	uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
-	uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
-	uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
-	uniforms.useInterpolation = rendering.useInterpolation;
-	uniforms.renderSand = rendering.renderSand;
-	uniforms.renderWater = rendering.renderWater;
-	uniforms.gridSize = terrain.gridSize;
-	uniforms.gridScale = terrain.gridScale;
-	uniforms.maxLayerCount = terrain.maxLayerCount;
-	uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
-	uniforms.heights = terrain.heightBuffer.getBindlessHandle();
-	uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
-	uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
-	pointRenderer.material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
-	pointRenderer.enabled = !rendering.useRaymarching;
-	screenTextureRenderer.enabled = rendering.useRaymarching;
 
 	if (!std::filesystem::is_regular_file(path)) {
 		lastFile = std::filesystem::path{};
 		onec::World& world{ onec::getWorld() };
 
-		geo::SimpleMaterialUniforms uniforms;
-		uniforms.bedrockColor = onec::sRGBToLinear(rendering.bedrockColor);
-		uniforms.sandColor = onec::sRGBToLinear(rendering.sandColor);
-		uniforms.waterColor = onec::sRGBToLinear(rendering.waterColor);
-		uniforms.useInterpolation = rendering.useInterpolation;
-		uniforms.renderSand = rendering.renderSand;
-		uniforms.renderWater = rendering.renderWater;
-		uniforms.gridSize = this->terrain.gridSize;
-		uniforms.gridScale = this->terrain.gridScale;
-		uniforms.maxLayerCount = this->terrain.maxLayerCount;
-
-		terrain = Terrain{ uniforms.gridSize, uniforms.gridScale, static_cast<char>(uniforms.maxLayerCount), terrain.simulation };
+		terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(this->terrain.maxLayerCount), terrain.simulation };
 		terrain.simulation.init = true;
 
-		uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
-		uniforms.heights = terrain.heightBuffer.getBindlessHandle();
-		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
-		uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
-
-		world.setComponent<onec::Position>(this->terrain.entity, -0.5f * uniforms.gridScale * world.getComponent<onec::Scale>(this->terrain.entity)->scale * glm::vec3{ uniforms.gridSize.x, 0.0f, uniforms.gridSize.y });
-
-		pointRenderer.material->uniformBuffer.upload(onec::asBytes(&uniforms, 1));
-		pointRenderer.count = terrain.numValidColumns;
-		std::cout << "Bla" << uniforms.gridSize.x << std::endl;
+		world.setComponent<onec::Position>(this->terrain.entity, -0.5f * this->terrain.gridScale * world.getComponent<onec::Scale>(this->terrain.entity)->scale * glm::vec3{ this->terrain.gridSize.x, 0.0f, this->terrain.gridSize.y });
 	}
 }
 

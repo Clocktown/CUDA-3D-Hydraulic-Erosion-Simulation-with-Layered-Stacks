@@ -93,12 +93,10 @@ struct Terrain
 	glm::ivec2 windowSize;
 	onec::Texture screenTexture;
 	onec::Array integratedBRDF;
-	onec::GraphicsBuffer layerCountBuffer;
-	onec::GraphicsBuffer heightBuffer;
-	onec::GraphicsBuffer sedimentBuffer;
-	onec::GraphicsBuffer stabilityBuffer;
-	onec::GraphicsBuffer indicesBuffer;
-	onec::Buffer atomicCounter;
+	onec::Buffer layerCountBuffer;
+	onec::Buffer heightBuffer;
+	onec::Buffer sedimentBuffer;
+	onec::Buffer stabilityBuffer;
 	onec::Buffer pipeBuffer;
 	onec::Buffer slopeBuffer;
 	onec::Buffer fluxBuffer;

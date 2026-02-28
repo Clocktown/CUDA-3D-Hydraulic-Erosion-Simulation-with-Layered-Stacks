@@ -1,4 +1,4 @@
-#include "simulation.hpp"
+#include "simulation.cuh"
 
 namespace initNoise {
 #include "cuda_noise.cuh"
@@ -191,10 +191,10 @@ __global__ void initKernel()
 
 
 	simulation.layerCounts[flatIndex] = 1;
-	simulation.heights[flatIndex] = float4{ noiseVal2 + 16.f * (simulation.gridSize.x - index.x) / simulation.gridSize.x, 1.f, 0.0f, FLT_MAX};
-	simulation.sediments[flatIndex] = 0.0f;
-	simulation.fluxes[flatIndex] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-	simulation.damages[flatIndex] = 0.0f;
+	simulation.heights[flatIndex] = toHalf4(float4{ noiseVal2 + 16.f * (simulation.gridSize.x - index.x) / simulation.gridSize.x, 1.f, 0.0f, FLT_MAX});
+	simulation.sediments[flatIndex] = CUDART_ZERO_FP16;
+	simulation.fluxes[flatIndex] = half4{ {CUDART_ZERO_FP16, CUDART_ZERO_FP16}, {CUDART_ZERO_FP16, CUDART_ZERO_FP16} };
+	simulation.damages[flatIndex] = CUDART_ZERO_FP16;
 
 
 	/*const float noiseVal1 = 5.f * fbm(index, 8, 0.01f * simulation.gridScale, 42);

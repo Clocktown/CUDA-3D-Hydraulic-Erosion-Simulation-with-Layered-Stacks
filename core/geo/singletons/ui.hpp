@@ -33,7 +33,6 @@ struct UI
 		int renderSand{ true };
 		int renderWater{ true };
 		bool renderScene{ true };
-		bool useRaymarching{ false };
 		float surfaceVolumePercentage{ 0.5f };
 		float smoothingRadiusInCells{ 1.f };
 		float normalSmoothingFactor{ 1.f };

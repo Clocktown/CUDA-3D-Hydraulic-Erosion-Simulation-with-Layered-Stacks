@@ -11,7 +11,6 @@ namespace geo
 struct ScreenTextureRenderer
 {
 	std::shared_ptr<onec::Material> material;
-	bool enabled;
 };
 
 }

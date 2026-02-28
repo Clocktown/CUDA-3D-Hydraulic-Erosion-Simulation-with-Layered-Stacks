@@ -28,19 +28,17 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 	texDesc.normalizedCoords = 1;
 
 	integratedBRDF.initialize(glm::ivec3(512, 512, 0), cudaCreateChannelDescHalf2(), 0, texDesc);
-	layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)), true);
-	heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)), true);
-	sedimentBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)), true);
-	stabilityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)), true);
-	indicesBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(int)), true);
+	layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)));
+	heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
+	sedimentBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(uint16_t)));
+	stabilityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(uint16_t)));
 	pipeBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(char4)));
-	slopeBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
-	fluxBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
-	slippageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float4)));
-	velocityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
-	damageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
-	sedimentFluxScaleBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
-	atomicCounter.initialize(static_cast<std::ptrdiff_t>(sizeof(int)));
+	slopeBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(uint16_t)));
+	fluxBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
+	slippageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
+	velocityBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float)));
+	damageBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(uint16_t)));
+	sedimentFluxScaleBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(uint16_t)));
 
 	// Allocate QuadTree for Raymarching
 	glm::ivec2 currentSize = gridSize;
@@ -62,8 +60,10 @@ Terrain::Terrain(const glm::ivec2 gridSize, const float gridScale, const char ma
 		quadTree[i].maxLayerCount = currentMaxLayerCount;
 		quadTree[i].rGridScale = 1.f / currentScale;
 		quadTree[i].layerStride = cellCount;
-		quadTree[i].layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)));
-		quadTree[i].heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
+		if(i > 0) {
+			quadTree[i].layerCountBuffer.initialize(cellCount * static_cast<std::ptrdiff_t>(sizeof(char)));
+			quadTree[i].heightBuffer.initialize(columnCount * static_cast<std::ptrdiff_t>(sizeof(float2)));
+		}
 
 		currentSize = glm::ceil(0.5f * glm::vec2(currentSize));
 		currentScale *= 2.f;

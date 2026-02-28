@@ -43,7 +43,7 @@ namespace geo {
 		std::map<std::string, measurement> measurements {
 			{"Global Simulation", {}},
 			{"Rendering", {}},
-			{"Build Draw List", {}},
+			//{"Build Draw List", {}},
 			{"Build Quad Tree", {}},
 			{"Raymarching", {}},
 			{"Map Buffers", {}},

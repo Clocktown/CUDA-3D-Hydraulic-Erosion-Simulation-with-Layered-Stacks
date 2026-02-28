@@ -1,7 +1,6 @@
 #include "terrain.hpp"
 #include "../components/terrain.hpp"
 #include "../device/simulation.hpp"
-#include "../components/point_renderer.hpp"
 #include "../singletons/ui.hpp"
 #include <onec/resources/array.hpp>
 #include <onec/components/camera.hpp>
@@ -14,7 +13,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 {
 	onec::World& world{ onec::getWorld() };
 
-	const auto view{ world.getView<Terrain, PointRenderer, onec::Scale, onec::LocalToWorld, Includes...>(excludes) };
+	const auto view{ world.getView<Terrain, onec::Scale, onec::LocalToWorld, Includes...>(excludes) };
 	const auto view2{ world.getView<onec::WorldToView, onec::ViewToClip, onec::Position, Includes...>(excludes) };
 
 	auto ui = world.getSingleton<geo::UI>();
@@ -22,14 +21,13 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 	for (const entt::entity entity : view)
 	{
 		Terrain& terrain{ view.get<Terrain>(entity) };
-		onec::Buffer layerCountBuffer{ terrain.layerCountBuffer };
-		onec::Buffer heightBuffer{ terrain.heightBuffer };
-		onec::Buffer sedimentBuffer{ terrain.sedimentBuffer };
-		onec::Buffer stabilityBuffer{ terrain.stabilityBuffer };
-		onec::Buffer indicesBuffer{ terrain.indicesBuffer };
+		onec::Buffer& layerCountBuffer{ terrain.layerCountBuffer };
+		onec::Buffer& heightBuffer{ terrain.heightBuffer };
+		onec::Buffer& sedimentBuffer{ terrain.sedimentBuffer };
+		onec::Buffer& stabilityBuffer{ terrain.stabilityBuffer };
 		onec::Buffer renderPipelineBuffer{ world.getSingleton<onec::RenderPipeline>()->uniformBuffer };
 
-		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
+		if (ui->rendering.renderScene) {
 			glm::ivec2 windowSize = onec::getWindow().getFramebufferSize();
 			if (windowSize != terrain.windowSize) {
 				terrain.screenTexture.initialize(GL_TEXTURE_2D, glm::ivec3(windowSize.x, windowSize.y, 1), GL_RGBA8, 1, onec::SamplerState{}, true);
@@ -89,18 +87,16 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		simulation.borderSupport = terrain.simulation.borderSupport;
 
 		simulation.layerCounts = reinterpret_cast<char*>(layerCountBuffer.getData());
-		simulation.heights = reinterpret_cast<float4*>(heightBuffer.getData());
-		simulation.sediments = reinterpret_cast<float*>(sedimentBuffer.getData());
-		simulation.stability = reinterpret_cast<float*>(stabilityBuffer.getData());
-		simulation.indices = reinterpret_cast<int*>(indicesBuffer.getData());
-		simulation.atomicCounter = reinterpret_cast<int*>(terrain.atomicCounter.getData());
+		simulation.heights = reinterpret_cast<half4*>(heightBuffer.getData());
+		simulation.sediments = reinterpret_cast<half*>(sedimentBuffer.getData());
+		simulation.stability = reinterpret_cast<half*>(stabilityBuffer.getData());
 		simulation.pipes = reinterpret_cast<char4*>(terrain.pipeBuffer.getData());
-		simulation.slopes = reinterpret_cast<float*>(terrain.slopeBuffer.getData());
-		simulation.fluxes = reinterpret_cast<float4*>(terrain.fluxBuffer.getData());
-		simulation.slippages = reinterpret_cast<float4*>(terrain.slippageBuffer.getData());
-		simulation.velocities = reinterpret_cast<float2*>(terrain.velocityBuffer.getData());
-		simulation.damages = reinterpret_cast<float*>(terrain.damageBuffer.getData());
-		simulation.sedimentFluxScale = reinterpret_cast<float*>(terrain.sedimentFluxScaleBuffer.getData());
+		simulation.slopes = reinterpret_cast<half*>(terrain.slopeBuffer.getData());
+		simulation.fluxes = reinterpret_cast<half4*>(terrain.fluxBuffer.getData());
+		simulation.slippages = reinterpret_cast<half4*>(terrain.slippageBuffer.getData());
+		simulation.velocities = reinterpret_cast<half2*>(terrain.velocityBuffer.getData());
+		simulation.damages = reinterpret_cast<half*>(terrain.damageBuffer.getData());
+		simulation.sedimentFluxScale = reinterpret_cast<half*>(terrain.sedimentFluxScaleBuffer.getData());
 		simulation.minBedrockThickness = terrain.simulation.minBedrockThickness;
 		if (terrain.simulation.init) terrain.simulation.currentSimulationStep = 0;
 		simulation.step = terrain.simulation.currentSimulationStep;
@@ -111,8 +107,13 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 		for (int i = 0; i < terrain.maxQuadTreeLevels; ++i) {
 			simulation.quadTree[i].gridScale = terrain.quadTree[i].gridScale;
 			simulation.quadTree[i].gridSize = terrain.quadTree[i].gridSize;
-			simulation.quadTree[i].heights = reinterpret_cast<half4*>(terrain.quadTree[i].heightBuffer.getData());
-			simulation.quadTree[i].layerCounts = reinterpret_cast<char*>(terrain.quadTree[i].layerCountBuffer.getData());
+			if(i == 0) {
+				simulation.quadTree[i].heights = reinterpret_cast<half4*>(terrain.heightBuffer.getData());
+				simulation.quadTree[i].layerCounts = reinterpret_cast<char*>(terrain.layerCountBuffer.getData());
+			} else {
+				simulation.quadTree[i].heights = reinterpret_cast<half4*>(terrain.quadTree[i].heightBuffer.getData());
+				simulation.quadTree[i].layerCounts = reinterpret_cast<char*>(terrain.quadTree[i].layerCountBuffer.getData());
+			}
 			simulation.quadTree[i].layerStride = terrain.quadTree[i].layerStride;
 			simulation.quadTree[i].maxLayerCount = terrain.quadTree[i].maxLayerCount;
 			simulation.quadTree[i].rGridScale = terrain.quadTree[i].rGridScale;
@@ -272,7 +273,7 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 			if(perf.measurePerformance && !perf.measureParts && !perf.measureIndividualKernels) perf.measurements["Global Simulation"].stop();
 	    }
 
-		if (ui->rendering.renderScene && ui->rendering.useRaymarching) {
+		if (ui->rendering.renderScene) {
 			if (perf.measureRendering) perf.measurements["Build Quad Tree"].start();
 			if (terrain.quadTreeDirty) {
 				device::buildQuadTree(treeLaunch, simulation, ui->rendering.useInterpolation);
@@ -295,18 +296,6 @@ void updateTerrains(const entt::exclude_t<Excludes...> excludes)
 				perf.measurements["Build Quad Tree"].update(0.f);
 				perf.measurements["Raymarching"].update(0.f);
 			}
-		}
-
-		if (ui->rendering.renderScene && !ui->rendering.useRaymarching) {
-			if (perf.measureRendering) perf.measurements["Build Draw List"].start();
-			terrain.numValidColumns = device::fillIndices(launch, simulation.atomicCounter, simulation.indices);
-			if (perf.measureRendering) perf.measurements["Build Draw List"].stop();
-
-			PointRenderer& pointRenderer{ view.get<PointRenderer>(entity) };
-			pointRenderer.count = terrain.numValidColumns;
-		}
-		else {
-			if (perf.measureRendering && ui->rendering.renderScene) perf.measurements["Build Draw List"].update(0.f);
 		}
 	}
 }

@@ -1,7 +1,6 @@
 #include "geo/geo.hpp"
 #include <onec/onec.hpp>
 
-#include "geo/singletons/point_render_pipeline.hpp"
 #include "geo/singletons/screen_texture_render_pipeline.hpp"
 
 #include <fstream>
@@ -23,7 +22,6 @@ void start()
 	glm::vec3 backgroundColor = glm::vec3(0.3f, 0.65f, 0.98f);
 	world.addSingleton<onec::AmbientLight>(backgroundColor, 37000.f);
 	world.addSingleton<onec::RenderPipeline>();
-	world.addSingleton<geo::PointRenderPipeline>();
 	world.addSingleton<geo::ScreenTextureRenderPipeline>();
 
 	geo::UI& ui{ world.addSingleton<geo::UI>() };
@@ -100,30 +98,8 @@ void start()
 		world.addComponent<onec::LocalToWorld>(entity);
 
 		geo::Terrain& terrain{ world.addComponent<geo::Terrain>(entity, gridSize, gridScale) };
-		geo::SimpleMaterialUniforms uniforms;
-		uniforms.bedrockColor = onec::sRGBToLinear(ui.rendering.bedrockColor);
-		uniforms.sandColor = onec::sRGBToLinear(ui.rendering.sandColor);
-		uniforms.waterColor = onec::sRGBToLinear(ui.rendering.waterColor);
-		uniforms.useInterpolation = ui.rendering.useInterpolation;
-		uniforms.renderSand = ui.rendering.renderSand;
-		uniforms.renderWater = ui.rendering.renderWater;
-		uniforms.gridSize = gridSize;
-		uniforms.gridScale = gridScale;
-		uniforms.maxLayerCount = terrain.maxLayerCount;
-		uniforms.layerCounts = terrain.layerCountBuffer.getBindlessHandle();
-		uniforms.heights = terrain.heightBuffer.getBindlessHandle();
-		uniforms.stability = terrain.stabilityBuffer.getBindlessHandle();
-		uniforms.indices = terrain.indicesBuffer.getBindlessHandle();
 
 		const std::filesystem::path assets{ application.getDirectory() / "assets" };
-		const auto material{ std::make_shared<onec::Material>() };
-		const std::array<std::filesystem::path, 3> shaders{ assets / "shaders/point_terrain/simple_terrain.vert",
-															assets / "shaders/point_terrain/simple_terrain.geom",
-															assets / "shaders/point_terrain/simple_terrain.frag" };
-
-		material->program = std::make_shared<onec::Program>(shaders);
-		material->renderState = std::make_shared<onec::RenderState>();
-		material->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
 
 		const auto screenMaterial{ std::make_shared<onec::Material>() };
 		const std::array<std::filesystem::path, 2> screenShaders{ assets / "shaders/screen_texture/screen_texture.vert",
@@ -131,17 +107,9 @@ void start()
 
 		screenMaterial->program = std::make_shared<onec::Program>(screenShaders);
 		screenMaterial->renderState = std::make_shared<onec::RenderState>();
-		screenMaterial->uniformBuffer.initialize(onec::asBytes(&uniforms, 1));
-
-		geo::PointRenderer& pointRenderer{ world.addComponent<geo::PointRenderer>(entity) };
-		pointRenderer.material = material;
-		pointRenderer.first = 0;
-		pointRenderer.count = terrain.numValidColumns;
-		pointRenderer.enabled = true;
 
 		geo::ScreenTextureRenderer& screenTextureRenderer{ world.addComponent<geo::ScreenTextureRenderer>(entity) };
 		screenTextureRenderer.material = screenMaterial;
-		screenTextureRenderer.enabled = false;
 
 		ui.terrain.entity = entity;
 	}
@@ -206,8 +174,6 @@ void update()
 void render()
 {
 	onec::World& world{ onec::getWorld() };
-	geo::PointRenderPipeline& pointRenderPipeline{ *world.getSingleton<geo::PointRenderPipeline>() };
-	pointRenderPipeline.render();
 	geo::ScreenTextureRenderPipeline& screenTextureRenderPipeline{ *world.getSingleton<geo::ScreenTextureRenderPipeline>() };
 	screenTextureRenderPipeline.render();
 }
@@ -227,7 +193,7 @@ int main()
 		}
 	}
 
-	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1280, 720 }, multisamples) };
+	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1920, 1080 }, multisamples) };
 	application.setTargetFrameRate(3000);
 
 	onec::Window& window{ onec::getWindow() };

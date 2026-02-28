@@ -36,11 +36,6 @@ inline void ScreenTextureRenderPipeline::render(const entt::exclude_t<Excludes..
 		const ScreenTextureRenderer& screenTextureRenderer{ view.get<ScreenTextureRenderer>(entity) };
 		Terrain& terrain{ view.get<Terrain>(entity) };
 
-		if (!screenTextureRenderer.enabled)
-		{
-			continue;
-		}
-
 		ScreenTextureRenderPipelineUniforms uniforms{};
 		uniformBuffer.upload(asBytes(&uniforms, 1));
 
