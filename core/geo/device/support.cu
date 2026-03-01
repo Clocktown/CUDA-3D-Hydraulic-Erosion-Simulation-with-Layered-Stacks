@@ -126,15 +126,14 @@ namespace geo
 		template<bool UseWeight>
 		__global__ void stepSupportCheckKernel(int i)
 		{
-			const glm::ivec2 index{ getLaunchIndex() };
+			glm::ivec2 index{ getLaunchIndex() };
+
+			index.x <<= 1;
+			index.x += (index.y + i) & 1;
 
 			if (index.x >= simulation.gridSize.x || index.y >= simulation.gridSize.y)
 			{
 				return;
-			}
-
-			if ((index.x + ((index.y + i) % 2)) % 2 == 0) {
-				return; // Checkerboard update to avoid race conditions (evil hack)
 			}
 
 			int flatIndex{ flattenIndex(index, simulation.gridSize) };
@@ -229,15 +228,17 @@ namespace geo
 		}
 
 		void stepSupportCheck(const Launch& launch, bool use_weight) {
+			auto newGrid = launch.gridSize;
+			newGrid.x = (newGrid.x / 2) + 1;
 			if (use_weight) {
 				//CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > ());
-				CU_CHECK_KERNEL(stepSupportCheckKernel <true> << <launch.gridSize, launch.blockSize >> > (0));
-				CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <launch.gridSize, launch.blockSize >> > (1));
+				CU_CHECK_KERNEL(stepSupportCheckKernel <true> << <newGrid, launch.blockSize >> > (0));
+				CU_CHECK_KERNEL(stepSupportCheckKernel <true><< <newGrid, launch.blockSize >> > (1));
 			}
 			else {
 				//CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > ());
-				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (0));
-				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <launch.gridSize, launch.blockSize >> > (1));
+				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <newGrid, launch.blockSize >> > (0));
+				CU_CHECK_KERNEL(stepSupportCheckKernel <false><< <newGrid, launch.blockSize >> > (1));
 			}
 		}
 	}

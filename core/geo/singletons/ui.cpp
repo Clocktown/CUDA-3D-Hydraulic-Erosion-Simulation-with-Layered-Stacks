@@ -345,7 +345,7 @@ void UI::updateTerrain()
 			const entt::entity entity{ terrain.entity };
 
 			Terrain& terrain{ *world.getComponent<Terrain>(entity) };
-			terrain = Terrain{ terrain.gridSize, terrain.gridScale, static_cast<char>(terrain.maxLayerCount), terrain.simulation };
+			terrain = Terrain{ this->terrain.gridSize, this->terrain.gridScale, static_cast<char>(this->terrain.maxLayerCount), terrain.simulation };
 			terrain.simulation.init = true;
 
 			world.setComponent<onec::Position>(entity, -0.5f * terrain.gridScale * world.getComponent<onec::Scale>(entity)->scale * glm::vec3{ terrain.gridSize.x, 0.0f, terrain.gridSize.y });

@@ -193,7 +193,7 @@ int main()
 		}
 	}
 
-	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1920, 1080 }, multisamples) };
+	onec::Application& application{ onec::createApplication("Hydraulic Erosion", glm::ivec2{ 1280, 720 }, multisamples) };
 	application.setTargetFrameRate(3000);
 
 	onec::Window& window{ onec::getWindow() };
